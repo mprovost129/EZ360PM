@@ -35,6 +35,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(default=timezone.now)
     accepted_tos_at = models.DateTimeField(null=True, blank=True)
     accepted_privacy_at = models.DateTimeField(null=True, blank=True)
+    is_verified = models.BooleanField(default=False)
 
 
     USERNAME_FIELD = "email"
