@@ -1,0 +1,12 @@
+Hello,
+
+{% if mode == "reminder" %}This is a friendly reminder for {% endif %}Invoice {{ inv.number }} from {{ inv.company.name }}.
+
+Amount due: {{ inv.total|default:"0" }}
+View & pay securely: {{ site_url }}{% url 'core:invoice_public' token=inv.public_token %}
+
+{% if note %}Message:
+{{ note }}
+{% endif %}
+
+Sent via {{ APP_NAME }}.

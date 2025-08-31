@@ -1,0 +1,12 @@
+<!-- templates/core/onboarding_company.html -->
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-5" style="max-width:640px">
+  <h1 class="h4 mb-3">Create your company</h1>
+  <p class="text-muted">Just a few details to get started.</p>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %} {{ form.as_p }}
+    <button class="btn btn-primary">Create company</button>
+  </form>
+</div>
+{% endblock %}

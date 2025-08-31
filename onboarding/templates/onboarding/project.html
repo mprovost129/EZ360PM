@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-5" style="max-width:640px">
+  <h1 class="h4 mb-3">Create a project</h1>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="d-flex gap-2">
+      <button class="btn btn-primary">Continue</button>
+      <button class="btn btn-outline-secondary" name="skip" value="1">Skip</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

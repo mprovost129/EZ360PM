@@ -1,0 +1,24 @@
+{# templates/core/notifications.html #}
+{% extends "_app_shell.html" %}
+{% block page_title %}Notifications{% endblock %}
+{% block app_content %}
+<form method="post" action="{% url 'core:notifications_read_all' %}">{% csrf_token %}
+  <button class="btn btn-sm btn-outline-secondary mb-3">Mark all read</button>
+</form>
+<ul class="list-group">
+  {% for n in items %}
+    <li class="list-group-item d-flex justify-content-between">
+      <div>
+        <div class="{% if not n.read_at %}fw-semibold{% endif %}">{{ n.text }}</div>
+        <div class="small text-muted">{{ n.created_at }}</div>
+      </div>
+      {% if n.url %}
+        <a class="btn btn-sm btn-outline-primary" href="{{ n.url }}">Open</a>
+      {% endif %}
+    </li>
+  {% empty %}
+    <li class="list-group-item text-muted">Nothing yet.</li>
+  {% endfor %}
+</ul>
+{% endblock %}
+

@@ -1,0 +1,44 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}Refund — Invoice {{ inv.number }}{% endblock %}
+{% block app_content %}
+<div class="row">
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <p class="text-muted mb-2">
+          Refundable balance: <strong>${{ refundable }}</strong>
+        </p>
+        <form method="post" class="vstack gap-3">
+          {% csrf_token %}
+          <div>
+            <label class="form-label">Amount</label>
+            {{ form.amount }}
+            {% if form.amount.errors %}<div class="text-danger small">{{ form.amount.errors }}</div>{% endif %}
+          </div>
+
+          {% if form.use_stripe %}
+            <div class="form-check">
+              {{ form.use_stripe }} <label class="form-check-label">Issue Stripe refund</label>
+            </div>
+            <div>
+              <label class="form-label">Stripe payment</label>
+              {{ form.payment_intent }}
+              {% if form.payment_intent.errors %}<div class="text-danger small">{{ form.payment_intent.errors }}</div>{% endif %}
+            </div>
+          {% endif %}
+
+          <div class="d-flex gap-2">
+            <a href="{% url 'core:invoice_detail' inv.pk %}" class="btn btn-outline-secondary">Cancel</a>
+            <button class="btn btn-danger" type="submit">Submit refund</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="mt-3">
+      <small class="text-muted">
+        Stripe refunds return funds to the original card. Manual refunds only adjust records here (use when you sent money back outside Stripe).
+      </small>
+    </div>
+  </div>
+</div>
+{% endblock %}

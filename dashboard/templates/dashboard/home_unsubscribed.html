@@ -1,0 +1,98 @@
+{% extends "_app_shell.html" %}
+
+{% block page_title %}Welcome to {{ APP_NAME }}{% endblock %}
+
+{% block app_content %}
+<div class="row g-3">
+  <div class="col-12 col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h4 mb-2">
+          {% if company %}You're almost set up, {{ company.name }}!{% else %}You're almost set up!{% endif %}
+        </h2>
+        {% if sub %}
+          {% if sub.status == "trialing" %}
+            <p class="text-muted mb-3">
+              You’re currently on a trial{% if days_left is not None %} — <strong>{{ days_left }}</strong> day{% if days_left != 1 %}s{% endif %} left{% endif %}.
+            </p>
+          {% elif sub.status == "past_due" %}
+            <p class="text-warning mb-3">Your subscription is past due. Update billing to continue using {{ APP_NAME }}.</p>
+          {% else %}
+            <p class="text-muted mb-3">Your subscription isn’t active yet.</p>
+          {% endif %}
+        {% else %}
+          <p class="text-muted mb-3">Pick a plan to unlock invoices, estimates, projects, time tracking, and reports.</p>
+        {% endif %}
+
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-primary" href="{% url 'billing:plans' %}">Choose a plan</a>
+          {% if company and company.subscription and company.subscription.stripe_customer_id %}
+            <a class="btn btn-outline-secondary" href="{% url 'billing:portal' %}">Manage billing</a>
+          {% endif %}
+          {% if company %}
+            <a class="btn btn-outline-secondary" href="{% url 'core:company_edit' %}">Company settings</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mt-3">
+      <div class="card-body">
+        <h3 class="h6 mb-3">What you’ll get</h3>
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <div class="border rounded p-3 h-100">
+              <strong>Invoices & payments</strong>
+              <p class="text-muted mb-0">Send branded invoices, accept online payments, auto-remind, and track status.</p>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="border rounded p-3 h-100">
+              <strong>Projects & time</strong>
+              <p class="text-muted mb-0">Track time, approve timesheets, convert to invoices in a click.</p>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="border rounded p-3 h-100">
+              <strong>Estimates</strong>
+              <p class="text-muted mb-0">Share estimates for e-signature and convert to projects/invoices.</p>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="border rounded p-3 h-100">
+              <strong>Reports</strong>
+              <p class="text-muted mb-0">Quick insights on cash flow, profit & loss, and more.</p>
+            </div>
+          </div>
+        </div>
+
+        <hr class="my-4">
+
+        <h3 class="h6 mb-2">Recommended next steps</h3>
+        <ol class="mb-0">
+          {% if not company %}
+            <li><a href="{% url 'core:company_edit' %}">Add your company name & logo</a></li>
+          {% else %}
+            <li><a href="{% url 'core:company_edit' %}">Check your company settings</a></li>
+          {% endif %}
+          <li><a href="{% url 'billing:plans' %}">Select a subscription plan</a></li>
+          <li>Invite a teammate from <a href="{% url 'core:team_list' %}">Team</a> (optional)</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h3 class="h6 mb-2">Need help?</h3>
+        <ul class="list-unstyled mb-0">
+          <li><a href="#" class="text-decoration-none">Getting started guide</a></li>
+          <li><a href="#" class="text-decoration-none">How billing works</a></li>
+          <li><a href="#" class="text-decoration-none">Contact support</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

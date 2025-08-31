@@ -1,0 +1,28 @@
+{% extends "_public_shell.html" %}
+{% block title %}Estimate {{ est.number }}{% endblock %}
+{% block content %}
+<div class="container py-5" style="max-width: 720px;">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h3 class="mb-3">Estimate {{ est.number }}</h3>
+
+      {% if result == "accepted" %}
+        <div class="alert alert-success">Thanks! The estimate has been <strong>accepted</strong>.</div>
+        {% if invoice %}
+          <p>An invoice has been created from this estimate.</p>
+          <a class="btn btn-primary" href="{% url 'core:invoice_public' invoice.public_token %}">View Invoice</a>
+        {% endif %}
+      {% elif result == "declined" %}
+        <div class="alert alert-secondary">This estimate has been <strong>declined</strong>. We’ll be in touch.</div>
+      {% elif result == "expired" %}
+        <div class="alert alert-warning">This estimate has <strong>expired</strong>. Please contact us for a new quote.</div>
+      {% else %}
+        <div class="alert alert-info">This estimate was already processed.</div>
+      {% endif %}
+
+      <hr>
+      <a class="btn btn-outline-secondary" href="{% url 'core:estimate_public' est.public_token %}">Back to estimate</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

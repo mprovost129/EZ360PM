@@ -1,0 +1,72 @@
+<!-- core/templates/core/pdf/estimate.html -->
+{% load static %}
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Estimate {{ est.number }}</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color:#222; }
+    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 20px; }
+    .title { font-size: 22px; font-weight: 700; }
+    .muted { color: #666; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { padding: 8px; border-bottom: 1px solid #ddd; }
+    th { text-align:left; background:#f6f6f6; }
+    .right { text-align:right; }
+    .totals th { background:none; border:0; }
+    .totals td { border:0; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="title">Estimate {{ est.number }}</div>
+      <div class="muted">Issued {{ est.issue_date|date:"Y-m-d" }}</div>
+      {% if est.valid_until %}<div class="muted">Valid until {{ est.valid_until|date:"Y-m-d" }}</div>{% endif %}
+      {% if est.project %}<div class="muted">Project: {{ est.project.name }}</div>{% endif %}
+    </div>
+    <div>
+      {% if est.company and est.company.logo %}
+        <img src="{{ est.company.logo.url }}" style="max-height:60px;">
+      {% else %}
+        <strong>{{ est.company.name }}</strong>
+      {% endif %}
+    </div>
+  </div>
+
+  <div>
+    <strong>To</strong><br>
+    {{ est.client.org|default:est.client }}<br>
+    {{ est.client.email }}
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Description</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Amount</th></tr>
+    </thead>
+    <tbody>
+      {% for it in est.items.all %}
+        <tr>
+          <td>{{ it.description }}</td>
+          <td class="right">{{ it.quantity|default:0 }}</td>
+          <td class="right">{{ it.unit_price|default:"0.00" }}</td>
+          <td class="right">{{ it.total|default:"0.00" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="muted">No items</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <table class="totals" style="margin-top: 16px;">
+    <tr><td class="right" style="width:80%;">Subtotal</td><td class="right">{{ est.subtotal|default:"0.00" }}</td></tr>
+    <tr><td class="right">Tax</td><td class="right">{{ est.tax|default:"0.00" }}</td></tr>
+    <tr><td class="right"><strong>Total</strong></td><td class="right"><strong>{{ est.total|default:"0.00" }}</strong></td></tr>
+  </table>
+
+  {% if est.notes %}
+    <p class="muted" style="margin-top: 18px;">{{ est.notes|linebreaksbr }}</p>
+  {% endif %}
+</body>
+</html>

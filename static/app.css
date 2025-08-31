@@ -1,0 +1,3 @@
+:root { --sidebar-width: 260px; }
+.app-sidebar { width: var(--sidebar-width); min-height: 100vh; background: #fff; }
+.app-topbar { background:#fff; }

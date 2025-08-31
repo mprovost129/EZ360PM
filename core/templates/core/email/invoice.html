@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+  <body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;line-height:1.5">
+    <h2 style="margin:0 0 12px 0;">
+      {% if mode == "reminder" %}Reminder: {% endif %}Invoice {{ inv.number }}
+    </h2>
+    <p style="margin:0 0 12px 0;">from <strong>{{ inv.company.name }}</strong></p>
+    <p style="margin:0 0 12px 0;">Amount due: <strong>{{ inv.total|default:"0" }}</strong></p>
+    <p style="margin:0 0 16px 0;">
+      <a href="{{ site_url }}{% url 'core:invoice_public' token=inv.public_token %}"
+         style="display:inline-block;padding:10px 14px;background:#0d6efd;color:#fff;text-decoration:none;border-radius:6px;">
+        View &amp; Pay Invoice
+      </a>
+    </p>
+    {% if note %}
+    <p style="white-space:pre-wrap;border-left:3px solid #eee;padding-left:10px;color:#555">{{ note }}</p>
+    {% endif %}
+    <p style="color:#888;margin-top:24px;">Sent via {{ APP_NAME }}.</p>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}Delete Invoice{% endblock %}
+{% block app_content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <p>Are you sure you want to delete <strong>{{ inv.number }}</strong>?</p>
+    <form method="post">{% csrf_token %}
+      <a class="btn btn-outline-secondary" href="{% url 'core:invoice_detail' inv.pk %}">Cancel</a>
+      <button class="btn btn-danger" type="submit">Delete</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

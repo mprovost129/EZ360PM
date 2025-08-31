@@ -1,0 +1,33 @@
+{# templates/core/approvals_list.html #}
+{% extends "_app_shell.html" %}
+{% block page_title %}Approvals{% endblock %}
+{% block app_content %}
+{% if groups %}
+  {% for key, g in groups.items %}
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <div class="fw-semibold">{{ g.user }}</div>
+            <div class="text-muted small">Week of {{ g.week }}</div>
+          </div>
+          <form method="post" action="{% url 'core:approvals_decide' %}">
+            {% csrf_token %}
+            <input type="hidden" name="user_id" value="{{ g.user.id }}">
+            <input type="hidden" name="week" value="{{ g.week }}">
+            <button name="action" value="approve" class="btn btn-sm btn-success">Approve</button>
+            <button name="action" value="reject" class="btn btn-sm btn-outline-danger">Reject</button>
+          </form>
+        </div>
+        <ul class="small mt-2 mb-0">
+          {% for t in g.entries %}
+            <li>{{ t.started_at|date:"Y-m-d" }} — {{ t.project.name }} — {{ t.hours }}h — {{ t.notes|default:"" }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  {% endfor %}
+{% else %}
+  <p class="text-muted">No submissions awaiting approval.</p>
+{% endif %}
+{% endblock %}

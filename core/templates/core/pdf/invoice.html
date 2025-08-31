@@ -1,0 +1,74 @@
+<!-- core/templates/core/pdf/invoice.html -->
+{% load static %}
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Invoice {{ inv.number }}</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color:#222; }
+    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 20px; }
+    .title { font-size: 22px; font-weight: 700; }
+    .muted { color: #666; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { padding: 8px; border-bottom: 1px solid #ddd; }
+    th { text-align:left; background:#f6f6f6; }
+    .right { text-align:right; }
+    .totals th { background:none; border:0; }
+    .totals td { border:0; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="title">Invoice {{ inv.number }}</div>
+      <div class="muted">Issue date: {{ inv.issue_date|date:"Y-m-d" }}</div>
+      {% if inv.due_date %}<div class="muted">Due: {{ inv.due_date|date:"Y-m-d" }}</div>{% endif %}
+      {% if inv.project %}<div class="muted">Project: {{ inv.project.name }}</div>{% endif %}
+    </div>
+    <div>
+      {% if inv.company and inv.company.logo %}
+        <img src="{{ inv.company.logo.url }}" style="max-height:60px;">
+      {% else %}
+        <strong>{{ inv.company.name }}</strong>
+      {% endif %}
+    </div>
+  </div>
+
+  <div>
+    <strong>Bill To</strong><br>
+    {{ inv.client.org|default:inv.client }}<br>
+    {{ inv.client.email }}
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Description</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Amount</th></tr>
+    </thead>
+    <tbody>
+      {% for item in inv.items.all %}
+        <tr>
+          <td>{{ item.description }}</td>
+          <td class="right">{{ item.quantity|default:0 }}</td>
+          <td class="right">{{ item.unit_price|default:"0.00" }}</td>
+          <td class="right">{{ item.total|default:"0.00" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="muted">No items</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <table class="totals" style="margin-top: 16px;">
+    <tr><td class="right" style="width:80%;">Subtotal</td><td class="right">{{ inv.subtotal|default:"0.00" }}</td></tr>
+    <tr><td class="right">Tax</td><td class="right">{{ inv.tax|default:"0.00" }}</td></tr>
+    <tr><td class="right"><strong>Total</strong></td><td class="right"><strong>{{ inv.total|default:"0.00" }}</strong></td></tr>
+    <tr><td class="right">Paid</td><td class="right">{{ inv.amount_paid|default:"0.00" }}</td></tr>
+    <tr><td class="right"><strong>Balance</strong></td><td class="right"><strong>{{ inv.balance|default:"0.00" }}</strong></td></tr>
+  </table>
+
+  {% if inv.notes %}
+    <p class="muted" style="margin-top: 18px;">{{ inv.notes|linebreaksbr }}</p>
+  {% endif %}
+</body>
+</html>

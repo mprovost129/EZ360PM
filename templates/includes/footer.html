@@ -1,0 +1,61 @@
+{% load tz %}
+<footer class="border-top mt-auto">
+  <div class="container py-4">
+    <div class="row gy-4">
+      <!-- Brand / meta -->
+      <div class="col-12 col-md-4">
+        <div class="fw-semibold">{{ company_name|default:APP_NAME|default:"EZ360PM" }}</div>
+        <div class="text-muted small">
+          © {% now "Y" %} {{ company_name|default:APP_NAME|default:"EZ360PM" }}. All rights reserved.
+        </div>
+        <div class="text-muted small">
+          <a class="text-decoration-none" href="mailto:{{ support_email|default:'support@example.com' }}">
+            {{ support_email|default:"support@example.com" }}
+          </a>
+        </div>
+      </div>
+
+      <!-- Legal -->
+      <div class="col-6 col-md-2">
+        <div class="text-uppercase text-muted small mb-2">Legal</div>
+        <ul class="list-unstyled mb-0 small">
+          <li><a class="text-decoration-none" href="{% url 'dashboard:terms' %}">Terms</a></li>
+          <li><a class="text-decoration-none" href="{% url 'dashboard:privacy' %}">Privacy</a></li>
+          <li><a class="text-decoration-none" href="{% url 'dashboard:cookies' %}">Cookie Policy</a></li>
+          <li><a class="text-decoration-none" href="{% url 'dashboard:cookie_preferences' %}">Cookie Preferences</a></li>
+          {% if do_not_sell_url %}
+            <li><a class="text-decoration-none" href="{{ do_not_sell_url }}">Do Not Sell/Share</a></li>
+          {% endif %}
+          <li><a class="text-decoration-none" href="{% url 'dashboard:subprocessors' %}">Subprocessors</a></li>
+        </ul>
+      </div>
+
+      <!-- Company -->
+      <div class="col-6 col-md-3">
+        <div class="text-uppercase text-muted small mb-2">Company</div>
+        <ul class="list-unstyled mb-0 small">
+          <li><a class="text-decoration-none" href="{% url 'dashboard:help_index' %}">Help Center</a></li>
+          <li><a class="text-decoration-none" href="{% url 'dashboard:contact' %}">Contact</a></li>
+          <li><a class="text-decoration-none" href="{% url 'billing:plans' %}">Plans & Pricing</a></li>
+          {% if request.user.is_staff %}
+            <li><a class="text-decoration-none" href="{% url 'billing:webhook_logs' %}">Webhook Logs</a></li>
+          {% endif %}
+        </ul>
+      </div>
+
+      <!-- Account -->
+      <div class="col-12 col-md-3">
+        <div class="text-uppercase text-muted small mb-2">Account</div>
+        <ul class="list-unstyled mb-0 small">
+          {% if request.user.is_authenticated %}
+            <li><a class="text-decoration-none" href="{% url 'accounts:password_change' %}">Change Password</a></li>
+            <li><a class="text-decoration-none" href="{% url 'accounts:logout' %}">Log out</a></li>
+          {% else %}
+            <li><a class="text-decoration-none" href="{% url 'accounts:login' %}">Log in</a></li>
+            <li><a class="text-decoration-none" href="{% url 'accounts:register' %}">Register</a></li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</footer>

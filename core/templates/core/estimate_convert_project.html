@@ -1,0 +1,83 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}Convert to Project — Estimate {{ est.number }}{% endblock %}
+{% block app_content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+
+      <div class="mb-3">
+        <label class="form-label">Conversion mode</label>
+        {{ form.mode }}
+      </div>
+
+      <div id="attach-fields" class="mb-3">
+        <label class="form-label">Existing project</label>
+        {{ form.existing_project }}
+        {% if form.existing_project.errors %}
+          <div class="text-danger small">{{ form.existing_project.errors|join:", " }}</div>
+        {% endif %}
+        <div class="form-text">Projects are filtered to your company{% if est.client %} and client ({{ est.client }}){% endif %}.</div>
+      </div>
+
+      <div id="new-fields">
+        <div class="row g-3">
+          <div class="col-12 col-md-4">
+            <label class="form-label">Project #</label>
+            {{ form.new_number }}
+          </div>
+          <div class="col-12 col-md-8">
+            <label class="form-label">Project name</label>
+            {{ form.new_name }}
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">Billing type</label>
+            {{ form.new_billing_type }}
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label">Estimated hours</label>
+            {{ form.new_estimated_hours }}
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label">Budget</label>
+            {{ form.new_budget }}
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label">Start date</label>
+            {{ form.new_start_date }}
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label">Due date</label>
+            {{ form.new_due_date }}
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-3 d-flex gap-2">
+        <button class="btn btn-primary">Convert</button>
+        <a class="btn btn-outline-secondary" href="{% url 'core:estimate_detail' est.pk %}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  const radios = document.querySelectorAll('input[name="mode"]');
+  const newFields = document.getElementById('new-fields');
+  const attachFields = document.getElementById('attach-fields');
+  function sync() {
+    const v = document.querySelector('input[name="mode"]:checked')?.value || 'new';
+    if (v === 'attach') {
+      newFields.style.display = 'none';
+      attachFields.style.display = '';
+    } else {
+      newFields.style.display = '';
+      attachFields.style.display = 'none';
+    }
+  }
+  radios.forEach(r => r.addEventListener('change', sync));
+  sync();
+})();
+</script>
+{% endblock %}

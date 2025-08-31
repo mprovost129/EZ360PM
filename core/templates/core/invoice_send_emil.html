@@ -1,0 +1,21 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}{% if mode == "reminder" %}Send Reminder{% else %}Send Invoice{% endif %} {{ inv.number }}{% endblock %}
+{% block app_content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label">To</label>
+        <input type="email" name="to" class="form-control" required value="{{ default_to }}">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">{% if mode == "reminder" %}Reminder message{% else %}Message (optional){% endif %}</label>
+        <textarea name="note" class="form-control" rows="4" placeholder="{% if mode == 'reminder' %}Friendly reminder about your invoice…{% else %}Add a short note to your client…{% endif %}"></textarea>
+      </div>
+      <button class="btn btn-primary">{% if mode == "reminder" %}Send reminder{% else %}Send invoice{% endif %}</button>
+      <a class="btn btn-outline-secondary" href="{% url 'core:invoice_detail' inv.pk %}">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base_public.html" %}
+{% block content %}
+<div class="container py-4" style="max-width:980px">
+  <h1 class="h3 mb-3">Cookie Policy</h1>
+  <p class="text-muted">Effective {{ effective_date }}</p>
+
+  <p>This Cookie Policy explains how {{ company_name }} uses cookies and similar technologies on {{ site_url }}.</p>
+
+  <h2 class="h5 mt-4">What are cookies?</h2>
+  <p>Cookies are small text files stored on your device to help websites function and improve your experience.</p>
+
+  <h2 class="h5 mt-4">Types of cookies we use</h2>
+  <ul>
+    <li><strong>Essential:</strong> Required for core functionality (login sessions, security). Always active.</li>
+    <li><strong>Analytics:</strong> Help us understand usage and improve the product. Optional and used only with your consent.</li>
+    <li><strong>Marketing:</strong> Used for advertising or retargeting. Optional and used only with your consent.</li>
+  </ul>
+
+  <h2 class="h5 mt-4">Managing your preferences</h2>
+  <p>You can adjust your cookie choices at any time:</p>
+  <p><a class="btn btn-outline-primary btn-sm" href="{% url 'dashboard:cookie_preferences' %}">Open cookie preferences</a></p>
+
+  <h2 class="h5 mt-4">Third-party cookies</h2>
+  <p>Some third-party services (e.g., analytics, payments) may set cookies. See our <a href="{% url 'dashboard:subprocessors' %}">Subprocessors</a>.</p>
+
+  <h2 class="h5 mt-4">More information</h2>
+  <p>For details about how we handle personal data, read our <a href="{% url 'dashboard:privacy' %}">Privacy Policy</a>.</p>
+</div>
+{% endblock %}

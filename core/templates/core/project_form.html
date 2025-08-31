@@ -1,0 +1,57 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}{{ mode == 'create'|yesno:'New Project,Edit Project' }}{% endblock %}
+{% block app_content %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Project #</label>
+          {{ form.number }}
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">Name</label>
+          {{ form.name }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Client</label>
+          {{ form.client }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Billing Type</label>
+          {{ form.billing_type }}
+        </div>
+        <div class="col-md-12">
+          <label class="form-label">Details</label>
+          {{ form.details }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Budget</label>
+          {{ form.budget }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Estimated Hours</label>
+          {{ form.estimated_hours }}
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Start</label>
+          {{ form.start_date }}
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Due</label>
+          {{ form.due_date }}
+        </div>
+        <div class="col-12">
+          <label class="form-label">Team</label>
+          {{ form.team }}
+        </div>
+      </div>
+    </div>
+    <div class="card-footer d-flex justify-content-between">
+      <a class="btn btn-outline-secondary" href="{% url 'core:projects' %}">Cancel</a>
+      <button class="btn btn-primary" type="submit">Save</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

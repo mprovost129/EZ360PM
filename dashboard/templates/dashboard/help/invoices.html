@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-5">
+  <h1 class="h4 mb-3">Invoices</h1>
+  <p class="text-muted">A quick overview of setting up your invoices.</p>
+  <ol>
+    <li>Create an invoice.</li>
+    <li>Save an invoice as a template.</li>
+    <li>Send an invoice.</li>
+  </ol>
+  <a class="btn btn-outline-secondary" href="{% url 'dashboard:help_index' %}">Back to Help</a>
+</div>
+{% endblock %}

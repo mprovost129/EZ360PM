@@ -1,0 +1,44 @@
+<nav class="navbar navbar-expand-md navbar-light bg-body border-bottom sticky-top">
+  <div class="container">
+    <a class="navbar-brand fw-semibold" href="{% url 'dashboard:home' %}">
+      {{ APP_NAME|default:"EZ360PM" }}
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#publicNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div id="publicNav" class="collapse navbar-collapse">
+      {% with urlname=request.resolver_match.url_name|default:'' %}
+      <ul class="navbar-nav ms-auto align-items-md-center">
+
+        <li class="nav-item">
+          <a class="nav-link {% if urlname == 'help_index' %}active{% endif %}"
+             href="{% url 'dashboard:help_index' %}">Features</a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link {% if urlname == 'contact' %}active{% endif %}"
+             href="{% url 'dashboard:contact' %}">Contact</a>
+        </li>
+
+        <li class="nav-item ms-md-2">
+          <a class="btn btn-outline-primary {% if urlname == 'register' %}active{% endif %}"
+             href="{% url 'accounts:register' %}">Register</a>
+        </li>
+
+        <li class="nav-item ms-md-2">
+          <a class="btn btn-primary {% if urlname == 'login' %}active{% endif %}"
+             href="{% url 'accounts:login' %}">Sign in</a>
+        </li>
+
+        <li class="nav-item ms-md-2">
+          <a class="btn btn-success {% if urlname == 'plans' %}active{% endif %}"
+             href="{% url 'billing:plans' %}">Subscribe</a>
+        </li>
+
+      </ul>
+      {% endwith %}
+    </div>
+  </div>
+</nav>

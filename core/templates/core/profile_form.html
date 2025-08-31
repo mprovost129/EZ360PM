@@ -1,0 +1,51 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}Edit Profile{% endblock %}
+{% block app_content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post" enctype="multipart/form-data" class="row g-3">
+      {% csrf_token %}
+      <div class="col-12 col-md-6">
+        <label class="form-label">First name</label>
+        {{ form.first_name }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Last name</label>
+        {{ form.last_name }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Title</label>
+        {{ form.title }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Phone</label>
+        {{ form.phone }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Timezone</label>
+        {{ form.timezone }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Locale</label>
+        {{ form.locale }}
+      </div>
+      <div class="col-12">
+        <label class="form-label">Avatar</label>
+        {{ form.avatar }}
+      </div>
+      <div class="col-12">
+        <label class="form-label">Bio</label>
+        {{ form.bio }}
+      </div>
+      <div class="col-12 form-check">
+        {{ form.dark_mode }} <label class="form-check-label">Enable dark mode</label>
+      </div>
+
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-primary">Save</button>
+        <a class="btn btn-outline-secondary" href="{% url 'core:my_profile' %}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

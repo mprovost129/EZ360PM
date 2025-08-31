@@ -1,0 +1,173 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}Search{% endblock %}
+
+{% block app_content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form class="row g-2 mb-3" method="get" action="{% url 'core:search' %}">
+      <div class="col-12 col-md-8">
+        <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Search clients, projects, invoices, estimates, expenses…">
+      </div>
+      <div class="col-12 col-md-auto">
+        <button class="btn btn-primary">Search</button>
+      </div>
+    </form>
+
+    {% if not has_query %}
+      <p class="text-muted mb-0">Type something above to search your workspace.</p>
+    {% else %}
+
+      {# Clients #}
+      <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h6 mb-0">Clients</h2>
+          {% if clients_total > limit %}
+            <a class="small" href="{% url 'core:clients' %}?q={{ q|urlencode }}">View all {{ clients_total }}</a>
+          {% endif %}
+        </div>
+        {% if clients %}
+          <ul class="list-group">
+            {% for c in clients %}
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>{{ c.org|default:('-' if not c.org) }} {% if c.first_name or c.last_name %}— {{ c.first_name }} {{ c.last_name }}{% endif %}</span>
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:clients' %}?q={{ c.org|default_if_none:''|urlencode }}">Open</a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="text-muted small">No matching clients.</div>
+        {% endif %}
+      </div>
+
+      {# Projects #}
+      <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h6 mb-0">Projects</h2>
+          {% if projects_total > limit %}
+            <a class="small" href="{% url 'core:projects' %}?q={{ q|urlencode }}">View all {{ projects_total }}</a>
+          {% endif %}
+        </div>
+        {% if projects %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>#</th><th>Name</th><th>Client</th><th>Created</th><th></th></tr></thead>
+              <tbody>
+                {% for p in projects %}
+                  <tr>
+                    <td>{{ p.number }}</td>
+                    <td><a href="{% url 'core:project_detail' p.pk %}">{{ p.name }}</a></td>
+                    <td>{{ p.client }}</td>
+                    <td>{{ p.created_at|date:'Y-m-d' }}</td>
+                    <td class="text-end">
+                      <a class="btn btn-sm btn-outline-primary" href="{% url 'core:project_detail' p.pk %}">Open</a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-muted small">No matching projects.</div>
+        {% endif %}
+      </div>
+
+      {# Invoices #}
+      <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h6 mb-0">Invoices</h2>
+          {% if invoices_total > limit %}
+            <a class="small" href="{% url 'core:invoices' %}?q={{ q|urlencode }}">View all {{ invoices_total }}</a>
+          {% endif %}
+        </div>
+        {% if invoices %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>#</th><th>Client</th><th>Project</th><th>Issued</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                {% for inv in invoices %}
+                  <tr>
+                    <td><a href="{% url 'core:invoice_detail' inv.pk %}">{{ inv.number }}</a></td>
+                    <td>{{ inv.client }}</td>
+                    <td>{{ inv.project }}</td>
+                    <td>{{ inv.issue_date|date:'Y-m-d' }}</td>
+                    <td class="text-capitalize">{{ inv.status }}</td>
+                    <td class="text-end">
+                      <a class="btn btn-sm btn-outline-primary" href="{% url 'core:invoice_detail' inv.pk %}">Open</a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-muted small">No matching invoices.</div>
+        {% endif %}
+      </div>
+
+      {# Estimates #}
+      <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h6 mb-0">Estimates</h2>
+          {% if estimates_total > limit %}
+            <a class="small" href="{% url 'core:estimates' %}?q={{ q|urlencode }}">View all {{ estimates_total }}</a>
+          {% endif %}
+        </div>
+        {% if estimates %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>#</th><th>Client</th><th>Project</th><th>Issued</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                {% for est in estimates %}
+                  <tr>
+                    <td><a href="{% url 'core:estimate_detail' est.pk %}">{{ est.number }}</a></td>
+                    <td>{{ est.client }}</td>
+                    <td>{{ est.project }}</td>
+                    <td>{{ est.issue_date|date:'Y-m-d' }}</td>
+                    <td class="text-capitalize">{{ est.status }}</td>
+                    <td class="text-end">
+                      <a class="btn btn-sm btn-outline-primary" href="{% url 'core:estimate_detail' est.pk %}">Open</a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-muted small">No matching estimates.</div>
+        {% endif %}
+      </div>
+
+      {# Expenses #}
+      <div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h6 mb-0">Expenses</h2>
+          {% if expenses_total > limit %}
+            <a class="small" href="{% url 'core:expenses' %}?q={{ q|urlencode }}">View all {{ expenses_total }}</a>
+          {% endif %}
+        </div>
+        {% if expenses %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>Date</th><th>Description</th><th>Project</th><th>Vendor</th><th>Amount</th></tr></thead>
+              <tbody>
+                {% for ex in expenses %}
+                  <tr>
+                    <td>{{ ex.date|date:'Y-m-d' }}</td>
+                    <td>{{ ex.description }}</td>
+                    <td>{{ ex.project }}</td>
+                    <td>{{ ex.vendor }}</td>
+                    <td>${{ ex.amount }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-muted small">No matching expenses.</div>
+        {% endif %}
+      </div>
+
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

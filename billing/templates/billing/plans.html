@@ -1,0 +1,41 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}Plans & Billing{% endblock %}
+{% block app_content %}
+{% if request.GET.success %}
+  <div class="alert alert-success">Subscription updated successfully.</div>
+{% elif request.GET.canceled %}
+  <div class="alert alert-warning">Checkout canceled.</div>
+{% endif %}
+
+<div class="row g-3">
+  {% for t in tiers %}
+    <div class="col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-body d-flex flex-column">
+          <div class="h5">{{ t.name }}</div>
+          <p class="text-muted flex-grow-1">{{ t.description }}</p>
+          <a class="btn btn-primary mt-auto" href="{% url 'billing:subscribe' t.slug %}">Choose {{ t.name }}</a>
+        </div>
+      </div>
+    </div>
+  {% empty %}
+    <div class="col-12"><div class="alert alert-info">No plans configured yet. Add tiers in admin.</div></div>
+  {% endfor %}
+</div>
+
+{% if sub %}
+  <hr>
+  <div class="card"><div class="card-body d-flex justify-content-between">
+    <div>
+      <div class="text-muted small">Current Plan</div>
+      <div>{{ sub.tier.name|default:"(none)" }} — <span class="text-capitalize">{{ sub.status }}</span></div>
+      {% if sub.current_period_end %}
+      <div class="text-muted small">Renews / ends: {{ sub.current_period_end|date:'Y-m-d H:i' }}</div>
+      {% endif %}
+    </div>
+    {% if sub.stripe_customer_id %}
+      <a class="btn btn-outline-secondary" href="{% url 'billing:portal' %}">Open Billing Portal</a>
+    {% endif %}
+  </div></div>
+{% endif %}
+{% endblock %}

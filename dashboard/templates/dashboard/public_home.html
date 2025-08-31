@@ -1,0 +1,137 @@
+{% extends "base_public.html" %}
+{% load static %}
+
+{% block page_content %}
+<style>
+  .hero {
+    min-height: 60vh;
+    display: grid;
+    place-items: center;
+    background:
+      radial-gradient(1200px 600px at 20% -20%, rgba(13,110,253,.12), transparent),
+      radial-gradient(900px 500px at 120% 20%, rgba(25,135,84,.10), transparent);
+  }
+  .feature-img {
+    width: 100%;
+    height: 280px;
+    object-fit: cover;
+    border-radius: 1rem;
+  }
+  .shadow-soft { box-shadow: 0 10px 30px rgba(0,0,0,.06); }
+</style>
+
+<!-- Hero -->
+<header class="hero">
+  <div class="container py-5">
+    <div class="row align-items-center g-4">
+      <div class="col-lg-6">
+        <h1 class="display-5 fw-bold mb-3">Run your studio with less busywork</h1>
+        <p class="lead text-muted mb-4">
+          Track time, send invoices, manage expenses, and stay on top of projects — all in one place.
+        </p>
+        <div class="d-flex gap-2 flex-wrap">
+          <a class="btn btn-primary btn-lg" href="{% url 'accounts:register' %}">Get started free</a>
+          <a class="btn btn-outline-primary btn-lg" href="{% url 'billing:plans' %}">See plans</a>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <img class="img-fluid rounded shadow-soft" src="{% static 'img/marketing/hero.jpg' %}" alt="EZ360PM app preview">
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Zig-zag sections -->
+<main id="features" class="py-5">
+  <div class="container">
+    <!-- Section 1 (image left) -->
+    <div class="row align-items-center g-5 mb-5">
+      <div class="col-md-6">
+        <img class="feature-img shadow-soft" src="{% static 'img/marketing/feature-invoices.jpg' %}" alt="Invoices">
+      </div>
+      <div class="col-md-6">
+        <h2 class="h3 fw-semibold">Invoices that get you paid faster</h2>
+        <p class="text-muted">
+          Create polished invoices in seconds, accept online payments, and send automated reminders with a click.
+        </p>
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'billing:plans' %}">Explore plans</a>
+      </div>
+    </div>
+
+    <!-- Section 2 (image right) -->
+    <div class="row align-items-center g-5 mb-5">
+      <div class="col-md-6 order-md-2">
+        <img class="feature-img shadow-soft" src="{% static 'img/marketing/feature-time.jpg' %}" alt="Time tracking">
+      </div>
+      <div class="col-md-6 order-md-1">
+        <h2 class="h3 fw-semibold">Time tracking that feels invisible</h2>
+        <p class="text-muted">
+          Start/stop timers from projects, log weekly timesheets, and roll unbilled time straight into invoices.
+        </p>
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'accounts:register' %}">Start tracking</a>
+      </div>
+    </div>
+
+    <!-- Section 3 (image left) -->
+    <div class="row align-items-center g-5 mb-5">
+      <div class="col-md-6">
+        <img class="feature-img shadow-soft" src="{% static 'img/marketing/feature-expenses.jpg' %}" alt="Expenses">
+      </div>
+      <div class="col-md-6">
+        <h2 class="h3 fw-semibold">Expenses without the spreadsheet</h2>
+        <p class="text-muted">
+          Categorize spending, add markups, and rebill to clients — no more copy/paste or double-entry.
+        </p>
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'accounts:login' %}">Sign in to view</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contact -->
+  <section id="contact" class="py-5 bg-light border-top">
+    <div class="container">
+      <div class="row g-4">
+        <div class="col-lg-6">
+          <h2 class="h4 fw-semibold">Have a question or suggestion?</h2>
+          <p class="text-muted mb-4">
+            We’re building EZ360PM for small studios and freelancers. Tell us what would make it perfect for you.
+          </p>
+          {% if messages %}
+            {% for m in messages %}
+              <div class="alert alert-{{ m.tags|default:'info' }} mb-3">{{ m }}</div>
+            {% endfor %}
+          {% endif %}
+          <!-- Post to the open contact endpoint (works logged-out) -->
+          <form method="post" action="{% url 'dashboard:contact' %}">
+            {% csrf_token %}
+            <div class="mb-2">
+              <label class="form-label">Your name</label>
+              <input class="form-control" type="text" name="name" placeholder="Jane Doe">
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Email</label>
+              <input class="form-control" type="email" name="email" required placeholder="jane@example.com">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Message</label>
+              <textarea class="form-control" name="message" rows="4" required placeholder="How can we help?"></textarea>
+            </div>
+            <button class="btn btn-primary">Send</button>
+          </form>
+        </div>
+        <div class="col-lg-6">
+          <div class="p-4 bg-white border rounded shadow-soft h-100">
+            <h3 class="h5 fw-semibold mb-3">Why EZ360PM?</h3>
+            <ul class="mb-0">
+              <li>Lightweight, freelancer-friendly workflows</li>
+              <li>Invoice + time + expenses in one place</li>
+              <li>No lock-in — export your data anytime</li>
+              <li>Human support that answers quickly</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+{% endblock %}

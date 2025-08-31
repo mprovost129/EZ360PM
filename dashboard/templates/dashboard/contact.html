@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-5" style="max-width:720px">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h1 class="h4 mb-3">Contact & Suggestions</h1>
+      <p class="text-muted">Tell us what would make EZ360PM better.</p>
+
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        {# Show any non-field errors at the top #}
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+          </div>
+        {% endif %}
+
+        {# Render hidden fields first (page_url, honeypot, etc.) #}
+        {% for field in form.hidden_fields %}
+          {{ field }}
+        {% endfor %}
+
+        {# Render normal visible fields except the consent checkboxes (we'll style those separately) #}
+        {% for field in form.visible_fields %}
+          {% if field.name != 'accept_terms' and field.name != 'accept_privacy' %}
+            {% if field.field.widget.input_type == 'checkbox' %}
+              <div class="form-check mb-3">
+                {{ field }}
+                <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+              </div>
+            {% else %}
+              <div class="mb-3">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+              </div>
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+
+        {# Terms checkbox (only if present on the form) #}
+        {% if form.accept_terms %}
+          <div class="form-check mb-2">
+            {{ form.accept_terms }}
+            <label class="form-check-label" for="{{ form.accept_terms.id_for_label }}">
+              I agree to the <a href="{% url 'dashboard:terms' %}" target="_blank" rel="noopener">Terms of Service</a>
+            </label>
+            {% if form.accept_terms.errors %}<div class="text-danger small">{{ form.accept_terms.errors }}</div>{% endif %}
+          </div>
+        {% endif %}
+
+        {# Optional Privacy checkbox (only if present) #}
+        {% if form.accept_privacy %}
+          <div class="form-check mb-3">
+            {{ form.accept_privacy }}
+            <label class="form-check-label" for="{{ form.accept_privacy.id_for_label }}">
+              I agree to the <a href="{% url 'dashboard:privacy' %}" target="_blank" rel="noopener">Privacy Policy</a>
+            </label>
+            {% if form.accept_privacy.errors %}<div class="text-danger small">{{ form.accept_privacy.errors }}</div>{% endif %}
+          </div>
+        {% endif %}
+
+        <button class="btn btn-primary">Send</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

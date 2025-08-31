@@ -1,0 +1,10 @@
+# core/templates/core/email/invoice_email.txt
+Hi {{ inv.client.first_name|default:inv.client.org|default:"there" }},
+
+Please find your invoice {{ inv.number }} attached as a PDF.
+
+You can also view and pay it online here:
+{{ site_url }}{% url 'core:invoice_public' inv.public_token %}
+
+Thanks!
+{{ inv.company.name }}

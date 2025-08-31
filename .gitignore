@@ -1,0 +1,79 @@
+# --- OS / Editor cruft ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+.vs/
+*.code-workspace
+
+# --- Python build / caches ---
+__pycache__/
+*.py[cod]
+*$py.class
+build/
+dist/
+.eggs/
+*.egg-info/
+pip-wheel-metadata/
+__pypackages__/
+.python-version
+
+# --- Virtual environments ---
+env/
+venv/
+.venv/
+ENV/
+.python-env/
+
+# --- Test / tooling caches ---
+.coverage*
+htmlcov/
+.tox/
+.nox/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.pylint.d/
+.cache/
+
+# --- Logs / runtime files ---
+*.log
+*.pid
+celerybeat-schedule
+celerybeat.pid
+
+# --- Environment & local settings ---
+.env
+.env.*
+!.env.example
+*.local
+*.secrets
+settings_local.py
+secret_key.txt
+
+# --- Django: database (dev) ---
+db.sqlite3
+*.sqlite3
+*.sqlite3-journal
+
+# --- Django: collected/static & uploads (runtime) ---
+# Adjust if your settings use different STATIC_ROOT/MEDIA_ROOT.
+staticfiles/
+static_root/
+media/
+media_root/
+!staticfiles/.gitkeep
+!media/.gitkeep
+
+# --- Frontend build artifacts (optional) ---
+node_modules/
+bower_components/
+*.map
+dist/
+coverage/

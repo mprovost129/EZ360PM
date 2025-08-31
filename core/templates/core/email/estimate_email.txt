@@ -1,0 +1,10 @@
+# core/templates/core/email/estimate_email.txt
+Hi {{ est.client.first_name|default:est.client.org|default:"there" }},
+
+Please find your estimate {{ est.number }} attached as a PDF.
+
+You can also view it online here:
+{{ site_url }}{% url 'core:estimate_public' est.public_token %}
+
+Thanks!
+{{ est.company.name }}

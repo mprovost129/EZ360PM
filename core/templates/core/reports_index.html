@@ -1,0 +1,15 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}Reports{% endblock %}
+{% block app_content %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="fw-semibold">Profit & Loss</div>
+        <p class="text-muted mb-3">Income minus expenses for a chosen date range. Cash or accrual basis.</p>
+        <a class="btn btn-primary" href="{% url 'core:report_pnl' %}">Open</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

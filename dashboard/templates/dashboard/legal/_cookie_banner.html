@@ -1,0 +1,106 @@
+{% load static %}
+{% with consent_cookie_name=COOKIE_CONSENT_NAME|default:"cookie_consent" %}
+<div id="cookie-banner" class="position-fixed bottom-0 start-0 end-0 p-3" style="z-index:1080; display:none;">
+  <div class="alert alert-dark border shadow-sm d-flex align-items-start gap-3 mb-0">
+    <div class="flex-grow-1">
+      We use essential cookies to make this site work, and optional analytics/marketing cookies to improve
+      your experience. You can change your choices at any time.
+      <a href="{% url 'dashboard:cookies' %}" class="alert-link">Learn more</a>.
+    </div>
+    <div class="d-flex gap-2">
+      <form method="post" action="{% url 'dashboard:cookie_consent_set' %}">
+        {% csrf_token %}
+        <input type="hidden" name="choice" value="reject_all">
+        <button class="btn btn-sm btn-outline-light">Reject all</button>
+      </form>
+      <form method="post" action="{% url 'dashboard:cookie_consent_set' %}">
+        {% csrf_token %}
+        <input type="hidden" name="choice" value="accept_all">
+        <button class="btn btn-sm btn-primary">Accept all</button>
+      </form>
+      <a class="btn btn-sm btn-outline-light" href="{% url 'dashboard:cookie_preferences' %}">Preferences</a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var name = "{{ consent_cookie_name }}";
+  function getCookie(n) {
+    var m = document.cookie.match(new RegExp('(^| )' + n.replace(/([.$?*|{}()[\]\\/+^])/g,'\\$1') + '=([^;]+)'));
+    return m ? decodeURIComponent(m[2]) : null;
+  }
+  function hasConsent() {
+    return !!getCookie(name);
+  }
+
+  // Show banner if no prior choice
+  if (!hasConsent()) {
+    var el = document.getElementById("cookie-banner");
+    if (el) el.style.display = "block";
+  }
+
+  // Conditional analytics loader (fires only after consent and only if enabled)
+  function parseConsent(v) {
+    // format: v=1&ana=0|1&mkt=0|1
+    var out = { ana:false, mkt:false };
+    if (!v) return out;
+    v.split("&").forEach(function(p){
+      var kv = p.split("=");
+      if (kv.length === 2) {
+        if (kv[0]==="ana") out.ana = (kv[1]==="1");
+        if (kv[0]==="mkt") out.mkt = (kv[1]==="1");
+      }
+    });
+    return out;
+  }
+  function loadAnalyticsIfConsented() {
+    var v = getCookie(name);
+    var c = parseConsent(v);
+
+    // Plausible (if configured)
+    {% if PLAUSIBLE_DOMAIN %}
+    if (c.ana) {
+      var s = document.createElement("script");
+      s.defer = true;
+      s.setAttribute("data-domain", "{{ PLAUSIBLE_DOMAIN }}");
+      s.src = "https://plausible.io/js/script.js";
+      document.head.appendChild(s);
+    }
+    {% endif %}
+
+    // Google Analytics (if configured)
+    {% if GA_MEASUREMENT_ID %}
+    if (c.ana) {
+      var gtagScript = document.createElement("script");
+      gtagScript.async = true;
+      gtagScript.src = "https://www.googletagmanager.com/gtag/js?id={{ GA_MEASUREMENT_ID }}";
+      document.head.appendChild(gtagScript);
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){ dataLayer.push(arguments); }
+      window.gtag = gtag;
+      gtag('js', new Date());
+      gtag('config', '{{ GA_MEASUREMENT_ID }}', { 'anonymize_ip': true });
+    }
+    {% endif %}
+  }
+
+  // Try load immediately (if consent cookie already exists)
+  if (hasConsent()) { loadAnalyticsIfConsented(); }
+
+  // Also observe cookie changes (simple polling)
+  var last = document.cookie;
+  setInterval(function(){
+    if (document.cookie !== last) {
+      last = document.cookie;
+      if (hasConsent()) {
+        // Hide banner and load analytics
+        var el = document.getElementById("cookie-banner");
+        if (el) el.style.display = "none";
+        loadAnalyticsIfConsented();
+      }
+    }
+  }, 1000);
+})();
+</script>
+{% endwith %}

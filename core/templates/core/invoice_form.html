@@ -1,0 +1,100 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}{{ mode == 'create'|yesno:'New Invoice,Edit Invoice' }}{% endblock %}
+{% block app_content %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Invoice #</label>
+          {{ form.number }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Client</label>
+          {{ form.client }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Project</label>
+          {{ form.project }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Status</label>
+          {{ form.status }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Issue date</label>
+          {{ form.issue_date }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Due date</label>
+          {{ form.due_date }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Tax (amount)</label>
+          {{ form.tax }}
+        </div>
+        <div class="col-12">
+          <label class="form-label">Notes</label>
+          {{ form.notes }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <strong>Line Items</strong>
+        <button class="btn btn-sm btn-outline-secondary" type="button" onclick="addFormsetRow()">Add row</button>
+      </div>
+      {{ formset.management_form }}
+      <div id="items">
+        {% for f in formset %}
+          <div class="row g-2 align-items-end border-bottom pb-2 mb-2">
+            <div class="col-md-7">
+              <label class="form-label">Description</label>
+              {{ f.description }}
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Qty</label>
+              {{ f.qty }}
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Unit price</label>
+              {{ f.unit_price }}
+            </div>
+            <div class="col-md-1">
+              <label class="form-label">Delete</label>
+              {{ f.DELETE }}
+            </div>
+            {{ f.id }}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="card-footer d-flex justify-content-between">
+      <a class="btn btn-outline-secondary" href="{% url 'core:invoices' %}">Cancel</a>
+      <button class="btn btn-primary" type="submit">Save</button>
+    </div>
+  </div>
+</form>
+
+<script>
+function addFormsetRow() {
+  const totalForms = document.getElementById('id_items-TOTAL_FORMS') || document.querySelector('[name$="-TOTAL_FORMS"]');
+  const formCount = parseInt(totalForms.value, 10);
+  const container = document.getElementById('items');
+  const empty = container.querySelector('.row.g-2');
+  const clone = empty.cloneNode(true);
+  clone.querySelectorAll('input,select,textarea').forEach(el => {
+    el.name = el.name.replace(/-(\d+)-/, `-${formCount}-`);
+    el.id = el.id.replace(/_(\d+)_/, `_${formCount}_`);
+    if (el.type !== 'hidden' && el.type !== 'checkbox') el.value = '';
+    if (el.type === 'checkbox') el.checked = false;
+  });
+  container.appendChild(clone);
+  totalForms.value = formCount + 1;
+}
+</script>
+{% endblock %}

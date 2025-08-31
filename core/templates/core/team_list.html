@@ -1,0 +1,62 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}Team{% endblock %}
+{% block app_content %}
+<div class="d-flex justify-content-between mb-3">
+  <div>
+    <div class="text-muted small">Company</div>
+    <div class="fw-semibold">{{ company.name }}</div>
+  </div>
+  {% if can_manage %}
+  <a class="btn btn-primary" href="{% url 'core:invite_create' %}">Invite Member</a>
+  {% endif %}
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="fw-semibold mb-2">Members</div>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead><tr><th>User</th><th>Role</th><th>Joined</th><th></th></tr></thead>
+        <tbody>
+          {% for m in members %}
+          <tr>
+            <td>{{ m.user.name|default:m.user.email }}</td>
+            <td class="text-capitalize">{{ m.role }}</td>
+            <td>{{ m.joined_at|date:'Y-m-d' }}</td>
+            <td class="text-end">
+              {% if can_manage and m.user_id != request.user.id %}
+                <a class="btn btn-sm btn-outline-danger" href="{% url 'core:member_remove' m.id %}">Remove</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-center text-muted py-3">No members yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="fw-semibold mb-2">Pending Invites</div>
+    <div class="table-responsive">
+      <table class="table mb-0 align-middle">
+        <thead><tr><th>Email</th><th>Role</th><th>Sent</th></tr></thead>
+        <tbody>
+          {% for i in invites %}
+          <tr>
+            <td>{{ i.email }}</td>
+            <td class="text-capitalize">{{ i.role }}</td>
+            <td>{{ i.sent_at|date:'Y-m-d H:i' }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="text-center text-muted py-3">No pending invites.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

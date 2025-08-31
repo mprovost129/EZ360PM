@@ -1,0 +1,114 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}Invoice {{ inv.number }}{% endblock %}
+{% block app_content %}
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="text-muted small">Client</div>
+            <div class="fw-semibold">{{ inv.client }}</div>
+            <div class="text-muted small">Project</div>
+            <div>{{ inv.project }}</div>
+          </div>
+          <div class="text-end">
+            <div class="text-muted small">Status</div>
+            <div class="text-capitalize">{{ inv.status }}</div>
+            <div class="text-muted small">Issued</div>
+            <div>{{ inv.issue_date|date:'Y-m-d' }}</div>
+            <div class="text-muted small">Due</div>
+            <div>{{ inv.due_date|date:'Y-m-d' }}</div>
+          </div>
+        </div>
+        <hr>
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead><tr><th>Description</th><th class="text-end">Qty</th><th class="text-end">Unit</th><th class="text-end">Line</th></tr></thead>
+            <tbody>
+              {% for it in inv.items.all %}
+                <tr>
+                  <td>{{ it.description }}</td>
+                  <td class="text-end">{{ it.qty }}</td>
+                  <td class="text-end">${{ it.unit_price }}</td>
+                  <td class="text-end">${{ it.line_total }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="text-center text-muted py-3">No items.</td></tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr><th colspan="3" class="text-end">Subtotal</th><th class="text-end">${{ inv.subtotal }}</th></tr>
+              <tr><th colspan="3" class="text-end">Tax</th><th class="text-end">${{ inv.tax }}</th></tr>
+              <tr><th colspan="3" class="text-end">Total</th><th class="text-end">${{ inv.total }}</th></tr>
+              <tr><th colspan="3" class="text-end">Paid</th><th class="text-end">${{ inv.amount_paid }}</th></tr>
+              <tr><th colspan="3" class="text-end">Balance</th><th class="text-end">${{ inv.balance }}</th></tr>
+            </tfoot>
+          </table>
+        </div>
+        {% if inv.notes %}
+          <div class="mt-3">
+            <div class="fw-semibold">Notes</div>
+            <div class="text-muted">{{ inv.notes|linebreaks }}</div>
+          </div>
+        {% endif %}
+      </div>
+      <div class="card-footer d-flex justify-content-between">
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-secondary" href="{% url 'core:invoice_update' inv.pk %}">Edit</a>
+          <a class="btn btn-outline-secondary" href="{% url 'core:invoice_pdf' inv.pk %}" target="_blank">PDF</a>
+          <a class="btn btn-primary" href="{% url 'core:invoice_email' inv.pk %}">Email</a>
+          {% with balance=(inv.total|default:0) |add:"-"|(inv.amount_paid|default:0) %}
+          {% if inv.status != inv.SENT %}
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'core:invoice_send_email' inv.pk %}">Send</a>
+          {% elif balance|floatformat:2 > 0 and inv.status != inv.VOID %}
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'core:invoice_send_reminder' inv.pk %}">Send reminder</a>
+          {% endif %}
+          {% endwith %}
+          <a class="btn btn-outline-primary" href="{% url 'core:invoice_mark_sent' inv.pk %}">Mark Sent</a>
+          {% if inv.amount_paid and inv.amount_paid|floatformat:2 != "0.00" %}
+          <a class="btn btn-sm btn-outline-danger" href="{% url 'core:invoice_refund' inv.pk %}">Refund</a>
+          {% endif %}
+          <a class="btn btn-outline-danger" href="{% url 'core:invoice_void' inv.pk %}">Void</a>
+        </div>
+        <a class="btn btn-primary" href="{% url 'core:payment_create' inv.pk %}">Add Payment</a>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mt-3">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Payments</div>
+        <div class="table-responsive">
+          <table class="table mb-0 align-middle">
+            <thead><tr><th>When</th><th>Method</th><th class="text-end">Amount</th></tr></thead>
+            <tbody>
+              {% for p in inv.payments.all|dictsortreversed:'received_at' %}
+                <tr>
+                  <td>{{ p.received_at|date:'Y-m-d H:i' }}</td>
+                  <td>{{ p.method }}</td>
+                  <td class="text-end">${{ p.amount }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="3" class="text-center text-muted py-3">No payments yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold">Quick Actions</div>
+        <div class="d-grid gap-2 mt-2">
+          <a class="btn btn-outline-secondary" href="{% url 'core:invoices' %}">Back to Invoices</a>
+          <a class="btn btn-outline-primary" href="{% url 'core:payment_create' inv.pk %}">Record a Payment</a>
+          <a class="btn btn-outline-secondary" href="{% url 'core:invoice_public' inv.public_token %}" target="_blank">Open Public Link</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}Expenses{% endblock %}
+{% block app_content %}
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-end mb-3">
+  <form class="row g-2 align-items-end" method="get" role="search">
+    <div class="col-auto">
+      <label class="form-label">Start</label>
+      <input class="form-control" type="date" name="start" value="{{ start|date:'Y-m-d' }}">
+    </div>
+    <div class="col-auto">
+      <label class="form-label">End</label>
+      <input class="form-control" type="date" name="end" value="{{ end|date:'Y-m-d' }}">
+    </div>
+    <div class="col-auto">
+      <label class="form-label">Search</label>
+      <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Vendor, description, category…">
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-outline-secondary" type="submit">Filter</button>
+    </div>
+  </form>
+  <div class="d-flex gap-2">
+    <a class="btn btn-primary" href="{% url 'core:expense_create' %}">New Expense</a>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Vendor</th>
+          <th>Description</th>
+          <th>Category</th>
+          <th>Project</th>
+          <th class="text-end">Amount</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in expenses %}
+        <tr>
+          <td>{{ e.date|date:'Y-m-d' }}</td>
+          <td>{{ e.vendor }}</td>
+          <td>{{ e.description }}</td>
+          <td>{{ e.category }}</td>
+          <td>{{ e.project }}</td>
+          <td class="text-end">${{ e.amount }}</td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:expense_update' e.pk %}">Edit</a>
+            <a class="btn btn-sm btn-outline-danger" href="{% url 'core:expense_delete' e.pk %}">Delete</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No expenses in this range.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-body d-flex justify-content-end">
+    <div class="text-muted">Total: <strong>${{ total }}</strong></div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}My Profile{% endblock %}
+{% block app_content %}
+<div class="row g-3">
+  <div class="col-12 col-md-4">
+    <div class="card shadow-sm">
+      <div class="card-body text-center">
+        {% if profile.avatar %}
+          <img src="{{ profile.avatar.url }}" alt="Avatar" class="rounded-circle mb-2" style="width:120px;height:120px;object-fit:cover;">
+        {% else %}
+          <div class="rounded-circle bg-light d-inline-flex align-items-center justify-content-center mb-2" style="width:120px;height:120px;">
+            {% firstof request.user.first_name request.user.get_username request.user.email as display_name %}
+            <span class="fw-bold fs-3">{{ display_name|slice:":1"|upper }}</span>
+          </div>
+        {% endif %}
+        {% firstof request.user.get_full_name request.user.email request.user.get_username as display_full %}
+        <h5 class="mb-0">{{ display_full }}</h5>
+        <div class="text-muted">{{ profile.title }}</div>
+        {% if company %}
+          <div class="mt-2 small">Current company: <strong>{{ company.name }}</strong></div>
+          {% if membership %}
+            <div class="small text-muted">Role: {{ membership.role }}{% if membership.job_title %} ({{ membership.job_title }}){% endif %}</div>
+          {% endif %}
+        {% endif %}
+        <a class="btn btn-sm btn-primary mt-3" href="{% url 'core:my_profile_edit' %}">Edit profile</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-8">
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="text-uppercase text-muted">Contact</h6>
+        <div class="row">
+          <div class="col-6"><span class="text-muted small">Email</span><div>{{ request.user.email }}</div></div>
+          <div class="col-6"><span class="text-muted small">Phone</span><div>{{ profile.phone|default:"—" }}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="text-uppercase text-muted">Preferences</h6>
+        <div class="row">
+          <div class="col-4"><span class="text-muted small">Timezone</span><div>{{ profile.timezone|default:"—" }}</div></div>
+          <div class="col-4"><span class="text-muted small">Locale</span><div>{{ profile.locale|default:"—" }}</div></div>
+          <div class="col-4"><span class="text-muted small">Dark mode</span><div>{% if profile.dark_mode %}On{% else %}Off{% endif %}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h6 class="text-uppercase text-muted">About</h6>
+        <div>{{ profile.bio|linebreaksbr|default:"—" }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

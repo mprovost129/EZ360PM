@@ -1,0 +1,12 @@
+Hello,
+
+{% if mode == "reminder" %}This is a friendly reminder for {% endif %}Estimate {{ est.number }} from {{ est.company.name }}.
+
+View online: {{ public_url }}
+{% if est.valid_until %}Valid until: {{ est.valid_until }}{% endif %}
+
+{% if note %}Message:
+{{ note }}
+{% endif %}
+
+Sent via {{ APP_NAME }}.

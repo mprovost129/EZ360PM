@@ -1,0 +1,8 @@
+{% if request.user.is_authenticated and active_company and not is_subscribed %}
+<div class="alert alert-warning d-flex align-items-center justify-content-between" role="alert">
+  <div>
+    <strong>Upgrade available.</strong> Unlock reports, estimates, and recurring invoices.
+  </div>
+  <a class="btn btn-sm btn-primary" href="{% url 'billing:plans' %}">See plans</a>
+</div>
+{% endif %}

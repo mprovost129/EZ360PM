@@ -1,0 +1,12 @@
+New suggestion submitted:
+
+Name: {{ s.name|default:"(none)" }}
+Email: {{ s.email|default:"(none)" }}
+Company: {{ s.company|default:"(none)" }}
+User: {{ s.user|default:"(anon)" }}
+From URL: {{ s.page_url|default:"(n/a)" }}
+
+Subject: {{ s.subject }}
+
+Message:
+{{ s.message }}

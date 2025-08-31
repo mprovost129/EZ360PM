@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-5" style="max-width:900px">
+  <div class="text-center mb-4">
+    {% if icon %}
+      <!-- Bootstrap Icons assumed; swap if needed -->
+      <span class="d-inline-block mb-2" aria-hidden="true" style="font-size:2rem;">
+        <i class="bi bi-{{ icon }}"></i>
+      </span>
+    {% endif %}
+    <h1 class="h3 mb-2">{{ title }}</h1>
+    <p class="text-muted mb-0">{{ lead }}</p>
+  </div>
+
+  <div class="row g-4 align-items-center mt-2">
+    <div class="col-md-6">
+      <div class="p-4 bg-light border rounded-3 h-100">
+        <h2 class="h5">What you’ll get</h2>
+        <ul class="mb-0">
+          <li>Clean, focused UI for {{ title|lower }}</li>
+          <li>Exports you can take anywhere</li>
+          <li>Fast support if you need a hand</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="p-4 border rounded-3 h-100">
+        <h2 class="h5">Ready to unlock {{ title|lower }}?</h2>
+        <p class="text-muted">Pick a plan that fits — or start free to kick the tires.</p>
+        <div class="d-flex gap-2">
+          {% if cta_primary_url and cta_primary_label %}
+            <a class="btn btn-primary" href="{{ cta_primary_url }}">{{ cta_primary_label }}</a>
+          {% endif %}
+          {% if cta_secondary_url and cta_secondary_label %}
+            <a class="btn btn-outline-primary" href="{{ cta_secondary_url }}">{{ cta_secondary_label }}</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="text-center mt-4">
+    <a class="small" href="{% url 'dashboard:home' %}">Back to Home</a>
+  </div>
+</div>
+{% endblock %}

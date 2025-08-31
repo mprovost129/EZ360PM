@@ -1,0 +1,180 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}Dashboard{% endblock %}
+{% block app_content %}
+{% if onboarding.show %}
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div>
+        <strong>Getting started</strong>
+        <div class="text-muted small">
+          {{ onboarding.completed }} of {{ onboarding.total }} complete
+        </div>
+      </div>
+      <div class="progress" style="width: 200px;">
+        <div class="progress-bar" role="progressbar"
+             style="width: {{ onboarding.percent }}%;"
+             aria-valuenow="{{ onboarding.percent }}" aria-valuemin="0" aria-valuemax="100">
+          {{ onboarding.percent }}%
+        </div>
+      </div>
+    </div>
+    <ul class="list-unstyled mb-0">
+      {% for item in onboarding.items %}
+        <li class="d-flex align-items-center py-1">
+          {% if item.done %}
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            <span class="text-muted flex-grow-1"><s>{{ item.label }}</s></span>
+            <a href="{{ item.url }}" class="btn btn-sm btn-outline-secondary">View</a>
+          {% else %}
+            <i class="bi bi-circle me-2"></i>
+            <a href="{{ item.url }}" class="flex-grow-1 text-decoration-none">{{ item.label }}</a>
+            <a href="{{ item.url }}" class="btn btn-sm btn-primary ms-2">Do it</a>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endif %}
+<div class="row g-3">
+  <!-- KPI cards -->
+  <div class="col-12 col-md-6 col-lg-3">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="text-muted small">Income (last 30d)</div>
+        <div class="fs-4 fw-semibold">{{ income_30 }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-3">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="text-muted small">Expenses (last 30d)</div>
+        <div class="fs-4 fw-semibold">{{ expenses_30 }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-3">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="text-muted small">Profit (last 30d)</div>
+        <div class="fs-4 fw-semibold">{{ profit_30 }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-3">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="text-muted small">Outstanding invoices</div>
+        <div class="fs-4 fw-semibold">{{ outstanding_total }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <!-- Overdue invoices -->
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">Overdue invoices</h6>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:invoices' %}?status=">View all</a>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead><tr><th>#</th><th>Client</th><th>Due</th><th class="text-end">Balance</th><th></th></tr></thead>
+            <tbody>
+              {% for inv, bal in overdue %}
+              <tr>
+                <td>INV {{ inv.number }}</td>
+                <td>{{ inv.client }}</td>
+                <td>{{ inv.due_date|date:"Y-m-d" }}</td>
+                <td class="text-end">{{ bal }}</td>
+                <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{% url 'core:invoice_detail' inv.pk %}">Open</a></td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="5" class="text-center text-muted py-3">Nothing overdue 🎉</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Time this week -->
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">Time this week ({{ start_week|date:"M d" }}–{{ end_week|date:"M d" }})</h6>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:time_list' %}">Time</a>
+        </div>
+        <div class="display-6 fw-semibold">{{ hours_week|floatformat:2 }} h</div>
+        <div class="text-muted small mt-1">{{ active_timers }} active timer{% if active_timers != 1 %}s{% endif %}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <!-- Recent activity -->
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">Recent activity</h6>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:notifications' %}">All notifications</a>
+        </div>
+        <ul class="list-group list-group-flush">
+          {% for n in recent_notes %}
+          <li class="list-group-item d-flex justify-content-between">
+            <div>
+              <span class="fw-semibold">{{ n.text }}</span>
+              {% if n.url %}<a class="ms-1" href="{{ n.url }}">Open</a>{% endif %}
+            </div>
+            <small class="text-muted">{{ n.created_at|date:"Y-m-d H:i" }}</small>
+          </li>
+          {% empty %}
+          <li class="list-group-item text-muted text-center">No activity yet.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick lists -->
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="mb-2">Recent projects</h6>
+        <ul class="list-group list-group-flush mb-3">
+          {% for p in recent_projects %}
+          <li class="list-group-item d-flex justify-content-between">
+            <span>{{ p.number }} {{ p.name }}</span>
+            <a class="btn btn-sm btn-outline-primary" href="{% url 'core:project_detail' p.pk %}">Open</a>
+          </li>
+          {% empty %}
+          <li class="list-group-item text-muted text-center">No projects yet.</li>
+          {% endfor %}
+        </ul>
+
+        <h6 class="mb-2">Top clients (by payments)</h6>
+        <ul class="list-group list-group-flush">
+          {% for c in top_clients %}
+          <li class="list-group-item d-flex justify-content-between">
+            <span>{{ c }}</span>
+            <span class="text-muted">{{ c.total_paid|default:"0" }}</span>
+          </li>
+          {% empty %}
+          <li class="list-group-item text-muted text-center">No payments yet.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}{% if mode == 'edit' %}Edit Recurring Plan{% else %}New Recurring Plan{% endif %}{% endblock %}
+{% block app_content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post" class="row g-3">
+      {% csrf_token %}
+      <div class="col-12 col-md-6">
+        <label class="form-label">Title</label>
+        {{ form.title }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Client</label>
+        {{ form.client }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Project (optional)</label>
+        {{ form.project }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Template Invoice (optional)</label>
+        {{ form.template_invoice }}
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Frequency</label>
+        {{ form.frequency }}
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Start date</label>
+        {{ form.start_date }}
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Next run date</label>
+        {{ form.next_run_date }}
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">End date</label>
+        {{ form.end_date }}
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Due days</label>
+        {{ form.due_days }}
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Status</label>
+        {{ form.status }}
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="form-check mt-4">
+          {{ form.auto_email }} <label class="form-check-label">Auto email invoice</label>
+        </div>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Max occurrences</label>
+        {{ form.max_occurrences }}
+      </div>
+      <div class="col-12 d-flex gap-2 mt-2">
+        <button class="btn btn-primary">Save</button>
+        <a class="btn btn-outline-secondary" href="{% url 'core:recurring_list' %}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

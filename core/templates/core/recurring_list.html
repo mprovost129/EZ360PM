@@ -1,0 +1,43 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}Recurring Invoices{% endblock %}
+{% block app_content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h5 class="mb-0">Recurring Plans</h5>
+  <a class="btn btn-primary" href="{% url 'core:recurring_create' %}">New Plan</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Title</th><th>Client</th><th>Project</th><th>Frequency</th>
+          <th>Next Run</th><th>Status</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in plans %}
+        <tr>
+          <td>{{ p.title }}</td>
+          <td>{{ p.client }}</td>
+          <td>{{ p.project|default:"—" }}</td>
+          <td class="text-capitalize">{{ p.frequency }}</td>
+          <td>{{ p.next_run_date }}</td>
+          <td><span class="badge {% if p.status == 'active' %}bg-success{% else %}bg-secondary{% endif %}">{{ p.status }}</span></td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-primary" href="{% url 'core:recurring_run_now' p.pk %}">Run now</a>
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:recurring_update' p.pk %}">Edit</a>
+            <a class="btn btn-sm btn-outline-warning" href="{% url 'core:recurring_toggle' p.pk %}">
+              {% if p.status == 'active' %}Pause{% else %}Activate{% endif %}
+            </a>
+            <a class="btn btn-sm btn-outline-danger" href="{% url 'core:recurring_delete' p.pk %}">Delete</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No recurring plans yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

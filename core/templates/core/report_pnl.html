@@ -1,0 +1,62 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}Profit & Loss{% endblock %}
+{% block app_content %}
+<form class="row g-2 align-items-end mb-3" method="get">
+  <div class="col-auto">
+    <label class="form-label">Start</label>
+    <input class="form-control" type="date" name="start" value="{{ start|date:'Y-m-d' }}">
+  </div>
+  <div class="col-auto">
+    <label class="form-label">End</label>
+    <input class="form-control" type="date" name="end" value="{{ end|date:'Y-m-d' }}">
+  </div>
+  <div class="col-auto">
+    <label class="form-label">Basis</label>
+    <select class="form-select" name="basis">
+      <option value="cash" {% if basis=='cash' %}selected{% endif %}>Cash</option>
+      <option value="accrual" {% if basis=='accrual' %}selected{% endif %}>Accrual</option>
+    </select>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-secondary" type="submit">Run</button>
+  </div>
+  <div class="col-auto">
+    <a class="btn btn-outline-primary" href="{% url 'core:report_pnl_csv' %}?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}&basis={{ basis }}">Export CSV</a>
+  </div>
+</form>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between"><div class="text-muted">Income</div><div class="fw-semibold">${{ income_total }}</div></div>
+        <div class="d-flex justify-content-between"><div class="text-muted">Expenses</div><div class="fw-semibold">${{ expenses_total }}</div></div>
+        <hr>
+        <div class="d-flex justify-content-between"><div class="fw-semibold">Profit</div><div class="fw-bold">${{ profit }}</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Expenses by Category</div>
+        <div class="table-responsive">
+          <table class="table mb-0 align-middle">
+            <thead><tr><th>Category</th><th class="text-end">Total</th></tr></thead>
+            <tbody>
+              {% for row in by_cat %}
+                <tr>
+                  <td>{{ row.category|default:'(Uncategorized)' }}</td>
+                  <td class="text-end">${{ row.total }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="2" class="text-center text-muted py-3">No expenses in range.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

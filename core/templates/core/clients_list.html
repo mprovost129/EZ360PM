@@ -1,0 +1,57 @@
+{% extends "_app_shell.html" %}
+{% block page_title %}Clients{% endblock %}
+{% block app_content %}
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+  <form class="d-flex" method="get" role="search" style="max-width:420px; width:100%">
+    <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Search clients…">
+  </form>
+  <a class="btn btn-primary" href="{% url 'core:client_create' %}">New Client</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Company</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for c in clients %}
+        <tr>
+          <td>{{ c.first_name }} {{ c.last_name }}</td>
+          <td>{{ c.org }}</td>
+          <td>{{ c.email }}</td>
+          <td>{{ c.phone }}</td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:client_update' c.pk %}">Edit</a>
+            <a class="btn btn-sm btn-outline-danger" href="{% url 'core:client_delete' c.pk %}">Delete</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No clients yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if clients.paginator.num_pages > 1 %}
+  <div class="card-body">
+    <nav>
+      <ul class="pagination mb-0">
+        {% if clients.has_previous %}
+          <li class="page-item"><a class="page-link" href="?page={{ clients.previous_page_number }}&q={{ q }}">Prev</a></li>
+        {% endif %}
+        <li class="page-item disabled"><span class="page-link">Page {{ clients.number }} of {{ clients.paginator.num_pages }}</span></li>
+        {% if clients.has_next %}
+          <li class="page-item"><a class="page-link" href="?page={{ clients.next_page_number }}&q={{ q }}">Next</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
