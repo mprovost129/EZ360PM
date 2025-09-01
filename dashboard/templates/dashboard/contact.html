@@ -1,27 +1,38 @@
 {% extends "base.html" %}
+
 {% block content %}
 <div class="container py-5" style="max-width:720px">
+
+  {# Flash messages #}
+  {% if messages %}
+    <div class="mb-3">
+      {% for m in messages %}
+        <div class="alert alert-{{ m.tags|default:'info' }} mb-2" role="alert">{{ m }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
   <div class="card shadow-sm">
     <div class="card-body">
-      <h1 class="h4 mb-3">Contact & Suggestions</h1>
-      <p class="text-muted">Tell us what would make EZ360PM better.</p>
+      <h1 class="h4 mb-1">Contact &amp; Suggestions</h1>
+      <p class="text-muted mb-3">Tell us what would make <strong>EZ360PM</strong> better.</p>
 
       <form method="post" novalidate>
         {% csrf_token %}
 
-        {# Show any non-field errors at the top #}
+        {# Non-field errors at the top #}
         {% if form.non_field_errors %}
-          <div class="alert alert-danger">
+          <div class="alert alert-danger" role="alert">
             {{ form.non_field_errors }}
           </div>
         {% endif %}
 
-        {# Render hidden fields first (page_url, honeypot, etc.) #}
+        {# Hidden fields (page_url, honeypot, etc.) #}
         {% for field in form.hidden_fields %}
           {{ field }}
         {% endfor %}
 
-        {# Render normal visible fields except the consent checkboxes (we'll style those separately) #}
+        {# Visible fields except consent checkboxes (styled separately) #}
         {% for field in form.visible_fields %}
           {% if field.name != 'accept_terms' and field.name != 'accept_privacy' %}
             {% if field.field.widget.input_type == 'checkbox' %}
@@ -42,7 +53,7 @@
           {% endif %}
         {% endfor %}
 
-        {# Terms checkbox (only if present on the form) #}
+        {# Terms checkbox (optional) #}
         {% if form.accept_terms %}
           <div class="form-check mb-2">
             {{ form.accept_terms }}
@@ -53,7 +64,7 @@
           </div>
         {% endif %}
 
-        {# Optional Privacy checkbox (only if present) #}
+        {# Privacy checkbox (optional) #}
         {% if form.accept_privacy %}
           <div class="form-check mb-3">
             {{ form.accept_privacy }}
@@ -64,10 +75,9 @@
           </div>
         {% endif %}
 
-        <button class="btn btn-primary">Send</button>
+        <button type="submit" class="btn btn-primary">Send</button>
       </form>
     </div>
   </div>
 </div>
 {% endblock %}
-

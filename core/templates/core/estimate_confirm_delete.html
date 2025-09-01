@@ -1,12 +1,46 @@
 {% extends "_app_shell.html" %}
 {% block page_title %}Delete Estimate{% endblock %}
+
 {% block app_content %}
 <div class="card shadow-sm">
   <div class="card-body">
-    <p>Delete <strong>{{ est.number }}</strong>?</p>
-    <form method="post">{% csrf_token %}
+    <div class="mb-3">
+      <p class="mb-1">You're about to delete this estimate:</p>
+      <ul class="list-unstyled mb-0 small text-muted">
+        <li><strong>#:</strong> {{ est.number }}</li>
+        {% if est.client %}<li><strong>Client:</strong> {{ est.client }}</li>{% endif %}
+        {% if est.project %}<li><strong>Project:</strong> {{ est.project }}</li>{% endif %}
+        <li><strong>Status:</strong> {{ est.get_status_display|default:est.status|capfirst }}</li>
+        {% if est.issue_date %}<li><strong>Issued:</strong> {{ est.issue_date|date:"Y-m-d" }}</li>{% endif %}
+        <li><strong>Total:</strong> ${{ est.total|default:"0.00" }}</li>
+      </ul>
+    </div>
+
+    {% if est.is_template %}
+      <div class="alert alert-info">
+        This is a <strong>template</strong>. Deleting it will not affect any estimates created from it.
+      </div>
+    {% endif %}
+
+    {% if est.converted_invoice_id %}
+      <div class="alert alert-warning">
+        This estimate has been converted to an invoice.
+        Deleting the estimate will <strong>not</strong> delete the invoice.
+        <a class="alert-link" href="{% url 'core:invoice_detail' est.converted_invoice_id %}">View invoice</a>.
+      </div>
+    {% endif %}
+
+    <div class="alert alert-danger">
+      <strong>Danger:</strong> This action cannot be undone.
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
       <a class="btn btn-outline-secondary" href="{% url 'core:estimate_detail' est.pk %}">Cancel</a>
-      <button class="btn btn-danger" type="submit">Delete</button>
+      <button class="btn btn-danger" type="submit"
+              onclick="return confirm('Delete estimate {{ est.number }}? This cannot be undone.');">
+        Delete
+      </button>
     </form>
   </div>
 </div>

@@ -11,7 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 
-UserModelRef = settings.AUTH_USER_MODEL  # string like "accounts.User"
+UserModelRef = settings.AUTH_USER_MODEL  # e.g. "accounts.User"
 
 
 # -----------------------------
@@ -65,7 +65,13 @@ class CompanyInvite(models.Model):
     email = models.EmailField()
     role = models.CharField(max_length=12, choices=CompanyMember.ROLE_CHOICES, default=CompanyMember.MEMBER)
     token = models.UUIDField(default=uuid4, unique=True, editable=False)
-    invited_by = models.ForeignKey(UserModelRef, on_delete=models.SET_NULL, null=True, blank=True, related_name="sent_company_invites")
+    invited_by = models.ForeignKey(
+        UserModelRef,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sent_company_invites",
+    )
     sent_at = models.DateTimeField(default=timezone.now)
     accepted_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=PENDING)
@@ -93,10 +99,14 @@ class Client(models.Model):
 
     class Meta:
         ordering = ("org", "last_name", "first_name", "id")
-        indexes = [models.Index(fields=["company", "org"]), models.Index(fields=["company", "email"])]
+        indexes = [
+            models.Index(fields=["company", "org"]),
+            models.Index(fields=["company", "email"]),
+        ]
 
     def __str__(self) -> str:
-        return self.org or f"{(self.first_name or '').strip()} {(self.last_name or '').strip()}".strip() or self.email
+        name = f"{(self.first_name or '').strip()} {(self.last_name or '').strip()}".strip()
+        return self.org or name or self.email
 
 
 class Project(models.Model):
@@ -120,14 +130,17 @@ class Project(models.Model):
 
     class Meta:
         ordering = ("-created_at", "-id")
-        indexes = [models.Index(fields=["company", "number"]), models.Index(fields=["company", "client", "due_date"])]
+        indexes = [
+            models.Index(fields=["company", "number"]),
+            models.Index(fields=["company", "client", "due_date"]),
+        ]
 
     def __str__(self) -> str:
         return f"{self.number} — {self.name}"
 
     def get_absolute_url(self) -> str:
         return reverse("core:project_detail", args=[self.pk])
-    
+
 
 # -----------------------------
 # Billing: Invoices, Items, Payments, Expenses, Recurring
@@ -158,7 +171,9 @@ class Invoice(models.Model):
     currency = models.CharField(max_length=3, default="usd")
     allow_reminders = models.BooleanField(default=True)
     reminder_log = models.CharField(
-        max_length=120, blank=True, default="",
+        max_length=120,
+        blank=True,
+        default="",
         help_text="CSV of offsets sent or 'manual' entries",
     )
     last_reminder_sent_at = models.DateTimeField(null=True, blank=True)
@@ -224,7 +239,9 @@ class Expense(models.Model):
     is_billable = models.BooleanField(default=False)
     invoice = models.ForeignKey("Invoice", null=True, blank=True, on_delete=models.SET_NULL, related_name="expenses")
     billable_markup_pct = models.DecimalField(
-        max_digits=5, decimal_places=2, default=Decimal("0.00"),
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
         help_text="Percentage markup to apply when rebilling, e.g. 10.00 for 10%.",
     )
     billable_note = models.CharField(max_length=200, blank=True, default="")
@@ -252,7 +269,10 @@ class RecurringPlan(models.Model):
     client = models.ForeignKey("core.Client", on_delete=models.PROTECT)
     project = models.ForeignKey("core.Project", on_delete=models.SET_NULL, null=True, blank=True)
     template_invoice = models.ForeignKey(
-        "core.Invoice", on_delete=models.SET_NULL, null=True, blank=True,
+        "core.Invoice",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         help_text="Items/notes/tax copied each cycle.",
     )
 
@@ -311,7 +331,11 @@ class TimeEntry(models.Model):
     submitted_at = models.DateTimeField(null=True, blank=True)
     approved_at = models.DateTimeField(null=True, blank=True)
     approved_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="approved_timeentries"
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="approved_timeentries",
     )
     reject_reason = models.CharField(max_length=200, blank=True, default="")
 
@@ -337,7 +361,13 @@ class Estimate(models.Model):
     ACCEPTED = "accepted"
     DECLINED = "declined"
     EXPIRED = "expired"
-    STATUS_CHOICES = [(DRAFT, "Draft"), (SENT, "Sent"), (ACCEPTED, "Accepted"), (DECLINED, "Declined"), (EXPIRED, "Expired")]
+    STATUS_CHOICES = [
+        (DRAFT, "Draft"),
+        (SENT, "Sent"),
+        (ACCEPTED, "Accepted"),
+        (DECLINED, "Declined"),
+        (EXPIRED, "Expired"),
+    ]
 
     company = models.ForeignKey("core.Company", on_delete=models.CASCADE, related_name="estimates")
     client = models.ForeignKey("core.Client", on_delete=models.PROTECT, related_name="estimates")
@@ -364,7 +394,11 @@ class Estimate(models.Model):
     client_note = models.TextField(blank=True, default="")
 
     converted_invoice = models.OneToOneField(
-        "core.Invoice", null=True, blank=True, on_delete=models.SET_NULL, related_name="from_estimate"
+        "core.Invoice",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="from_estimate",
     )
 
     class Meta:
@@ -517,8 +551,12 @@ class Notification(models.Model):
     def __str__(self) -> str:
         who = getattr(self.recipient, "email", str(self.recipient))
         return f"{who} · {self.text}"
-    
-    
+
+
+# -----------------------------
+# Suggestions / Feedback
+# -----------------------------
+
 class Suggestion(models.Model):
     STATUS_NEW = "new"
     STATUS_REVIEWED = "reviewed"
@@ -529,8 +567,12 @@ class Suggestion(models.Model):
         (STATUS_CLOSED, "Closed"),
     ]
 
-    company = models.ForeignKey("core.Company", null=True, blank=True, on_delete=models.SET_NULL, related_name="suggestions")
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="suggestions")
+    company = models.ForeignKey(
+        "core.Company", null=True, blank=True, on_delete=models.SET_NULL, related_name="suggestions"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="suggestions"
+    )
     name = models.CharField(max_length=120, blank=True)
     email = models.EmailField(blank=True)
     subject = models.CharField(max_length=200)
@@ -542,6 +584,6 @@ class Suggestion(models.Model):
     class Meta:
         ordering = ("-created_at",)
 
-    def __str__(self):
+    def __str__(self) -> str:
         who = self.name or self.email or (getattr(self.user, "email", "") or "Anon")
         return f"{who} — {self.subject[:60]}"

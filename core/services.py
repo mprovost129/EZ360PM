@@ -1,11 +1,10 @@
 # core/services.py
-
 from __future__ import annotations
 
 from collections import defaultdict
 from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional, Iterable
+from typing import Optional, Iterable, List, Dict
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -29,16 +28,14 @@ from .utils import advance_schedule, generate_invoice_number
 User = get_user_model()
 
 
-# ----------------------------
+# ============================
 # Totals / (Re)calculations
-# ----------------------------
+# ============================
 
 def recalc_invoice(invoice: Invoice) -> Invoice:
     """
     Recalculate invoice subtotal/total/amount_paid and set PAID status if applicable.
-    Assumes InvoiceItem has fields: description, qty, unit_price (no per-line total stored).
     """
-    # Subtotal in Python to be safe with Decimals and nulls
     subtotal = Decimal("0.00")
     for it in invoice.items.all():  # type: ignore[attr-defined]
         q = Decimal(str(it.qty or 0))
@@ -54,7 +51,6 @@ def recalc_invoice(invoice: Invoice) -> Invoice:
     )
     paid = Decimal(str(paid)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-    # Update status if fully paid
     new_status = invoice.status
     if total > 0 and paid >= total:
         new_status = getattr(Invoice, "PAID", "paid")
@@ -68,9 +64,7 @@ def recalc_invoice(invoice: Invoice) -> Invoice:
 
 
 def recalc_estimate(est: Estimate) -> Estimate:
-    """
-    Recalculate estimate subtotal/total.
-    """
+    """Recalculate estimate subtotal/total."""
     subtotal = Decimal("0.00")
     for it in est.items.all():  # type: ignore[attr-defined]
         q = Decimal(str(it.qty or 0))
@@ -86,22 +80,23 @@ def recalc_estimate(est: Estimate) -> Estimate:
     return est
 
 
-# ----------------------------
+# ============================
 # Estimate -> Invoice
-# ----------------------------
+# ============================
 
 def convert_estimate_to_invoice(est: Estimate) -> Invoice:
     """
     Idempotently create an Invoice from an Estimate and copy line items.
+    Ensures an invoice number is assigned immediately (no NULL/blank number).
     """
-    if getattr(est, "converted_invoice_id", None):  # already converted
+    if getattr(est, "converted_invoice_id", None):
         return est.converted_invoice  # type: ignore[attr-defined]
 
     inv = Invoice.objects.create(
         company=est.company,
         client=est.client,
         project=est.project,
-        number=None,  # will be assigned later via generate_invoice_number
+        number=generate_invoice_number(est.company),
         status=getattr(Invoice, "DRAFT", "draft"),
         issue_date=est.issue_date,
         due_date=None,
@@ -110,7 +105,7 @@ def convert_estimate_to_invoice(est: Estimate) -> Invoice:
         currency=getattr(est, "currency", "usd"),
     )
 
-    # Copy items (qty + unit_price)
+    # Copy items
     items = [
         InvoiceItem(
             invoice=inv,
@@ -125,7 +120,7 @@ def convert_estimate_to_invoice(est: Estimate) -> Invoice:
 
     recalc_invoice(inv)
 
-    # Mark estimate as accepted + link converted invoice
+    # Link estimate -> invoice and mark accepted
     est.converted_invoice = inv  # type: ignore[attr-defined]
     est.status = getattr(Estimate, "ACCEPTED", "accepted")
     est.save(update_fields=["converted_invoice", "status"])
@@ -133,9 +128,9 @@ def convert_estimate_to_invoice(est: Estimate) -> Invoice:
     return inv
 
 
-# ----------------------------
+# ============================
 # Recurring Plans
-# ----------------------------
+# ============================
 
 def generate_invoice_from_plan(plan: RecurringPlan) -> Invoice:
     """
@@ -176,18 +171,16 @@ def generate_invoice_from_plan(plan: RecurringPlan) -> Invoice:
 
 
 def advance_plan_after_run(plan: RecurringPlan) -> None:
-    """
-    Bump counters and compute next run date after creating/sending a plan's invoice.
-    """
+    """Bump counters and compute next run date after creating/sending a plan's invoice."""
     plan.occurrences_sent = (plan.occurrences_sent or 0) + 1
     plan.last_run_at = timezone.now()
     plan.next_run_date = advance_schedule(plan.next_run_date, plan.frequency)
     plan.save(update_fields=["occurrences_sent", "last_run_at", "next_run_date"])
 
 
-# ----------------------------
+# ============================
 # Emailing Invoices (with PDF)
-# ----------------------------
+# ============================
 
 def email_invoice_default(inv: Invoice, request_base_url: Optional[str] = None) -> None:
     """
@@ -198,19 +191,14 @@ def email_invoice_default(inv: Invoice, request_base_url: Optional[str] = None) 
     if not to_email:
         return
 
-    # Body
-    body = render_to_string(
-        "core/email/invoice_email.txt",
-        {"inv": inv, "site_url": settings.SITE_URL},
-    )
+    body = render_to_string("core/email/invoice_email.txt", {"inv": inv, "site_url": settings.SITE_URL})
 
-    # PDF
-    from .views import _render_pdf_from_html  # lazy import to avoid heavy deps at import time
+    # Lazy import heavy PDF deps via views helper
+    from .views import _render_pdf_from_html  # noqa: WPS433
     html = render_to_string("core/pdf/invoice.html", {"inv": inv})
     base_url = request_base_url or f"{settings.SITE_URL}/"
     pdf_bytes = _render_pdf_from_html(html, base_url=base_url)
 
-    # Email
     subject = f"Invoice {inv.number} from {inv.company.name}"
     email = EmailMessage(
         subject=subject,
@@ -222,11 +210,11 @@ def email_invoice_default(inv: Invoice, request_base_url: Optional[str] = None) 
     email.send(fail_silently=False)
 
 
-# ----------------------------
+# ============================
 # Notifications
-# ----------------------------
+# ============================
 
-def _company_users(company, exclude: Optional[User] = None) -> list[User]: # type: ignore
+def _company_users(company, exclude: Optional[User] = None) -> List[User]:  # type: ignore
     """
     Return all user accounts associated with a company (members + owner).
     Optionally exclude a specific user (e.g., the actor).
@@ -258,7 +246,7 @@ def notify(
         recipient=recipient,
         actor=actor,
         kind=kind,
-        text=text[:280],  # hard cap
+        text=text[:280],
         url=(url or "")[:500],
     )
     if target is not None:
@@ -271,7 +259,7 @@ def notify(
 
 def notify_company(
     company,
-    actor: Optional[User], # type: ignore
+    actor: Optional[User],  # type: ignore
     text: str,
     *,
     url: str = "",
@@ -294,13 +282,13 @@ def unread_count(company, user) -> int:
     return Notification.objects.for_company_user(company, user).unread().count()  # type: ignore[attr-defined]
 
 
-def mark_all_read(company, user):
+def mark_all_read(company, user) -> None:
     Notification.objects.for_company_user(company, user).unread().update(read_at=timezone.now())  # type: ignore[attr-defined]
 
 
-# ----------------------------
+# ============================
 # Time → Invoice
-# ----------------------------
+# ============================
 
 def _round_hours(hours: Decimal, step: Decimal) -> Decimal:
     """
@@ -308,7 +296,6 @@ def _round_hours(hours: Decimal, step: Decimal) -> Decimal:
     """
     if step <= 0:
         return hours.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    # round to integer number of steps, then back to hours
     return ((hours / step).quantize(Decimal("1"), rounding=ROUND_HALF_UP) * step).quantize(Decimal("0.01"))
 
 
@@ -320,17 +307,17 @@ def _parse_rounding(val: str) -> Decimal:
         return Decimal("0")
 
 
-def group_time_entries(entries: Iterable[TimeEntry], group_by: str, rounding_step: Decimal):
+def group_time_entries(entries: Iterable[TimeEntry], group_by: str, rounding_step: Decimal) -> List[Dict]:
     """
     Group time entries for invoicing.
     Returns list of dicts: {"label": str, "hours": Decimal, "entries": [TimeEntry]}
     """
-    buckets: dict[object, list[TimeEntry]] = defaultdict(list)
+    buckets: Dict[object, List[TimeEntry]] = defaultdict(list)
     for t in entries:
         if group_by == "day":
             key = (t.started_at.date() if t.started_at else timezone.localdate())
         elif group_by == "user":
-            key = getattr(t.user, "email", str(t.user_id)) # type: ignore
+            key = getattr(t.user, "email", str(t.user_id))  # type: ignore
         elif group_by == "entry":
             key = t.pk
         elif group_by == "project":
@@ -339,7 +326,7 @@ def group_time_entries(entries: Iterable[TimeEntry], group_by: str, rounding_ste
             key = "all"
         buckets[key].append(t)
 
-    out = []
+    out: List[Dict] = []
     for key, rows in buckets.items():
         total = sum((Decimal(str(r.hours or 0)) for r in rows), Decimal("0"))
         total = _round_hours(total, rounding_step)
@@ -367,16 +354,18 @@ def create_invoice_from_time(
     """
     Build a draft invoice from unbilled project time (and optional billable expenses).
     Links included time/expenses to the created invoice to prevent double-billing.
+    Ensures a non-null, unique invoice number at creation.
     """
     rounding_step = _parse_rounding(rounding)
     base_rate = project.hourly_rate or Decimal("0.00")
     rate = (override_rate if override_rate and override_rate > 0 else base_rate)
 
-    # Create invoice shell
+    # Create invoice shell with a valid number immediately
     inv = Invoice.objects.create(
         company=company,
         client=project.client,
         project=project,
+        number=generate_invoice_number(company),  # ✅ ensure required field is set
         issue_date=timezone.now().date(),
         status=getattr(Invoice, "DRAFT", "draft"),
     )
@@ -389,18 +378,16 @@ def create_invoice_from_time(
         started_at__date__lte=end,
     )
     if only_approved:
-        # Use approval fields (approved_at) rather than a status enum
         time_qs = time_qs.filter(approved_at__isnull=False)
 
     groups = group_time_entries(time_qs, group_by=group_by, rounding_step=rounding_step)
 
-    line_items: list[InvoiceItem] = []
+    line_items: List[InvoiceItem] = []
     for g in groups:
         if g["hours"] <= 0:
             continue
         qty = g["hours"]
-        label: str
-        # If grouping by entry and exactly one entry with notes, use that as label
+        # Prefer single-entry notes as description if grouping by entry
         if group_by == "entry" and len(g["entries"]) == 1 and getattr(g["entries"][0], "notes", ""):
             label = g["entries"][0].notes  # type: ignore[index]
         else:
@@ -411,12 +398,7 @@ def create_invoice_from_time(
         if description_prefix:
             label = f"{description_prefix.strip()} — {label}"
 
-        line_items.append(InvoiceItem(
-            invoice=inv,
-            description=label,
-            qty=qty,
-            unit_price=rate,
-        ))
+        line_items.append(InvoiceItem(invoice=inv, description=label, qty=qty, unit_price=rate))
 
     # --- EXPENSES (optional) ---
     if include_expenses:
@@ -438,12 +420,9 @@ def create_invoice_from_time(
             )
             for g in groups_e:
                 # Each expense group becomes a single line with qty=1 and unit_price=total
-                line_items.append(InvoiceItem(
-                    invoice=inv,
-                    description=g["label"],
-                    qty=Decimal("1"),
-                    unit_price=g["total"],
-                ))
+                line_items.append(
+                    InvoiceItem(invoice=inv, description=g["label"], qty=Decimal("1"), unit_price=g["total"])
+                )
             # Link expenses to prevent rebilling
             exp_qs.update(invoice=inv)
 
@@ -451,7 +430,7 @@ def create_invoice_from_time(
     if line_items:
         InvoiceItem.objects.bulk_create(line_items)
 
-    # Link the time entries even if rounded (common pattern)
+    # Link the time entries to the invoice (even when rounding was applied)
     for g in groups:
         ids = [t.id for t in g["entries"]]
         if ids:
@@ -462,14 +441,12 @@ def create_invoice_from_time(
     return inv
 
 
-# ----------------------------
+# ============================
 # Expenses Helpers
-# ----------------------------
+# ============================
 
 def _expense_price(amount: Decimal, markup_pct: Optional[Decimal]) -> Decimal:
-    """
-    Apply percentage markup to an expense amount (e.g., 10 => +10%).
-    """
+    """Apply percentage markup to an expense amount (e.g., 10 => +10%)."""
     pct = (markup_pct or Decimal("0.00")) / Decimal("100.00")
     return (amount * (Decimal("1.00") + pct)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
@@ -479,11 +456,12 @@ def _group_expenses(
     group_by: str,
     override_markup_pct: Optional[Decimal],
     label_prefix: str = "",
-):
+) -> List[Dict]:
     """
+    Group expenses and compute rebilled totals.
     Returns list of dicts: {"label": str, "total": Decimal, "items": [Expense]}
     """
-    buckets: dict[object, list[Expense]] = defaultdict(list)
+    buckets: Dict[object, List[Expense]] = defaultdict(list)
     for e in qs:
         if group_by == "category":
             key = e.category or "Uncategorized"
@@ -495,14 +473,14 @@ def _group_expenses(
             key = "all"
         buckets[key].append(e)
 
-    out = []
+    out: List[Dict] = []
     for key, rows in buckets.items():
         total = Decimal("0.00")
         for r in rows:
             base = Decimal(str(r.amount or 0))
             price = _expense_price(
                 base,
-                override_markup_pct if override_markup_pct is not None else r.billable_markup_pct
+                override_markup_pct if override_markup_pct is not None else r.billable_markup_pct,
             )
             total += price
 

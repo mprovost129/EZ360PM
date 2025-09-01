@@ -1,38 +1,46 @@
 {% load tz %}
-<footer class="border-top mt-auto">
+<footer class="border-top mt-auto" role="contentinfo" aria-label="Site footer">
   <div class="container py-4">
     <div class="row gy-4">
       <!-- Brand / meta -->
       <div class="col-12 col-md-4">
-        <div class="fw-semibold">{{ company_name|default:APP_NAME|default:"EZ360PM" }}</div>
-        <div class="text-muted small">
-          © {% now "Y" %} {{ company_name|default:APP_NAME|default:"EZ360PM" }}. All rights reserved.
+        <div class="fw-semibold">
+          {{ company_name|default:APP_NAME|default:"EZ360PM" }}
         </div>
         <div class="text-muted small">
-          <a class="text-decoration-none" href="mailto:{{ support_email|default:'support@example.com' }}">
+          © <time datetime="{% now 'Y' %}">{% now "Y" %}</time>
+          {{ company_name|default:APP_NAME|default:"EZ360PM" }}. All rights reserved.
+        </div>
+        <div class="text-muted small">
+          <a class="text-decoration-none"
+             href="mailto:{{ support_email|default:'support@example.com' }}">
             {{ support_email|default:"support@example.com" }}
           </a>
         </div>
       </div>
 
       <!-- Legal -->
-      <div class="col-6 col-md-2">
-        <div class="text-uppercase text-muted small mb-2">Legal</div>
+      <nav class="col-6 col-md-2" aria-labelledby="ft-legal">
+        <div id="ft-legal" class="text-uppercase text-muted small mb-2">Legal</div>
         <ul class="list-unstyled mb-0 small">
           <li><a class="text-decoration-none" href="{% url 'dashboard:terms' %}">Terms</a></li>
           <li><a class="text-decoration-none" href="{% url 'dashboard:privacy' %}">Privacy</a></li>
           <li><a class="text-decoration-none" href="{% url 'dashboard:cookies' %}">Cookie Policy</a></li>
           <li><a class="text-decoration-none" href="{% url 'dashboard:cookie_preferences' %}">Cookie Preferences</a></li>
           {% if do_not_sell_url %}
-            <li><a class="text-decoration-none" href="{{ do_not_sell_url }}">Do Not Sell/Share</a></li>
+            <li>
+              <a class="text-decoration-none" href="{{ do_not_sell_url }}" rel="noopener noreferrer">
+                Do Not Sell/Share
+              </a>
+            </li>
           {% endif %}
           <li><a class="text-decoration-none" href="{% url 'dashboard:subprocessors' %}">Subprocessors</a></li>
         </ul>
-      </div>
+      </nav>
 
       <!-- Company -->
-      <div class="col-6 col-md-3">
-        <div class="text-uppercase text-muted small mb-2">Company</div>
+      <nav class="col-6 col-md-3" aria-labelledby="ft-company">
+        <div id="ft-company" class="text-uppercase text-muted small mb-2">Company</div>
         <ul class="list-unstyled mb-0 small">
           <li><a class="text-decoration-none" href="{% url 'dashboard:help_index' %}">Help Center</a></li>
           <li><a class="text-decoration-none" href="{% url 'dashboard:contact' %}">Contact</a></li>
@@ -41,11 +49,11 @@
             <li><a class="text-decoration-none" href="{% url 'billing:webhook_logs' %}">Webhook Logs</a></li>
           {% endif %}
         </ul>
-      </div>
+      </nav>
 
       <!-- Account -->
-      <div class="col-12 col-md-3">
-        <div class="text-uppercase text-muted small mb-2">Account</div>
+      <nav class="col-12 col-md-3" aria-labelledby="ft-account">
+        <div id="ft-account" class="text-uppercase text-muted small mb-2">Account</div>
         <ul class="list-unstyled mb-0 small">
           {% if request.user.is_authenticated %}
             <li><a class="text-decoration-none" href="{% url 'accounts:password_change' %}">Change Password</a></li>
@@ -55,7 +63,7 @@
             <li><a class="text-decoration-none" href="{% url 'accounts:register' %}">Register</a></li>
           {% endif %}
         </ul>
-      </div>
+      </nav>
     </div>
   </div>
 </footer>

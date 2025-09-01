@@ -1,0 +1,14 @@
+{% extends "dashboard/help/_article_base.html" %}
+{% block help_title %}Reports{% endblock %}
+{% block help_intro %}Quick insights for cash flow, profit & loss, time, and project performance.{% endblock %}
+{% block help_body %}
+<ul class="mb-3">
+  <li><strong>P&L (cash basis):</strong> Income (payments) minus expenses over a period.</li>
+  <li><strong>Time:</strong> Hours by project, person, and billable status.</li>
+  <li><strong>Projects:</strong> Budget vs. actuals and profitability.</li>
+</ul>
+<p class="mb-4">Use filters (date range, client, project, team) and export CSV for accounting.</p>
+<div class="alert alert-info small">
+  <strong>Tip:</strong> Save frequently used filters as bookmarks in your browser for one-click access.
+</div>
+{% endblock %}

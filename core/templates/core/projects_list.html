@@ -1,6 +1,8 @@
+{# core/templates/core/projects_list.html #}
 {% extends "_app_shell.html" %}
 {% block page_title %}Projects{% endblock %}
 {% block app_content %}
+
 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
   <form class="d-flex" method="get" role="search" style="max-width:520px; width:100%">
     <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Search by name, number, client…">
@@ -40,9 +42,17 @@
           <td><a href="{% url 'core:project_detail' p.pk %}">{{ p.name }}</a></td>
           <td>{{ p.client }}</td>
           <td class="text-capitalize">{{ p.billing_type }}</td>
-          <td class="text-end">{{ p.estimated_hours }}</td>
+          <td class="text-end">{{ p.estimated_hours|default_if_none:"0"|floatformat:2 }}</td>
           <td class="text-end">{{ p.logged_hours|default:"0"|floatformat:2 }}</td>
-          <td>{{ p.due_date|date:'Y-m-d' }}</td>
+          <td>
+            {% if p.due_date %}
+              {% if p.due_date < today %}
+                <span class="badge text-bg-danger">{{ p.due_date|date:'Y-m-d' }}</span>
+              {% else %}
+                {{ p.due_date|date:'Y-m-d' }}
+              {% endif %}
+            {% else %}—{% endif %}
+          </td>
           <td class="text-end">
             <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:project_update' p.pk %}">Edit</a>
             <a class="btn btn-sm btn-outline-danger" href="{% url 'core:project_delete' p.pk %}">Delete</a>
@@ -54,5 +64,32 @@
       </tbody>
     </table>
   </div>
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div class="card-footer d-flex justify-content-between align-items-center">
+    <div class="small text-muted">
+      Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+    </div>
+    <nav>
+      <ul class="pagination pagination-sm mb-0">
+        {% if page_obj.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="?q={{ q|urlencode }}&sort={{ sort }}&page={{ page_obj.previous_page_number }}">Prev</a>
+          </li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">Prev</span></li>
+        {% endif %}
+        <li class="page-item disabled"><span class="page-link">{{ page_obj.number }}</span></li>
+        {% if page_obj.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="?q={{ q|urlencode }}&sort={{ sort }}&page={{ page_obj.next_page_number }}">Next</a>
+          </li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">Next</span></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

@@ -1,6 +1,8 @@
 {% extends "_app_shell.html" %}
 {% block page_title %}Dashboard{% endblock %}
+
 {% block app_content %}
+
 {% if onboarding.show %}
 <div class="card shadow-sm mb-3">
   <div class="card-body">
@@ -11,11 +13,11 @@
           {{ onboarding.completed }} of {{ onboarding.total }} complete
         </div>
       </div>
-      <div class="progress" style="width: 200px;">
-        <div class="progress-bar" role="progressbar"
-             style="width: {{ onboarding.percent }}%;"
-             aria-valuenow="{{ onboarding.percent }}" aria-valuemin="0" aria-valuemax="100">
-          {{ onboarding.percent }}%
+      <div class="progress" style="width: 200px;" role="progressbar"
+           aria-label="Onboarding progress"
+           aria-valuenow="{{ onboarding.percent }}" aria-valuemin="0" aria-valuemax="100">
+        <div class="progress-bar" style="width: {{ onboarding.percent }}%;">
+          <span class="visually-hidden">{{ onboarding.percent }}%</span>
         </div>
       </div>
     </div>
@@ -23,11 +25,11 @@
       {% for item in onboarding.items %}
         <li class="d-flex align-items-center py-1">
           {% if item.done %}
-            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            <i class="bi bi-check-circle-fill text-success me-2" aria-hidden="true"></i>
             <span class="text-muted flex-grow-1"><s>{{ item.label }}</s></span>
             <a href="{{ item.url }}" class="btn btn-sm btn-outline-secondary">View</a>
           {% else %}
-            <i class="bi bi-circle me-2"></i>
+            <i class="bi bi-circle me-2 text-muted" aria-hidden="true"></i>
             <a href="{{ item.url }}" class="flex-grow-1 text-decoration-none">{{ item.label }}</a>
             <a href="{{ item.url }}" class="btn btn-sm btn-primary ms-2">Do it</a>
           {% endif %}
@@ -37,37 +39,41 @@
   </div>
 </div>
 {% endif %}
+
 <div class="row g-3">
   <!-- KPI cards -->
   <div class="col-12 col-md-6 col-lg-3">
-    <div class="card shadow-sm">
+    <div class="card shadow-sm h-100">
       <div class="card-body">
         <div class="text-muted small">Income (last 30d)</div>
-        <div class="fs-4 fw-semibold">{{ income_30 }}</div>
+        <div class="fs-4 fw-semibold">{{ income_30|default:"0.00" }}</div>
+        <div class="text-muted small">({{ start_30|date:"M d" }}–{{ end_30|date:"M d" }})</div>
       </div>
     </div>
   </div>
   <div class="col-12 col-md-6 col-lg-3">
-    <div class="card shadow-sm">
+    <div class="card shadow-sm h-100">
       <div class="card-body">
         <div class="text-muted small">Expenses (last 30d)</div>
-        <div class="fs-4 fw-semibold">{{ expenses_30 }}</div>
+        <div class="fs-4 fw-semibold">{{ expenses_30|default:"0.00" }}</div>
+        <div class="text-muted small">({{ start_30|date:"M d" }}–{{ end_30|date:"M d" }})</div>
       </div>
     </div>
   </div>
   <div class="col-12 col-md-6 col-lg-3">
-    <div class="card shadow-sm">
+    <div class="card shadow-sm h-100">
       <div class="card-body">
         <div class="text-muted small">Profit (last 30d)</div>
-        <div class="fs-4 fw-semibold">{{ profit_30 }}</div>
+        <div class="fs-4 fw-semibold">{{ profit_30|default:"0.00" }}</div>
+        <div class="text-muted small">({{ start_30|date:"M d" }}–{{ end_30|date:"M d" }})</div>
       </div>
     </div>
   </div>
   <div class="col-12 col-md-6 col-lg-3">
-    <div class="card shadow-sm">
+    <div class="card shadow-sm h-100">
       <div class="card-body">
         <div class="text-muted small">Outstanding invoices</div>
-        <div class="fs-4 fw-semibold">{{ outstanding_total }}</div>
+        <div class="fs-4 fw-semibold">{{ outstanding_total|default:"0.00" }}</div>
       </div>
     </div>
   </div>
@@ -84,18 +90,33 @@
         </div>
         <div class="table-responsive">
           <table class="table align-middle mb-0">
-            <thead><tr><th>#</th><th>Client</th><th>Due</th><th class="text-end">Balance</th><th></th></tr></thead>
+            <caption class="visually-hidden">List of overdue invoices</caption>
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">Client</th>
+                <th scope="col">Due</th>
+                <th scope="col" class="text-end">Balance</th>
+                <th scope="col" class="text-end"></th>
+              </tr>
+            </thead>
             <tbody>
               {% for inv, bal in overdue %}
               <tr>
-                <td>INV {{ inv.number }}</td>
+                <td>INV {{ inv.number|default:inv.pk }}</td>
                 <td>{{ inv.client }}</td>
-                <td>{{ inv.due_date|date:"Y-m-d" }}</td>
+                <td class="text-nowrap">{{ inv.due_date|date:"Y-m-d" }}</td>
                 <td class="text-end">{{ bal }}</td>
-                <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{% url 'core:invoice_detail' inv.pk %}">Open</a></td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-outline-primary" href="{% url 'core:invoice_detail' inv.pk %}">Open</a>
+                </td>
               </tr>
               {% empty %}
-              <tr><td colspan="5" class="text-center text-muted py-3">Nothing overdue 🎉</td></tr>
+              <tr>
+                <td colspan="5" class="text-center text-muted py-3">
+                  Nothing overdue 🎉
+                </td>
+              </tr>
               {% endfor %}
             </tbody>
           </table>
@@ -135,7 +156,7 @@
               <span class="fw-semibold">{{ n.text }}</span>
               {% if n.url %}<a class="ms-1" href="{{ n.url }}">Open</a>{% endif %}
             </div>
-            <small class="text-muted">{{ n.created_at|date:"Y-m-d H:i" }}</small>
+            <small class="text-muted text-nowrap">{{ n.created_at|date:"Y-m-d H:i" }}</small>
           </li>
           {% empty %}
           <li class="list-group-item text-muted text-center">No activity yet.</li>
@@ -152,8 +173,8 @@
         <h6 class="mb-2">Recent projects</h6>
         <ul class="list-group list-group-flush mb-3">
           {% for p in recent_projects %}
-          <li class="list-group-item d-flex justify-content-between">
-            <span>{{ p.number }} {{ p.name }}</span>
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <span class="text-truncate">{{ p.number }} {{ p.name }}</span>
             <a class="btn btn-sm btn-outline-primary" href="{% url 'core:project_detail' p.pk %}">Open</a>
           </li>
           {% empty %}
@@ -165,7 +186,7 @@
         <ul class="list-group list-group-flush">
           {% for c in top_clients %}
           <li class="list-group-item d-flex justify-content-between">
-            <span>{{ c }}</span>
+            <span class="text-truncate">{{ c }}</span>
             <span class="text-muted">{{ c.total_paid|default:"0" }}</span>
           </li>
           {% empty %}

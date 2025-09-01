@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-5" style="max-width:640px">
+  {# Onboarding progress indicator #}
+  {% include "onboarding/_progress.html" with step="payments" %}
+  <h1 class="h4 mb-3">Connect Payments</h1>
+  <p class="text-muted mb-4">
+    Enable online payments so clients can pay invoices by card or wallet. You can set this up now or later.
+  </p>
+
+  <div class="border rounded p-3 mb-4">
+    <p class="mb-2"><strong>Recommended next actions</strong></p>
+    <ul class="mb-0">
+      <li><a href="{% url 'billing:plans' %}">Choose a subscription plan</a> (required to enable payments).</li>
+      {% if company and company.subscription and company.subscription.stripe_customer_id %}
+        <li><a href="{% url 'billing:portal' %}">Open the Billing Portal</a> to add/update your payment method.</li>
+      {% else %}
+        <li class="text-muted">Billing Portal will be available after selecting a plan.</li>
+      {% endif %}
+    </ul>
+  </div>
+
+  <form method="post" class="d-flex gap-2">
+    {% csrf_token %}
+    <a class="btn btn-primary" href="{% url 'billing:plans' %}">Go to Plans</a>
+    {% if company and company.subscription and company.subscription.stripe_customer_id %}
+      <a class="btn btn-outline-secondary" href="{% url 'billing:portal' %}">Billing Portal</a>
+    {% endif %}
+    <button type="submit" class="btn btn-outline-secondary" name="skip" value="1">Skip</button>
+  </form>
+</div>
+{% endblock %}

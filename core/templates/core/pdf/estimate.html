@@ -1,4 +1,4 @@
-<!-- core/templates/core/pdf/estimate.html -->
+{# core/templates/core/pdf/estimate.html #}
 {% load static %}
 <!doctype html>
 <html>
@@ -6,52 +6,79 @@
   <meta charset="utf-8">
   <title>Estimate {{ est.number }}</title>
   <style>
-    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color:#222; }
-    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 20px; }
-    .title { font-size: 22px; font-weight: 700; }
-    .muted { color: #666; }
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-    th, td { padding: 8px; border-bottom: 1px solid #ddd; }
-    th { text-align:left; background:#f6f6f6; }
+    /* PDF-friendly, minimal styles */
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color:#222; margin: 24px; }
+    .row { width:100%; display:table; table-layout:fixed; }
+    .col { display:table-cell; vertical-align:top; }
     .right { text-align:right; }
-    .totals th { background:none; border:0; }
-    .totals td { border:0; }
+    .muted { color:#666; }
+    .title { font-size:22px; font-weight:700; }
+    .mb-2 { margin-bottom:8px; }
+    .mb-3 { margin-bottom:12px; }
+    .mb-4 { margin-bottom:16px; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:8px; border-bottom:1px solid #ddd; vertical-align:top; }
+    th { background:#f6f6f6; text-align:left; }
+    tfoot th, tfoot td { background:#fff; border:0; }
+    .totals td:first-child { width:80%; }
+    tr { page-break-inside: avoid; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div>
+
+  <!-- Header -->
+  <div class="row mb-4">
+    <div class="col" style="width:65%;">
       <div class="title">Estimate {{ est.number }}</div>
-      <div class="muted">Issued {{ est.issue_date|date:"Y-m-d" }}</div>
-      {% if est.valid_until %}<div class="muted">Valid until {{ est.valid_until|date:"Y-m-d" }}</div>{% endif %}
+      <div class="muted">Issue date: {{ est.issue_date|date:"Y-m-d" }}</div>
+      {% if est.valid_until %}<div class="muted">Valid until: {{ est.valid_until|date:"Y-m-d" }}</div>{% endif %}
       {% if est.project %}<div class="muted">Project: {{ est.project.name }}</div>{% endif %}
     </div>
-    <div>
+    <div class="col right" style="width:35%;">
       {% if est.company and est.company.logo %}
-        <img src="{{ est.company.logo.url }}" style="max-height:60px;">
+        <img src="{{ est.company.logo.url }}" alt="Logo" style="max-height:60px;">
+      {% endif %}
+      <div><strong>{{ est.company.name }}</strong></div>
+      {% if est.company.phone %}<div class="muted">{{ est.company.phone }}</div>{% endif %}
+      {% if est.company.address %}<div class="muted" style="white-space:pre-line">{{ est.company.address }}</div>{% endif %}
+    </div>
+  </div>
+
+  <!-- Parties -->
+  <div class="row mb-3">
+    <div class="col" style="width:50%;">
+      <strong>To</strong><br>
+      {% if est.client %}
+        {% if est.client.org %}{{ est.client.org }}<br>{% endif %}
+        {% if est.client.first_name or est.client.last_name %}
+          {{ est.client.first_name }} {{ est.client.last_name }}<br>
+        {% endif %}
+        {% if est.client.email %}{{ est.client.email }}<br>{% endif %}
+        {% if est.client.address %}<span class="muted" style="white-space:pre-line">{{ est.client.address }}</span>{% endif %}
       {% else %}
-        <strong>{{ est.company.name }}</strong>
+        —
       {% endif %}
     </div>
   </div>
 
-  <div>
-    <strong>To</strong><br>
-    {{ est.client.org|default:est.client }}<br>
-    {{ est.client.email }}
-  </div>
-
+  <!-- Line items -->
   <table>
     <thead>
-      <tr><th>Description</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Amount</th></tr>
+      <tr>
+        <th>Description</th>
+        <th class="right" style="width:80px;">Qty</th>
+        <th class="right" style="width:100px;">Rate</th>
+        <th class="right" style="width:110px;">Amount</th>
+      </tr>
     </thead>
     <tbody>
       {% for it in est.items.all %}
         <tr>
           <td>{{ it.description }}</td>
-          <td class="right">{{ it.quantity|default:0 }}</td>
-          <td class="right">{{ it.unit_price|default:"0.00" }}</td>
-          <td class="right">{{ it.total|default:"0.00" }}</td>
+          <td class="right">{{ it.qty|default:"0" }}</td>
+          <td class="right">${{ it.unit_price|default:"0.00" }}</td>
+          <td class="right">${{ it.line_total|default:"0.00" }}</td>
         </tr>
       {% empty %}
         <tr><td colspan="4" class="muted">No items</td></tr>
@@ -59,14 +86,25 @@
     </tbody>
   </table>
 
-  <table class="totals" style="margin-top: 16px;">
-    <tr><td class="right" style="width:80%;">Subtotal</td><td class="right">{{ est.subtotal|default:"0.00" }}</td></tr>
-    <tr><td class="right">Tax</td><td class="right">{{ est.tax|default:"0.00" }}</td></tr>
-    <tr><td class="right"><strong>Total</strong></td><td class="right"><strong>{{ est.total|default:"0.00" }}</strong></td></tr>
+  <!-- Totals -->
+  <table class="totals" style="margin-top:16px;">
+    <tr>
+      <td class="right">Subtotal</td>
+      <td class="right">${{ est.subtotal|default:"0.00" }}</td>
+    </tr>
+    <tr>
+      <td class="right">Tax</td>
+      <td class="right">${{ est.tax|default:"0.00" }}</td>
+    </tr>
+    <tr>
+      <td class="right"><strong>Total</strong></td>
+      <td class="right"><strong>${{ est.total|default:"0.00" }}</strong></td>
+    </tr>
   </table>
 
   {% if est.notes %}
-    <p class="muted" style="margin-top: 18px;">{{ est.notes|linebreaksbr }}</p>
+    <p class="muted" style="margin-top:18px; white-space:pre-line;">{{ est.notes }}</p>
   {% endif %}
+
 </body>
 </html>

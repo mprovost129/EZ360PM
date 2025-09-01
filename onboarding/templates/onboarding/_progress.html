@@ -1,0 +1,13 @@
+{# Call with: {% include "onboarding/_progress.html" with step="payments" %} #}
+{% with steps="company,client,project,payments,team"|cut:" " as s %}
+  {% firstof step "" as current %}
+  <div class="d-flex align-items-center gap-2 small text-muted mb-3">
+    {% for name in s|split:"," %}
+      {% if forloop.first %}{% endif %}
+      <span class="{% if name == current %}fw-semibold text-body{% endif %}">
+        {{ name|title }}
+      </span>
+      {% if not forloop.last %}<span>›</span>{% endif %}
+    {% endfor %}
+  </div>
+{% endwith %}

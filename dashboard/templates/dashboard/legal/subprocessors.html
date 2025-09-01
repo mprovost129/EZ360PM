@@ -1,14 +1,18 @@
 {% extends "base_public.html" %}
+
 {% block content %}
 <div class="container py-4" style="max-width:980px">
-  <h1 class="h3 mb-3">Subprocessors</h1>
-  <p class="text-muted">Effective {{ effective_date }}</p>
+  <h1 class="h3 mb-2">Subprocessors</h1>
+  <p class="text-muted mb-4">Effective {{ effective_date|date:"Y-m-d" }}</p>
+
   <p>
     {{ company_name }} uses the following third-party subprocessors to help provide the Service.
     Each subprocessor is contractually bound by confidentiality and data protection obligations.
   </p>
+
   <div class="table-responsive">
-    <table class="table table-sm align-middle">
+    <table class="table table-sm align-middle" role="table">
+      <caption class="visually-hidden">List of subprocessors engaged by {{ company_name }}</caption>
       <thead>
         <tr>
           <th scope="col">Provider</th>
@@ -25,14 +29,23 @@
           <td>{{ s.purpose }}</td>
           <td>{{ s.data }}</td>
           <td>{{ s.location }}</td>
-          <td>{% if s.dpa_url %}<a href="{{ s.dpa_url }}" target="_blank" rel="noopener">Details</a>{% else %}—{% endif %}</td>
+          <td>
+            {% if s.dpa_url %}
+              <a href="{{ s.dpa_url }}" target="_blank" rel="noopener">Details</a>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="5" class="text-muted">No subprocessors currently listed.</td></tr>
+        <tr>
+          <td colspan="5" class="text-center text-muted py-3">No subprocessors currently listed.</td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+
   <p class="mt-3">
     Questions? Email <a href="mailto:{{ support_email }}">{{ support_email }}</a>.
   </p>

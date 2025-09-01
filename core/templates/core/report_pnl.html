@@ -1,58 +1,125 @@
 {% extends "_app_shell.html" %}
-{% block page_title %}Profit & Loss{% endblock %}
+{% load humanize %}
+{% block page_title %}Profit &amp; Loss{% endblock %}
+
 {% block app_content %}
 <form class="row g-2 align-items-end mb-3" method="get">
   <div class="col-auto">
-    <label class="form-label">Start</label>
-    <input class="form-control" type="date" name="start" value="{{ start|date:'Y-m-d' }}">
+    <label class="form-label" for="pnl-start">Start</label>
+    <input id="pnl-start" class="form-control" type="date" name="start" value="{{ start|date:'Y-m-d' }}">
   </div>
   <div class="col-auto">
-    <label class="form-label">End</label>
-    <input class="form-control" type="date" name="end" value="{{ end|date:'Y-m-d' }}">
+    <label class="form-label" for="pnl-end">End</label>
+    <input id="pnl-end" class="form-control" type="date" name="end" value="{{ end|date:'Y-m-d' }}">
   </div>
   <div class="col-auto">
-    <label class="form-label">Basis</label>
-    <select class="form-select" name="basis">
-      <option value="cash" {% if basis=='cash' %}selected{% endif %}>Cash</option>
-      <option value="accrual" {% if basis=='accrual' %}selected{% endif %}>Accrual</option>
+    <label class="form-label" for="pnl-basis">Basis</label>
+    <select id="pnl-basis" class="form-select" name="basis">
+      <option value="cash" {% if basis == 'cash' %}selected{% endif %}>Cash</option>
+      <option value="accrual" {% if basis == 'accrual' %}selected{% endif %}>Accrual</option>
     </select>
   </div>
   <div class="col-auto">
     <button class="btn btn-outline-secondary" type="submit">Run</button>
   </div>
   <div class="col-auto">
-    <a class="btn btn-outline-primary" href="{% url 'core:report_pnl_csv' %}?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}&basis={{ basis }}">Export CSV</a>
+    <a class="btn btn-outline-primary"
+       href="{% url 'core:report_pnl_csv' %}?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}&basis={{ basis }}">
+      Export CSV
+    </a>
+  </div>
+
+  <!-- Quick ranges -->
+  <div class="col-12">
+    <div class="d-flex flex-wrap gap-2 small">
+      <span class="text-muted me-2">Quick ranges:</span>
+      <a class="btn btn-sm btn-light"
+         href="?basis={{ basis }}&start={{ today_minus_30|date:'Y-m-d' }}&end={{ today|date:'Y-m-d' }}">Last 30 days</a>
+      <a class="btn btn-sm btn-light"
+         href="?basis={{ basis }}&start={{ month_start|date:'Y-m-d' }}&end={{ today|date:'Y-m-d' }}">Month to date</a>
+      <a class="btn btn-sm btn-light"
+         href="?basis={{ basis }}&start={{ quarter_start|date:'Y-m-d' }}&end={{ today|date:'Y-m-d' }}">Quarter to date</a>
+      <a class="btn btn-sm btn-light"
+         href="?basis={{ basis }}&start={{ year_start|date:'Y-m-d' }}&end={{ today|date:'Y-m-d' }}">Year to date</a>
+    </div>
+    <div class="form-text mt-1">
+      {% if basis == 'cash' %}
+        Cash basis recognizes income when paid and expenses when paid.
+      {% else %}
+        Accrual basis recognizes income when invoiced and expenses when incurred.
+      {% endif %}
+    </div>
   </div>
 </form>
 
 <div class="row g-3">
+  <!-- Totals -->
   <div class="col-lg-6">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <div class="d-flex justify-content-between"><div class="text-muted">Income</div><div class="fw-semibold">${{ income_total }}</div></div>
-        <div class="d-flex justify-content-between"><div class="text-muted">Expenses</div><div class="fw-semibold">${{ expenses_total }}</div></div>
+        <div class="d-flex justify-content-between">
+          <div class="text-muted">Income</div>
+          <div class="fw-semibold">
+            ${{ income_total|floatformat:2|intcomma }}
+          </div>
+        </div>
+        <div class="d-flex justify-content-between">
+          <div class="text-muted">Expenses</div>
+          <div class="fw-semibold">
+            ${{ expenses_total|floatformat:2|intcomma }}
+          </div>
+        </div>
         <hr>
-        <div class="d-flex justify-content-between"><div class="fw-semibold">Profit</div><div class="fw-bold">${{ profit }}</div></div>
+        <div class="d-flex justify-content-between">
+          <div class="fw-semibold">Profit</div>
+          <div class="fw-bold {% if profit < 0 %}text-danger{% endif %}">
+            ${{ profit|floatformat:2|intcomma }}
+          </div>
+        </div>
+        <div class="text-muted small mt-2">
+          Showing {{ start|date:'Y-m-d' }}–{{ end|date:'Y-m-d' }} ({{ basis|capfirst }} basis)
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- By category -->
   <div class="col-lg-6">
     <div class="card shadow-sm h-100">
       <div class="card-body">
         <div class="fw-semibold mb-2">Expenses by Category</div>
         <div class="table-responsive">
           <table class="table mb-0 align-middle">
-            <thead><tr><th>Category</th><th class="text-end">Total</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th class="text-end">Total</th>
+              </tr>
+            </thead>
             <tbody>
               {% for row in by_cat %}
                 <tr>
                   <td>{{ row.category|default:'(Uncategorized)' }}</td>
-                  <td class="text-end">${{ row.total }}</td>
+                  <td class="text-end">
+                    ${{ row.total|floatformat:2|intcomma }}
+                  </td>
                 </tr>
               {% empty %}
-                <tr><td colspan="2" class="text-center text-muted py-3">No expenses in range.</td></tr>
+                <tr>
+                  <td colspan="2" class="text-center text-muted py-3">No expenses in range.</td>
+                </tr>
               {% endfor %}
             </tbody>
+            {% if by_cat %}
+              <tfoot>
+                <tr class="fw-semibold">
+                  <td class="text-end">Total</td>
+                  <td class="text-end">
+                    ${{ expenses_total|floatformat:2|intcomma }}
+                  </td>
+                </tr>
+              </tfoot>
+            {% endif %}
           </table>
         </div>
       </div>

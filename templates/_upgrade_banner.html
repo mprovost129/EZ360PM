@@ -1,8 +1,15 @@
 {% if request.user.is_authenticated and active_company and not is_subscribed %}
-<div class="alert alert-warning d-flex align-items-center justify-content-between" role="alert">
-  <div>
-    <strong>Upgrade available.</strong> Unlock reports, estimates, and recurring invoices.
+  <div class="alert alert-warning alert-dismissible d-flex align-items-center justify-content-between mb-3" role="status">
+    <div class="d-flex align-items-center">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+      <span>
+        <strong>Upgrade available.</strong>
+        Unlock reports, estimates, and recurring invoices.
+      </span>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <a class="btn btn-sm btn-primary" href="{% url 'billing:plans' %}">See plans</a>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
   </div>
-  <a class="btn btn-sm btn-primary" href="{% url 'billing:plans' %}">See plans</a>
-</div>
 {% endif %}

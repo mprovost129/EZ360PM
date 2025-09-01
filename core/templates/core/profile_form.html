@@ -1,44 +1,104 @@
 {% extends "_app_shell.html" %}
 {% block page_title %}Edit Profile{% endblock %}
+
 {% block app_content %}
 <div class="card shadow-sm">
   <div class="card-body">
     <form method="post" enctype="multipart/form-data" class="row g-3">
       {% csrf_token %}
+
+      {# --- Error summary --- #}
+      {% if form.non_field_errors or form.errors %}
+        <div class="col-12">
+          <div class="alert alert-danger mb-0">
+            <div class="fw-semibold">Please fix the errors below.</div>
+            {{ form.non_field_errors }}
+          </div>
+        </div>
+      {% endif %}
+
+      {# --- Personal info --- #}
+      <div class="col-12">
+        <h6 class="text-uppercase text-muted mb-2">Personal</h6>
+      </div>
+
       <div class="col-12 col-md-6">
-        <label class="form-label">First name</label>
+        <label class="form-label" for="{{ form.first_name.id_for_label }}">First name</label>
         {{ form.first_name }}
+        {% for e in form.first_name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
       </div>
+
       <div class="col-12 col-md-6">
-        <label class="form-label">Last name</label>
+        <label class="form-label" for="{{ form.last_name.id_for_label }}">Last name</label>
         {{ form.last_name }}
+        {% for e in form.last_name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
       </div>
+
       <div class="col-12 col-md-6">
-        <label class="form-label">Title</label>
+        <label class="form-label" for="{{ form.title.id_for_label }}">Title</label>
         {{ form.title }}
+        {% for e in form.title.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
       </div>
+
       <div class="col-12 col-md-6">
-        <label class="form-label">Phone</label>
+        <label class="form-label" for="{{ form.phone.id_for_label }}">Phone</label>
         {{ form.phone }}
+        {% for e in form.phone.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
       </div>
+
+      {# --- Preferences --- #}
+      <div class="col-12">
+        <h6 class="text-uppercase text-muted mb-2">Preferences</h6>
+      </div>
+
       <div class="col-12 col-md-6">
-        <label class="form-label">Timezone</label>
+        <label class="form-label" for="{{ form.timezone.id_for_label }}">Timezone</label>
         {{ form.timezone }}
+        {% for e in form.timezone.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
       </div>
+
       <div class="col-12 col-md-6">
-        <label class="form-label">Locale</label>
+        <label class="form-label" for="{{ form.locale.id_for_label }}">Locale</label>
         {{ form.locale }}
+        {% for e in form.locale.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
       </div>
+
       <div class="col-12">
-        <label class="form-label">Avatar</label>
+        <div class="form-check">
+          {{ form.dark_mode }}
+          <label class="form-check-label" for="{{ form.dark_mode.id_for_label }}">Enable dark mode</label>
+        </div>
+        {% for e in form.dark_mode.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+      </div>
+
+      {# --- Avatar --- #}
+      <div class="col-12">
+        <h6 class="text-uppercase text-muted mb-2">Avatar</h6>
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.avatar.id_for_label }}">Avatar</label>
         {{ form.avatar }}
+        {% for e in form.avatar.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        {% with inst=form.instance %}
+          {% if inst and inst.avatar %}
+            <div class="mt-2">
+              <img src="{{ inst.avatar.url }}" alt="Current avatar" class="rounded-circle"
+                   style="width:80px;height:80px;object-fit:cover;">
+            </div>
+          {% endif %}
+        {% endwith %}
       </div>
+
+      {# --- Bio --- #}
       <div class="col-12">
-        <label class="form-label">Bio</label>
-        {{ form.bio }}
+        <h6 class="text-uppercase text-muted mb-2">About</h6>
       </div>
-      <div class="col-12 form-check">
-        {{ form.dark_mode }} <label class="form-check-label">Enable dark mode</label>
+
+      <div class="col-12">
+        <label class="form-label" for="{{ form.bio.id_for_label }}">Bio</label>
+        {{ form.bio }}
+        {% for e in form.bio.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
       </div>
 
       <div class="col-12 d-flex gap-2">

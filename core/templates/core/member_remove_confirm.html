@@ -1,13 +1,56 @@
+{# templates/core/member_remove.html #}
 {% extends "_app_shell.html" %}
 {% block page_title %}Remove Member{% endblock %}
+
 {% block app_content %}
 <div class="card shadow-sm">
   <div class="card-body">
-    <p>Remove <strong>{{ member.user.name|default:member.user.email }}</strong> from <strong>{{ member.company.name }}</strong>?</p>
-    <form method="post">{% csrf_token %}
+
+    {# Compact member header #}
+    <div class="d-flex align-items-center gap-3 mb-3">
+      {% firstof member.user.get_full_name member.user.email member.user.get_username as display_name %}
+      <div class="rounded-circle bg-light d-flex align-items-center justify-content-center"
+           style="width:48px;height:48px;">
+        <span class="fw-semibold">{{ display_name|slice:":1"|upper }}</span>
+      </div>
+      <div>
+        <div class="fw-semibold">{{ display_name }}</div>
+        <div class="text-muted small">
+          {{ member.company.name }} · {{ member.get_role_display|default:member.role|capfirst }}
+          {% if member.job_title %} ({{ member.job_title }}){% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# Safety notices #}
+    {% if member.role == 'owner' %}
+      <div class="alert alert-danger">
+        You can’t remove the Owner. Transfer ownership or change their role first.
+      </div>
+    {% elif is_self %}
+      <div class="alert alert-warning">
+        You’re removing yourself from <strong>{{ member.company.name }}</strong>.
+        You will immediately lose access.
+      </div>
+    {% endif %}
+
+    <p class="mb-2">
+      Remove <strong>{{ display_name }}</strong> from <strong>{{ member.company.name }}</strong>?
+    </p>
+    <ul class="small text-muted mb-3">
+      <li>They will immediately lose access to this company.</li>
+      <li>Existing records (time, expenses, invoices) remain for reporting.</li>
+    </ul>
+
+    <form method="post" class="d-flex gap-2">
+      {% csrf_token %}
       <a class="btn btn-outline-secondary" href="{% url 'core:team_list' %}">Cancel</a>
-      <button class="btn btn-danger" type="submit">Remove</button>
+      <button class="btn btn-danger" type="submit"
+              {% if member.role == 'owner' or disable_remove %}disabled{% endif %}>
+        Remove
+      </button>
     </form>
+
   </div>
 </div>
 {% endblock %}

@@ -3,74 +3,138 @@
 {% block app_content %}
 <div class="card shadow-sm">
   <div class="card-body">
-    <form method="post">
+    <form method="post" novalidate>
       {% csrf_token %}
-      <div class="row g-3">
-        <div class="col-6 col-md-3">
-          <label class="form-label">Start</label>
-          {{ form.start }}
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">End</label>
-          {{ form.end }}
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">Rounding</label>
-          {{ form.rounding }}
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">Group time by</label>
-          {{ form.group_by }}
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">Rate override</label>
-          <div class="input-group">
-            <span class="input-group-text">$</span>
-            {{ form.override_rate }}
-          </div>
-          <div class="form-text">Project rate: ${{ project_rate }}</div>
-        </div>
-        <div class="col-12">
-          <label class="form-label">Time description (optional)</label>
-          {{ form.description }}
-        </div>
 
-        <hr class="mt-1">
+      {# --- Errors (top) --- #}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
 
-        <div class="col-12">
-          <div class="form-check">
-            {{ form.include_expenses }} <label class="form-check-label" for="{{ form.include_expenses.id_for_label }}">Include billable expenses</label>
+      <!-- TIME -->
+      <fieldset class="mb-3">
+        <legend class="h6 mb-3">Time</legend>
+        <div class="row g-3">
+          <div class="col-6 col-md-3">
+            <label class="form-label" for="{{ form.start.id_for_label }}">Start</label>
+            {{ form.start }}
+            {{ form.start.errors }}
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label" for="{{ form.end.id_for_label }}">End</label>
+            {{ form.end }}
+            {{ form.end.errors }}
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label" for="{{ form.rounding.id_for_label }}">Rounding</label>
+            {{ form.rounding }}
+            {{ form.rounding.errors }}
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label" for="{{ form.group_by.id_for_label }}">Group time by</label>
+            {{ form.group_by }}
+            {{ form.group_by.errors }}
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="{{ form.override_rate.id_for_label }}">Rate override</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              {{ form.override_rate }}
+            </div>
+            <div class="form-text">Project rate: ${{ project_rate|floatformat:2 }}</div>
+            {{ form.override_rate.errors }}
+          </div>
+
+          <div class="col-12 col-md-8">
+            <label class="form-label" for="{{ form.description.id_for_label }}">Time description (optional)</label>
+            {{ form.description }}
+            {{ form.description.errors }}
+          </div>
+
+          <div class="col-12">
+            <div class="form-check">
+              {{ form.include_only_approved }}
+              <label class="form-check-label" for="{{ form.include_only_approved.id_for_label }}">
+                Only include approved time
+              </label>
+            </div>
+            {{ form.include_only_approved.errors }}
           </div>
         </div>
-        <div class="col-12 col-md-4">
-          <label class="form-label">Group expenses by</label>
-          {{ form.expense_group_by }}
-        </div>
-        <div class="col-12 col-md-4">
-          <label class="form-label">% Markup override</label>
-          <div class="input-group">
-            {{ form.expense_markup_override }}
-            <span class="input-group-text">%</span>
+      </fieldset>
+
+      <hr>
+
+      <!-- EXPENSES -->
+      <fieldset>
+        <legend class="h6 mb-3">Expenses (optional)</legend>
+        <div class="row g-3">
+          <div class="col-12">
+            <div class="form-check">
+              {{ form.include_expenses }}
+              <label class="form-check-label" for="{{ form.include_expenses.id_for_label }}">
+                Include billable expenses
+              </label>
+            </div>
+            {{ form.include_expenses.errors }}
           </div>
-          <div class="form-text">Leave blank to use each expense's markup.</div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="{{ form.expense_group_by.id_for_label }}">Group expenses by</label>
+            {{ form.expense_group_by }}
+            {{ form.expense_group_by.errors }}
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="{{ form.expense_markup_override.id_for_label }}">% Markup override</label>
+            <div class="input-group">
+              {{ form.expense_markup_override }}
+              <span class="input-group-text">%</span>
+            </div>
+            <div class="form-text">Leave blank to use each expense's markup.</div>
+            {{ form.expense_markup_override.errors }}
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="{{ form.expense_label_prefix.id_for_label }}">Expense label prefix</label>
+            {{ form.expense_label_prefix }}
+            {{ form.expense_label_prefix.errors }}
+          </div>
         </div>
-        <div class="col-12 col-md-4">
-          <label class="form-label">Expense label prefix</label>
-          {{ form.expense_label_prefix }}
-        </div>
-      </div>
+      </fieldset>
 
       <div class="mt-3 d-flex align-items-center justify-content-between">
         <div class="text-muted">
-          Unbilled (no rounding): <strong>{{ preview_hours }}</strong> h time
-          {% if preview_expenses %} &middot; Expenses: <strong>${{ preview_expenses }}</strong>{% endif %}
+          Unbilled (no rounding): <strong>{{ preview_hours|floatformat:2 }}</strong> h time
+          {% if preview_expenses %}&middot; Expenses: <strong>${{ preview_expenses|floatformat:2 }}</strong>{% endif %}
         </div>
         <div>
-          <button class="btn btn-primary">Create invoice</button>
+          <button class="btn btn-primary" type="submit">Create invoice</button>
           <a class="btn btn-outline-secondary" href="{% url 'core:project_detail' project.pk %}">Cancel</a>
         </div>
       </div>
     </form>
   </div>
 </div>
+
+{# Toggle-disable expense fields when checkbox is off #}
+<script>
+  (function () {
+    const inc = document.getElementById("{{ form.include_expenses.id_for_label }}") || document.getElementById("id_include_expenses");
+    const group = document.getElementById("{{ form.expense_group_by.id_for_label }}") || document.getElementById("id_expense_group_by");
+    const markup = document.getElementById("{{ form.expense_markup_override.id_for_label }}") || document.getElementById("id_expense_markup_override");
+    const prefix = document.getElementById("{{ form.expense_label_prefix.id_for_label }}") || document.getElementById("id_expense_label_prefix");
+
+    function setDisabled(on) {
+      [group, markup, prefix].forEach(el => { if (el) el.disabled = on; });
+    }
+    if (inc) {
+      setDisabled(!inc.checked);
+      inc.addEventListener("change", () => setDisabled(!inc.checked));
+    }
+  })();
+</script>
 {% endblock %}

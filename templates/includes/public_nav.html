@@ -4,7 +4,13 @@
       {{ APP_NAME|default:"EZ360PM" }}
     </a>
 
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#publicNav">
+    <button class="navbar-toggler"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#publicNav"
+            aria-controls="publicNav"
+            aria-expanded="false"
+            aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
@@ -14,26 +20,31 @@
 
         <li class="nav-item">
           <a class="nav-link {% if urlname == 'help_index' %}active{% endif %}"
+             {% if urlname == 'help_index' %}aria-current="page"{% endif %}
              href="{% url 'dashboard:help_index' %}">Features</a>
         </li>
 
         <li class="nav-item">
           <a class="nav-link {% if urlname == 'contact' %}active{% endif %}"
+             {% if urlname == 'contact' %}aria-current="page"{% endif %}
              href="{% url 'dashboard:contact' %}">Contact</a>
         </li>
 
         <li class="nav-item ms-md-2">
           <a class="btn btn-outline-primary {% if urlname == 'register' %}active{% endif %}"
+             {% if urlname == 'register' %}aria-current="page"{% endif %}
              href="{% url 'accounts:register' %}">Register</a>
         </li>
 
         <li class="nav-item ms-md-2">
           <a class="btn btn-primary {% if urlname == 'login' %}active{% endif %}"
+             {% if urlname == 'login' %}aria-current="page"{% endif %}
              href="{% url 'accounts:login' %}">Sign in</a>
         </li>
 
         <li class="nav-item ms-md-2">
           <a class="btn btn-success {% if urlname == 'plans' %}active{% endif %}"
+             {% if urlname == 'plans' %}aria-current="page"{% endif %}
              href="{% url 'billing:plans' %}">Subscribe</a>
         </li>
 

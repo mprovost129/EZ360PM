@@ -2,12 +2,65 @@
 {% block page_title %}Reports{% endblock %}
 {% block app_content %}
 <div class="row g-3">
-  <div class="col-lg-4">
+  <div class="col-12">
+    <p class="text-muted small mb-2">Analyze performance and export data.</p>
+  </div>
+
+  <!-- Profit & Loss -->
+  <div class="col-md-6 col-lg-4">
     <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <div class="fw-semibold">Profit & Loss</div>
-        <p class="text-muted mb-3">Income minus expenses for a chosen date range. Cash or accrual basis.</p>
-        <a class="btn btn-primary" href="{% url 'core:report_pnl' %}">Open</a>
+      <div class="card-body d-flex flex-column">
+        <div class="d-flex align-items-center mb-2">
+          <i class="bi bi-graph-up-arrow me-2"></i>
+          <div class="fw-semibold">Profit &amp; Loss</div>
+        </div>
+        <p class="text-muted flex-grow-1 mb-3">
+          Income minus expenses for a chosen date range. Cash or accrual basis.
+        </p>
+
+        <div class="d-flex flex-wrap gap-2">
+          {% if is_subscribed %}
+            <a class="btn btn-primary" href="{% url 'core:report_pnl' %}">Open</a>
+            <a class="btn btn-outline-secondary" href="{% url 'core:report_pnl_csv' %}">Export CSV</a>
+          {% else %}
+            <a class="btn btn-primary disabled" href="#" tabindex="-1" aria-disabled="true">Open</a>
+            <a class="btn btn-outline-secondary disabled" href="#" tabindex="-1" aria-disabled="true">Export CSV</a>
+            <a class="btn btn-link ms-auto" href="{% url 'billing:plans' %}">Upgrade</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Placeholder examples for future reports (safe & non-clickable) -->
+  <div class="col-md-6 col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body d-flex flex-column">
+        <div class="d-flex align-items-center mb-2">
+          <i class="bi bi-receipt-cutoff me-2"></i>
+          <div class="fw-semibold">A/R Aging</div>
+          <span class="badge bg-light text-dark ms-2">Coming soon</span>
+        </div>
+        <p class="text-muted flex-grow-1 mb-3">
+          Track outstanding invoices by age bucket.
+        </p>
+        <button class="btn btn-outline-secondary" disabled>Coming soon</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body d-flex flex-column">
+        <div class="d-flex align-items-center mb-2">
+          <i class="bi bi-clock-history me-2"></i>
+          <div class="fw-semibold">Time by Project</div>
+          <span class="badge bg-light text-dark ms-2">Coming soon</span>
+        </div>
+        <p class="text-muted flex-grow-1 mb-3">
+          Summaries of tracked hours grouped by project.
+        </p>
+        <button class="btn btn-outline-secondary" disabled>Coming soon</button>
       </div>
     </div>
   </div>

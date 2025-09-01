@@ -1,0 +1,125 @@
+{# Primary app sidebar #}
+<aside class="app-sidebar border-end overflow-auto" role="navigation" aria-label="Primary">
+  <div class="px-3 py-3 border-bottom">
+    <a href="{% url 'core:company_profile' %}"
+       class="d-flex align-items-center gap-2 text-decoration-none"
+       title="{{ active_company.name|default:'Company profile' }}">
+      {% if active_company and active_company.logo %}
+        <img src="{{ active_company.logo.url }}"
+             alt="{{ active_company.name }}" width="32" height="32" loading="lazy"
+             style="height:32px;width:auto;">
+        <span class="visually-hidden">{{ active_company.name }}</span>
+      {% elif active_company %}
+        <span class="fw-semibold text-truncate" style="max-width:170px;min-width:0;">
+          {{ active_company.name }}
+        </span>
+      {% else %}
+        <span class="fw-semibold text-truncate" style="max-width:170px;min-width:0;">Your Company</span>
+      {% endif %}
+      <span class="ms-auto">
+        <span class="btn btn-sm btn-outline-secondary">Profile</span>
+      </span>
+    </a>
+  </div>
+
+  <nav class="list-group list-group-flush">
+    {# Dashboard #}
+    <a class="list-group-item list-group-item-action {% if request.resolver_match.app_name == 'dashboard' and request.resolver_match.url_name == 'home' %}active{% endif %}"
+       href="{% url 'dashboard:home' %}"
+       {% if request.resolver_match.app_name == 'dashboard' and request.resolver_match.url_name == 'home' %}aria-current="page"{% endif %}>
+      Dashboard
+    </a>
+
+    {# Notifications #}
+    <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}"
+       href="{% url 'core:notifications' %}"
+       {% if request.resolver_match.url_name == 'notifications' %}aria-current="page"{% endif %}>
+      <span>Notifications</span>
+      {% if unread_notifications_count %}
+        <span class="badge rounded-pill bg-danger">{{ unread_notifications_count }}</span>
+      {% endif %}
+    </a>
+
+    <a class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'clients' %}active{% endif %}"
+       href="{% url 'core:clients' %}"
+       {% if request.resolver_match.url_name == 'clients' %}aria-current="page"{% endif %}>Clients</a>
+
+    <a class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'projects' %}active{% endif %}"
+       href="{% url 'core:projects' %}"
+       {% if request.resolver_match.url_name == 'projects' %}aria-current="page"{% endif %}>Projects</a>
+
+    {% with urlname=request.resolver_match.url_name|default:'' %}
+      {# --- INVOICES: collapsible --- #}
+      {% with invoices_open=(urlname in 'invoices invoice_detail invoice_create invoice_update invoice_refund payments payment_create webhook_logs'.split) %}
+      <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#navInvoices"
+              aria-controls="navInvoices"
+              aria-expanded="{{ invoices_open|yesno:'true,false' }}">
+        <span>Invoices</span>
+        <span class="small">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"
+               aria-hidden="true"
+               style="transition:transform .2s; {% if invoices_open %}transform:rotate(180deg);{% endif %}">
+            <path fill-rule="evenodd" d="M1.646 6.646a.5.5 0 0 1 .708 0L8 12.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/>
+          </svg>
+        </span>
+      </button>
+      <div id="navInvoices" class="collapse {% if invoices_open %}show{% endif %}">
+        <a class="list-group-item list-group-item-action ps-5 {% if urlname == 'invoices' %}active{% endif %}"
+           href="{% url 'core:invoices' %}"
+           {% if urlname == 'invoices' %}aria-current="page"{% endif %}>All invoices</a>
+        <a class="list-group-item list-group-item-action ps-5 {% if urlname in 'payments payment_create'.split %}active{% endif %}"
+           href="{% url 'core:payments' %}"
+           {% if urlname in 'payments payment_create'.split %}aria-current="page"{% endif %}>Payments</a>
+        {% if request.user.is_staff %}
+          <a class="list-group-item list-group-item-action ps-5 {% if urlname == 'webhook_logs' %}active{% endif %}"
+             href="{% url 'billing:webhook_logs' %}"
+             {% if urlname == 'webhook_logs' %}aria-current="page"{% endif %}>Stripe webhook logs</a>
+        {% endif %}
+      </div>
+      {% endwith %}
+
+      <a class="list-group-item list-group-item-action {% if urlname == 'expenses' %}active{% endif %}"
+         href="{% url 'core:expenses' %}"
+         {% if urlname == 'expenses' %}aria-current="page"{% endif %}>Expenses</a>
+
+      {# --- TIME: collapsible --- #}
+      {% with time_open=(urlname in 'time_list timesheet_week approvals_list'.split) %}
+      <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#navTime"
+              aria-controls="navTime"
+              aria-expanded="{{ time_open|yesno:'true,false' }}">
+        <span>Time</span>
+        <span class="small">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"
+               aria-hidden="true"
+               style="transition:transform .2s; {% if time_open %}transform:rotate(180deg);{% endif %}">
+            <path fill-rule="evenodd" d="M1.646 6.646a.5.5 0 0 1 .708 0L8 12.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/>
+          </svg>
+        </span>
+      </button>
+      <div id="navTime" class="collapse {% if time_open %}show{% endif %}">
+        <a class="list-group-item list-group-item-action ps-5 {% if urlname == 'time_list' %}active{% endif %}"
+           href="{% url 'core:time_list' %}"
+           {% if urlname == 'time_list' %}aria-current="page"{% endif %}>Overview</a>
+        <a class="list-group-item list-group-item-action ps-5 {% if urlname == 'timesheet_week' %}active{% endif %}"
+           href="{% url 'core:timesheet_week' %}"
+           {% if urlname == 'timesheet_week' %}aria-current="page"{% endif %}>Timesheet — weekly</a>
+        {% if active_company and request.user.id == active_company.owner_id %}
+          <a class="list-group-item list-group-item-action ps-5 {% if urlname == 'approvals_list' %}active{% endif %}"
+             href="{% url 'core:approvals_list' %}"
+             {% if urlname == 'approvals_list' %}aria-current="page"{% endif %}>Approvals</a>
+        {% endif %}
+      </div>
+      {% endwith %}
+    {% endwith %}
+
+    <a class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'reports' %}active{% endif %}"
+       href="{% url 'core:reports' %}"
+       {% if request.resolver_match.url_name == 'reports' %}aria-current="page"{% endif %}>Reports</a>
+  </nav>
+</aside>

@@ -1,29 +1,66 @@
 {# templates/core/approvals_list.html #}
 {% extends "_app_shell.html" %}
 {% block page_title %}Approvals{% endblock %}
+
 {% block app_content %}
 {% if groups %}
   {% for key, g in groups.items %}
-    <div class="card mb-3">
+    <div class="card shadow-sm mb-3">
       <div class="card-body">
-        <div class="d-flex justify-content-between">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
           <div>
-            <div class="fw-semibold">{{ g.user }}</div>
-            <div class="text-muted small">Week of {{ g.week }}</div>
+            <div class="fw-semibold">
+              {% firstof g.user.get_full_name g.user.email g.user.username g.user %}
+            </div>
+            <div class="text-muted small">
+              Week of {{ g.week|date:"Y-m-d" }}
+              {% if g.total_hours %} · <strong>{{ g.total_hours|floatformat:2 }}</strong> h{% endif %}
+              · {{ g.entries|length }} entr{{ g.entries|length|pluralize:"y,ies" }}
+            </div>
           </div>
-          <form method="post" action="{% url 'core:approvals_decide' %}">
+
+          <form method="post" action="{% url 'core:approvals_decide' %}" class="d-flex gap-2">
             {% csrf_token %}
             <input type="hidden" name="user_id" value="{{ g.user.id }}">
-            <input type="hidden" name="week" value="{{ g.week }}">
-            <button name="action" value="approve" class="btn btn-sm btn-success">Approve</button>
-            <button name="action" value="reject" class="btn btn-sm btn-outline-danger">Reject</button>
+            <input type="hidden" name="week" value="{{ g.week|date:'Y-m-d' }}">
+            <button name="action" value="approve" class="btn btn-sm btn-success"
+                    {% if not g.entries %}disabled{% endif %}>
+              Approve
+            </button>
+            <button name="action" value="reject" class="btn btn-sm btn-outline-danger"
+                    {% if not g.entries %}disabled{% endif %}>
+              Reject
+            </button>
           </form>
         </div>
-        <ul class="small mt-2 mb-0">
-          {% for t in g.entries %}
-            <li>{{ t.started_at|date:"Y-m-d" }} — {{ t.project.name }} — {{ t.hours }}h — {{ t.notes|default:"" }}</li>
-          {% endfor %}
-        </ul>
+
+        <div class="table-responsive mt-3">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width:120px">Date</th>
+                <th>Project</th>
+                <th class="text-end" style="width:100px">Hours</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in g.entries %}
+                <tr>
+                  <td>{{ t.started_at|date:"Y-m-d" }}</td>
+                  <td>{{ t.project.name }}</td>
+                  <td class="text-end">{{ t.hours|floatformat:2 }}</td>
+                  <td class="text-muted text-truncate" style="max-width:420px;">{{ t.notes|default:"" }}</td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="4" class="text-center text-muted py-3">No entries for this week.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
       </div>
     </div>
   {% endfor %}

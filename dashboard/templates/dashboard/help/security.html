@@ -1,0 +1,12 @@
+{% extends "dashboard/help/_article_base.html" %}
+{% block help_title %}Privacy & Security{% endblock %}
+{% block help_intro %}Overview of security practices, backups, and data retention.{% endblock %}
+{% block help_body %}
+<ul class="mb-3">
+  <li><strong>Transport security:</strong> All traffic uses HTTPS/TLS.</li>
+  <li><strong>Data protection:</strong> Role-based access controls; limited staff access.</li>
+  <li><strong>Backups:</strong> Regular backups and tested restores.</li>
+  <li><strong>Privacy:</strong> See our <a href="{% url 'dashboard:privacy' %}">Privacy Policy</a> and <a href="{% url 'dashboard:subprocessors' %}">Subprocessors</a>.</li>
+</ul>
+<p class="mb-0">Questions? Contact <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
+{% endblock %}

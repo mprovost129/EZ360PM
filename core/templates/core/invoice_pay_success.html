@@ -1,18 +1,68 @@
 {% extends "_public.html" %}
+{% load humanize %}
 {% block title %}Payment received{% endblock %}
+
 {% block content %}
 <div class="container py-5" style="max-width:720px">
   <div class="card shadow-sm">
     <div class="card-body text-center">
-      <div class="h4">Thank you!</div>
+
+      <div class="mb-2" aria-hidden="true" style="font-size:2rem;">
+        <i class="bi bi-check-circle-fill text-success"></i>
+      </div>
+
+      <div class="h4 mb-1">Thank you!</div>
+      <div class="text-muted mb-3">
+        Payment received for <strong>Invoice {{ inv.number }}</strong>.
+      </div>
+
       {% if inv.balance > 0 %}
-        <p class="text-muted">Your payment has been received. A balance of <strong>${{ inv.balance }}</strong> remains on this invoice.</p>
-        <a class="btn btn-primary" href="{% url 'core:invoice_public' inv.public_token %}">Return to invoice</a>
+        <p class="text-muted">
+          A balance of
+          <strong>${{ inv.balance|floatformat:2|intcomma }}</strong>
+          remains on this invoice.
+        </p>
+        <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+          <a class="btn btn-primary" href="{% url 'core:invoice_checkout' inv.public_token %}">
+            Pay remaining balance
+          </a>
+          <a class="btn btn-outline-secondary" href="{% url 'core:invoice_public' inv.public_token %}">
+            Return to invoice
+          </a>
+        </div>
       {% else %}
         <p class="text-muted">Your invoice is fully paid.</p>
-        <a class="btn btn-primary" href="{% url 'core:invoice_public' inv.public_token %}">View receipt</a>
+        <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+          <a class="btn btn-primary" href="{% url 'core:invoice_public' inv.public_token %}">View invoice</a>
+          <button class="btn btn-outline-secondary" type="button" onclick="window.print()">Print receipt</button>
+        </div>
       {% endif %}
     </div>
+
+    <div class="card-footer bg-light">
+      <div class="row text-center gy-2">
+        <div class="col-6 col-md-3">
+          <div class="text-muted small">Total</div>
+          <div class="fw-semibold">${{ inv.total|floatformat:2|intcomma }}</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="text-muted small">Paid</div>
+          <div class="fw-semibold">${{ inv.amount_paid|floatformat:2|intcomma }}</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="text-muted small">Balance</div>
+          <div class="fw-semibold">${{ inv.balance|floatformat:2|intcomma }}</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="text-muted small">Currency</div>
+          <div class="fw-semibold">{{ inv.currency|upper }}</div>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <p class="text-center text-muted small mt-3">
+    Need help? <a class="text-decoration-none" href="mailto:{{ support_email|default:'support@example.com' }}">{{ support_email|default:'support@example.com' }}</a>
+  </p>
 </div>
 {% endblock %}

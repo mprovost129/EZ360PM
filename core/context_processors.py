@@ -1,83 +1,140 @@
 # core/context_processors.py
-from .utils import get_active_company, user_has_active_subscription
-from .models import Notification
+from __future__ import annotations
+
+from typing import Dict, Any
+
 from django.conf import settings
+from django.http import HttpRequest
+
+from .utils import get_active_company, user_has_active_subscription
 from .services import unread_count
 
 
-def active_company(request):
-    return {"active_company": get_active_company(request)}
+# -------------------------------------------------------------------
+# Internal helpers
+# -------------------------------------------------------------------
 
+def _compute_app_frame(request: HttpRequest) -> Dict[str, Any]:
+    """
+    Centralized computation for commonly-needed frame context:
+      - active_company
+      - is_subscribed
+      - unread_notifications_count
 
-def notifications(request):
-    if not request.user.is_authenticated:
-        return {"unread_notifications_count": 0}
-    company = get_active_company(request)
-    if not company:
-        return {"unread_notifications_count": 0}
-    count = Notification.objects.filter(company=company, recipient=request.user, read_at__isnull=True).count()
-    return {"unread_notifications_count": count}
-
-def branding(_request):
-    return {"APP_NAME": getattr(settings, "APP_NAME", "EZ360PM")}
-
-def active_and_notifications(request):
-    c = get_active_company(request)
-    cnt = 0
-    if request.user.is_authenticated and c:
-        cnt = unread_count(c, request.user)
-    return {"active_company": c, "unread_notifications_count": cnt}
-
-
-def app_context(request):
-    company = None
-    subscribed = False
-    try:
-        if request.user.is_authenticated:
-            company = get_active_company(request)
-            if company:
-                subscribed = user_has_active_subscription(company)
-    except Exception:
-        pass
-    return {
-        "active_company": company,
-        "is_subscribed": subscribed,
-    }
-    
-
-def app_frame(request):
-    user = request.user
+    Safe against missing billing app or unusual states.
+    """
+    user = getattr(request, "user", None)
     active_company = None
-    unread_notifications_count = 0
+    is_subscribed = False
+    unread = 0
 
     if getattr(user, "is_authenticated", False):
         try:
             active_company = get_active_company(request)
         except Exception:
             active_company = None
+
         if active_company:
+            # subscription state (safe check)
             try:
-                unread_notifications_count = (
-                    Notification.objects.for_company_user(active_company, user) # type: ignore
-                    .unread()
-                    .count()
-                )
+                is_subscribed = user_has_active_subscription(active_company)
             except Exception:
-                unread_notifications_count = 0
+                is_subscribed = False
+
+            # unread notifications (use service to keep logic in one place)
+            try:
+                unread = unread_count(active_company, user)  # type: ignore[arg-type]
+            except Exception:
+                unread = 0
 
     return {
         "active_company": active_company,
-        "unread_notifications_count": unread_notifications_count,
+        "is_subscribed": is_subscribed,
+        "unread_notifications_count": unread,
     }
-    
-def app_globals(request):
+
+
+# -------------------------------------------------------------------
+# Primary, recommended context processors
+# -------------------------------------------------------------------
+
+def active_company(request: HttpRequest) -> Dict[str, Any]:
+    """
+    Lightweight: only inject active_company.
+    Prefer using app_frame() for most pages to avoid duplicate queries elsewhere.
+    """
+    try:
+        return {"active_company": get_active_company(request)}
+    except Exception:
+        return {"active_company": None}
+
+
+def app_frame(request: HttpRequest) -> Dict[str, Any]:
+    """
+    Canonical context for most app pages: active company, subscription state, and unread notifications.
+    """
+    return _compute_app_frame(request)
+
+
+def app_globals(_request: HttpRequest) -> Dict[str, Any]:
+    """
+    Global branding/config values. Keep defaults stable to avoid template breakage.
+    """
     return {
         "APP_NAME": getattr(settings, "APP_NAME", "EZ360PM"),
         "company_name": getattr(settings, "COMPANY_NAME", "EZ360PM, LLC"),
         "support_email": getattr(settings, "SUPPORT_EMAIL", "support@example.com"),
         "do_not_sell_url": getattr(settings, "DO_NOT_SELL_URL", ""),
-        # also handy for the cookie banner/analytics
+        # Cookie/analytics helpers
         "COOKIE_CONSENT_NAME": getattr(settings, "COOKIE_CONSENT_NAME", "cookie_consent"),
         "PLAUSIBLE_DOMAIN": getattr(settings, "PLAUSIBLE_DOMAIN", ""),
         "GA_MEASUREMENT_ID": getattr(settings, "GA_MEASUREMENT_ID", ""),
+    }
+
+
+# -------------------------------------------------------------------
+# Legacy / compatibility shims
+# (kept to avoid breaking existing templates; all use the central helper)
+# -------------------------------------------------------------------
+
+def notifications(request: HttpRequest) -> Dict[str, Any]:
+    """
+    Legacy: returns only unread_notifications_count.
+    Prefer app_frame().
+    """
+    if not getattr(getattr(request, "user", None), "is_authenticated", False):
+        return {"unread_notifications_count": 0}
+    ctx = _compute_app_frame(request)
+    return {"unread_notifications_count": ctx["unread_notifications_count"]}
+
+
+def branding(_request: HttpRequest) -> Dict[str, Any]:
+    """
+    Legacy: returns only APP_NAME.
+    Prefer app_globals().
+    """
+    return {"APP_NAME": getattr(settings, "APP_NAME", "EZ360PM")}
+
+
+def active_and_notifications(request: HttpRequest) -> Dict[str, Any]:
+    """
+    Legacy: returns active_company and unread_notifications_count.
+    Prefer app_frame().
+    """
+    ctx = _compute_app_frame(request)
+    return {
+        "active_company": ctx["active_company"],
+        "unread_notifications_count": ctx["unread_notifications_count"],
+    }
+
+
+def app_context(request: HttpRequest) -> Dict[str, Any]:
+    """
+    Legacy: returns active_company and is_subscribed.
+    Prefer app_frame().
+    """
+    ctx = _compute_app_frame(request)
+    return {
+        "active_company": ctx["active_company"],
+        "is_subscribed": ctx["is_subscribed"],
     }

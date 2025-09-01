@@ -1,0 +1,13 @@
+{% extends "dashboard/help/_article_base.html" %}
+{% block help_title %}Expenses{% endblock %}
+{% block help_intro %}Record spending, attach receipts, and rebill client-related costs.{% endblock %}
+{% block help_body %}
+<ol class="mb-4">
+  <li><strong>Add an expense:</strong> Enter vendor, category, amount, and (optional) project/client.</li>
+  <li><strong>Receipts:</strong> Upload images/PDFs; they’re stored with the expense.</li>
+  <li><strong>Rebill:</strong> Mark as billable to include on client invoices with optional markup.</li>
+</ol>
+<div class="alert alert-info small">
+  <strong>Tip:</strong> Categories power reporting. Keep them consistent for cleaner P&L.
+</div>
+{% endblock %}

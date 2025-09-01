@@ -1,11 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container py-4" style="max-width: 960px">
+  <!-- Header -->
   <div class="d-flex align-items-center justify-content-between mb-3">
     <h1 class="h4 mb-0">Getting started</h1>
     <form method="post" action="{% url 'dashboard:onboarding_dismiss' %}">
       {% csrf_token %}
-      <button class="btn btn-sm btn-outline-secondary">Hide</button>
+      <button type="submit" class="btn btn-sm btn-outline-secondary" title="Hide onboarding">
+        Hide
+      </button>
     </form>
   </div>
 
@@ -13,14 +16,18 @@
     Follow these steps to finish setup. You can do them in any order.
   </p>
 
-  <div class="list-group">
+  <!-- Steps -->
+  <section class="list-group">
+
     <!-- 1) Company -->
     <div class="list-group-item d-flex align-items-center justify-content-between">
       <div class="d-flex align-items-center gap-3">
         {% if status.has_company %}
-          <i class="bi bi-check-circle-fill"></i>
+          <i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i>
+          <span class="visually-hidden">Completed</span>
         {% else %}
-          <i class="bi bi-circle"></i>
+          <i class="bi bi-circle text-muted" aria-hidden="true"></i>
+          <span class="visually-hidden">Not completed</span>
         {% endif %}
         <div>
           <div class="fw-semibold">Set up your company</div>
@@ -40,9 +47,11 @@
     <div class="list-group-item d-flex align-items-center justify-content-between">
       <div class="d-flex align-items-center gap-3">
         {% if status.has_client %}
-          <i class="bi bi-check-circle-fill"></i>
+          <i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i>
+          <span class="visually-hidden">Completed</span>
         {% else %}
-          <i class="bi bi-circle"></i>
+          <i class="bi bi-circle text-muted" aria-hidden="true"></i>
+          <span class="visually-hidden">Not completed</span>
         {% endif %}
         <div>
           <div class="fw-semibold">Add a client</div>
@@ -56,25 +65,32 @@
     <div class="list-group-item d-flex align-items-center justify-content-between">
       <div class="d-flex align-items-center gap-3">
         {% if status.has_project %}
-          <i class="bi bi-check-circle-fill"></i>
+          <i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i>
+          <span class="visually-hidden">Completed</span>
         {% else %}
-          <i class="bi bi-circle"></i>
+          <i class="bi bi-circle text-muted" aria-hidden="true"></i>
+          <span class="visually-hidden">Not completed</span>
         {% endif %}
         <div>
           <div class="fw-semibold">Create your first project</div>
           <div class="text-muted small">Hourly or flat rate</div>
         </div>
       </div>
-      <a class="btn btn-sm btn-outline-primary" href="{% url 'core:project_create_hourly' %}">New project</a>
+      <div class="btn-group">
+        <a class="btn btn-sm btn-outline-primary" href="{% url 'core:project_create_hourly' %}">Hourly</a>
+        <a class="btn btn-sm btn-outline-primary" href="{% url 'core:project_create_flat' %}">Flat rate</a>
+      </div>
     </div>
 
     <!-- 4) Activity -->
     <div class="list-group-item d-flex align-items-center justify-content-between">
       <div class="d-flex align-items-center gap-3">
         {% if status.has_activity %}
-          <i class="bi bi-check-circle-fill"></i>
+          <i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i>
+          <span class="visually-hidden">Completed</span>
         {% else %}
-          <i class="bi bi-circle"></i>
+          <i class="bi bi-circle text-muted" aria-hidden="true"></i>
+          <span class="visually-hidden">Not completed</span>
         {% endif %}
         <div>
           <div class="fw-semibold">Track something</div>
@@ -91,9 +107,11 @@
     <div class="list-group-item d-flex align-items-center justify-content-between">
       <div class="d-flex align-items-center gap-3">
         {% if status.has_invoice %}
-          <i class="bi bi-check-circle-fill"></i>
+          <i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i>
+          <span class="visually-hidden">Completed</span>
         {% else %}
-          <i class="bi bi-circle"></i>
+          <i class="bi bi-circle text-muted" aria-hidden="true"></i>
+          <span class="visually-hidden">Not completed</span>
         {% endif %}
         <div>
           <div class="fw-semibold">Create your first invoice</div>
@@ -107,9 +125,11 @@
     <div class="list-group-item d-flex align-items-center justify-content-between">
       <div class="d-flex align-items-center gap-3">
         {% if status.is_subscribed %}
-          <i class="bi bi-check-circle-fill"></i>
+          <i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i>
+          <span class="visually-hidden">Completed</span>
         {% else %}
-          <i class="bi bi-circle"></i>
+          <i class="bi bi-circle text-muted" aria-hidden="true"></i>
+          <span class="visually-hidden">Not completed</span>
         {% endif %}
         <div>
           <div class="fw-semibold">Choose a plan</div>
@@ -118,10 +138,12 @@
       </div>
       <a class="btn btn-sm btn-outline-primary" href="{% url 'billing:plans' %}">View plans</a>
     </div>
-  </div>
+  </section>
 
-  <div class="mt-4">
+  <!-- Footer actions -->
+  <div class="mt-4 d-flex gap-2">
     <a href="{% url 'dashboard:home' %}" class="btn btn-secondary">Back to dashboard</a>
+    <a href="{% url 'dashboard:help_index' %}" class="btn btn-outline-secondary">Help center</a>
   </div>
 </div>
 {% endblock %}

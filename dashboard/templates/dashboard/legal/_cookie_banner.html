@@ -1,22 +1,35 @@
 {% load static %}
 {% with consent_cookie_name=COOKIE_CONSENT_NAME|default:"cookie_consent" %}
-<div id="cookie-banner" class="position-fixed bottom-0 start-0 end-0 p-3" style="z-index:1080; display:none;">
+<style>
+  /* subtle, motion-safe fade */
+  #cookie-banner[hidden] { display: none !important; }
+  @media (prefers-reduced-motion: no-preference) {
+    #cookie-banner.showing { animation: cc-fade .2s ease-out both; }
+    @keyframes cc-fade { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
+  }
+</style>
+
+<div id="cookie-banner"
+     class="position-fixed bottom-0 start-0 end-0 p-3"
+     style="z-index:1080;" hidden
+     role="region" aria-label="Cookie notice">
   <div class="alert alert-dark border shadow-sm d-flex align-items-start gap-3 mb-0">
     <div class="flex-grow-1">
+      <strong class="me-1">Cookies:</strong>
       We use essential cookies to make this site work, and optional analytics/marketing cookies to improve
       your experience. You can change your choices at any time.
       <a href="{% url 'dashboard:cookies' %}" class="alert-link">Learn more</a>.
     </div>
     <div class="d-flex gap-2">
-      <form method="post" action="{% url 'dashboard:cookie_consent_set' %}">
+      <form method="post" action="{% url 'dashboard:cookie_consent_set' %}" data-cc-action="reject_all">
         {% csrf_token %}
         <input type="hidden" name="choice" value="reject_all">
-        <button class="btn btn-sm btn-outline-light">Reject all</button>
+        <button type="submit" class="btn btn-sm btn-outline-light">Reject all</button>
       </form>
-      <form method="post" action="{% url 'dashboard:cookie_consent_set' %}">
+      <form method="post" action="{% url 'dashboard:cookie_consent_set' %}" data-cc-action="accept_all">
         {% csrf_token %}
         <input type="hidden" name="choice" value="accept_all">
-        <button class="btn btn-sm btn-primary">Accept all</button>
+        <button type="submit" class="btn btn-sm btn-primary">Accept all</button>
       </form>
       <a class="btn btn-sm btn-outline-light" href="{% url 'dashboard:cookie_preferences' %}">Preferences</a>
     </div>
@@ -24,38 +37,47 @@
 </div>
 
 <script>
-(function() {
-  var name = "{{ consent_cookie_name }}";
+(function () {
+  var COOKIE_NAME = "{{ consent_cookie_name }}";
+  var banner = document.getElementById("cookie-banner");
+
   function getCookie(n) {
-    var m = document.cookie.match(new RegExp('(^| )' + n.replace(/([.$?*|{}()[\]\\/+^])/g,'\\$1') + '=([^;]+)'));
+    var m = document.cookie.match(new RegExp('(^| )' + n.replace(/([.$?*|{}()[\\]\\/+^])/g,'\\$1') + '=([^;]+)'));
     return m ? decodeURIComponent(m[2]) : null;
   }
-  function hasConsent() {
-    return !!getCookie(name);
-  }
+  function hasConsent() { return !!getCookie(COOKIE_NAME); }
 
-  // Show banner if no prior choice
-  if (!hasConsent()) {
-    var el = document.getElementById("cookie-banner");
-    if (el) el.style.display = "block";
-  }
-
-  // Conditional analytics loader (fires only after consent and only if enabled)
   function parseConsent(v) {
     // format: v=1&ana=0|1&mkt=0|1
     var out = { ana:false, mkt:false };
     if (!v) return out;
-    v.split("&").forEach(function(p){
-      var kv = p.split("=");
+    var parts = v.split("&");
+    for (var i=0;i<parts.length;i++){
+      var kv = parts[i].split("=");
       if (kv.length === 2) {
-        if (kv[0]==="ana") out.ana = (kv[1]==="1");
-        if (kv[0]==="mkt") out.mkt = (kv[1]==="1");
+        if (kv[0] === "ana") out.ana = (kv[1] === "1");
+        if (kv[0] === "mkt") out.mkt = (kv[1] === "1");
       }
-    });
+    }
     return out;
   }
+
+  function showBanner() {
+    if (!banner) return;
+    banner.hidden = false;
+    banner.classList.add("showing");
+    // move focus for SR/keyboard
+    banner.setAttribute("tabindex","-1");
+    try { banner.focus({ preventScroll: true }); } catch(e){}
+  }
+  function hideBanner() {
+    if (!banner) return;
+    banner.hidden = true;
+  }
+
+  // Conditional analytics loader (fires only after consent and only if enabled)
   function loadAnalyticsIfConsented() {
-    var v = getCookie(name);
+    var v = getCookie(COOKIE_NAME);
     var c = parseConsent(v);
 
     // Plausible (if configured)
@@ -72,10 +94,10 @@
     // Google Analytics (if configured)
     {% if GA_MEASUREMENT_ID %}
     if (c.ana) {
-      var gtagScript = document.createElement("script");
-      gtagScript.async = true;
-      gtagScript.src = "https://www.googletagmanager.com/gtag/js?id={{ GA_MEASUREMENT_ID }}";
-      document.head.appendChild(gtagScript);
+      var ga = document.createElement("script");
+      ga.async = true;
+      ga.src = "https://www.googletagmanager.com/gtag/js?id={{ GA_MEASUREMENT_ID }}";
+      document.head.appendChild(ga);
       window.dataLayer = window.dataLayer || [];
       function gtag(){ dataLayer.push(arguments); }
       window.gtag = gtag;
@@ -85,22 +107,67 @@
     {% endif %}
   }
 
-  // Try load immediately (if consent cookie already exists)
-  if (hasConsent()) { loadAnalyticsIfConsented(); }
+  // Show banner or load analytics immediately
+  if (!hasConsent()) {
+    showBanner();
+  } else {
+    loadAnalyticsIfConsented();
+  }
 
-  // Also observe cookie changes (simple polling)
-  var last = document.cookie;
+  // Progressive enhancement: AJAX-submit the quick actions (no page reload).
+  function getCsrfToken() {
+    // Django default cookie name
+    var m = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  if (banner) {
+    banner.addEventListener("submit", function (ev) {
+      var form = ev.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      var action = form.getAttribute("data-cc-action");
+      if (!action || !window.fetch) return; // let normal POST happen
+
+      ev.preventDefault();
+      var fd = new FormData(form);
+      var csrf = getCsrfToken();
+      fetch(form.action, {
+        method: "POST",
+        headers: csrf ? {"X-CSRFToken": csrf} : {},
+        body: fd,
+        credentials: "same-origin"
+      }).then(function () {
+        // Hide and load analytics on success
+        hideBanner();
+        loadAnalyticsIfConsented();
+        // Let other scripts know consent changed
+        document.dispatchEvent(new CustomEvent("cookieconsent:updated"));
+      }).catch(function () {
+        // Fallback: submit normally if fetch fails
+        form.submit();
+      });
+    });
+  }
+
+  // Listen for consent changes triggered elsewhere (e.g., preferences page)
+  document.addEventListener("cookieconsent:updated", function () {
+    if (hasConsent()) {
+      hideBanner();
+      loadAnalyticsIfConsented();
+    }
+  });
+
+  // Gentle fallback polling in case consent is set from another tab
+  var lastCookie = document.cookie;
   setInterval(function(){
-    if (document.cookie !== last) {
-      last = document.cookie;
+    if (document.cookie !== lastCookie) {
+      lastCookie = document.cookie;
       if (hasConsent()) {
-        // Hide banner and load analytics
-        var el = document.getElementById("cookie-banner");
-        if (el) el.style.display = "none";
+        hideBanner();
         loadAnalyticsIfConsented();
       }
     }
-  }, 1000);
+  }, 5000);
 })();
 </script>
 {% endwith %}

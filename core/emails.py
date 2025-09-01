@@ -1,11 +1,21 @@
 # core/emails.py
+from __future__ import annotations
+
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.urls import reverse
 
+
+# ============================
+# Invoices
+# ============================
+
 def send_invoice_email(inv, to_email: str, *, note: str = "", mode: str = "initial") -> int:
-    # mode: "initial" or "reminder"
+    """
+    Send an invoice email (optionally with attached PDF).
+    mode: "initial" | "reminder"
+    """
     prefix = getattr(settings, "EMAIL_SUBJECT_PREFIX", "[EZ360PM] ")
     if mode == "reminder":
         subject = f"{prefix}Reminder: Invoice {inv.number} from {inv.company.name}"
@@ -25,19 +35,26 @@ def send_invoice_email(inv, to_email: str, *, note: str = "", mode: str = "initi
     msg = EmailMultiAlternatives(subject, text_body, settings.DEFAULT_FROM_EMAIL, [to_email])
     msg.attach_alternative(html_body, "text/html")
 
-    # Optional PDF attach if you added a renderer
+    # Optional: attach PDF if renderer exists
     try:
-        from core.pdf import render_invoice_pdf # type: ignore
+        from core.pdf import render_invoice_pdf  # type: ignore
         pdf_bytes = render_invoice_pdf(inv)
         if pdf_bytes:
             msg.attach(f"invoice_{inv.number}.pdf", pdf_bytes, "application/pdf")
     except Exception:
+        # Silently ignore PDF issues so email still sends
         pass
 
     return msg.send()
 
+
+# ============================
+# Estimates
+# ============================
+
 def send_estimate_email(est, to_email: str, *, note: str = "", mode: str = "initial") -> int:
     """
+    Send an estimate email (optionally with attached PDF).
     mode: "initial" | "reminder"
     """
     prefix = getattr(settings, "EMAIL_SUBJECT_PREFIX", "[EZ360PM] ")
@@ -63,17 +80,14 @@ def send_estimate_email(est, to_email: str, *, note: str = "", mode: str = "init
     msg = EmailMultiAlternatives(subject, text_body, settings.DEFAULT_FROM_EMAIL, [to_email])
     msg.attach_alternative(html_body, "text/html")
 
-    # Optional: attach PDF if you have a renderer
+    # Optional: attach PDF if renderer exists
     try:
-        from core.pdf import render_estimate_pdf # type: ignore
-        pdf_bytes = None
-        try:
-            pdf_bytes = render_estimate_pdf(est)
-        except TypeError:
-            pdf_bytes = render_estimate_pdf(est)
+        from core.pdf import render_estimate_pdf  # type: ignore
+        pdf_bytes = render_estimate_pdf(est)
         if pdf_bytes:
             msg.attach(f"estimate_{est.number}.pdf", pdf_bytes, "application/pdf")
     except Exception:
+        # Silently ignore PDF issues so email still sends
         pass
 
     return msg.send()

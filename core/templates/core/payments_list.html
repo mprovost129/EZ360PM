@@ -1,10 +1,92 @@
 {% extends "_app_shell.html" %}
 {% block page_title %}Clients{% endblock %}
 {% block app_content %}
-<div class="d-flex justify-content-end mb-3">
-  <a class="btn btn-primary" href="#">New Client</a>
+
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+  <form class="d-flex" method="get" role="search" style="max-width:520px; width:100%">
+    <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Search by company, name, email…">
+    <button class="btn btn-outline-secondary ms-2">Search</button>
+  </form>
+  <a class="btn btn-primary" href="{% url 'core:client_create' %}">New Client</a>
 </div>
-<div class="card">
-  <div class="card-body">Payments List</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Client</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th style="width:140px">Created</th>
+          <th style="width:160px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in clients %}
+        <tr>
+          <td class="fw-semibold">
+            {% if c.org %}
+              {{ c.org }}
+              {% if c.first_name or c.last_name %}
+                <div class="text-muted small">{{ c.first_name }} {{ c.last_name }}</div>
+              {% endif %}
+            {% else %}
+              {% firstof c.first_name '' %} {% firstof c.last_name '' %}
+              {% if not c.first_name and not c.last_name %}
+                <div class="text-muted small">{{ c.email }}</div>
+              {% endif %}
+            {% endif %}
+          </td>
+          <td>
+            {% if c.email %}
+              <a class="text-decoration-none" href="mailto:{{ c.email }}">{{ c.email }}</a>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if c.phone %}
+              <a class="text-decoration-none" href="tel:{{ c.phone }}">{{ c.phone }}</a>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>{{ c.created_at|date:"Y-m-d" }}</td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:client_update' c.pk %}">Edit</a>
+            <a class="btn btn-sm btn-outline-danger" href="{% url 'core:client_delete' c.pk %}">Delete</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="text-center text-muted py-4">No clients found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# Optional pagination support if you’re passing a page_obj #}
+  {% if page_obj %}
+    <div class="card-footer d-flex justify-content-between align-items-center">
+      <div class="text-muted small">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+      </div>
+      <div class="btn-group">
+        {% if page_obj.has_previous %}
+          <a class="btn btn-sm btn-outline-secondary" href="?q={{ q|urlencode }}&page={{ page_obj.previous_page_number }}">Previous</a>
+        {% else %}
+          <button class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+        {% endif %}
+        {% if page_obj.has_next %}
+          <a class="btn btn-sm btn-outline-secondary" href="?q={{ q|urlencode }}&page={{ page_obj.next_page_number }}">Next</a>
+        {% else %}
+          <button class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
 </div>
+
 {% endblock %}

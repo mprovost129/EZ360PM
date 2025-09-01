@@ -1,27 +1,44 @@
 {% extends "base_public.html" %}
 {% block content %}
-<div class="container py-5" style="max-width:520px">
+<div class="container py-5" style="max-width: 520px">
   <div class="card shadow-sm">
     <div class="card-body">
-      <h1 class="h4 mb-3">{{ APP_NAME|default:"EZ360PM" }} — Sign in</h1>
+      <h1 class="h4 mb-3">
+        {{ APP_NAME|default:"EZ360PM" }} — Sign in
+      </h1>
 
-      <form method="post" novalidate>
+      <form method="post" autocomplete="off" novalidate>
         {% csrf_token %}
-        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        {% if next %}
+          <input type="hidden" name="next" value="{{ next }}">
+        {% endif %}
 
         {% if form.non_field_errors %}
           <div class="alert alert-danger" role="alert">
-            {% for e in form.non_field_errors %}{{ e }}<br>{% endfor %}
+            {% for e in form.non_field_errors %}
+              {{ e }}<br>
+            {% endfor %}
           </div>
         {% endif %}
 
         {% for field in form %}
           <div class="mb-3">
-            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-            {{ field }}
+            <label class="form-label" for="{{ field.id_for_label }}">
+              {{ field.label }}
+            </label>
+            {# Add is-invalid class if field has errors #}
+            {% if field.errors %}
+              {% with classes=field.field.widget.attrs.class|default:'' %}
+                {% render_field field class=classes|add:' is-invalid' %}
+              {% endwith %}
+            {% else %}
+              {{ field }}
+            {% endif %}
+
             {% if field.help_text %}
               <div class="form-text">{{ field.help_text }}</div>
             {% endif %}
+
             {% for e in field.errors %}
               <div class="invalid-feedback d-block">{{ e }}</div>
             {% endfor %}
@@ -33,7 +50,7 @@
 
       <div class="mt-3 d-flex justify-content-between">
         <a href="{% url 'accounts:password_reset' %}">Forgot password?</a>
-        <a href="/accounts/register/">Create an account</a>
+        <a href="{% url 'accounts:register' %}">Create an account</a>
       </div>
     </div>
   </div>

@@ -3,18 +3,51 @@
 {% block app_content %}
 <div class="card shadow-sm">
   <div class="card-body">
-    <form method="post">
+    {% if not est.client or not est.client.email %}
+      <div class="alert alert-warning">
+        This estimate’s client doesn’t have an email on file. Add one to <a href="{% url 'core:clients' %}?q={{ est.client|urlencode }}">{{ est.client }}</a> first, or enter a recipient below.
+      </div>
+    {% endif %}
+
+    <form method="post" novalidate>
       {% csrf_token %}
+
       <div class="mb-3">
-        <label class="form-label">To</label>
-        <input type="email" name="to" class="form-control" required value="{{ default_to }}">
+        <label class="form-label" for="id_to">To</label>
+        <input
+          id="id_to"
+          type="email"
+          name="to"
+          class="form-control"
+          required
+          autocomplete="email"
+          value="{{ request.POST.to|default:default_to }}"
+          placeholder="{{ est.client.email|default:'client@example.com' }}"
+        >
       </div>
+
       <div class="mb-3">
-        <label class="form-label">{% if mode == "reminder" %}Reminder message{% else %}Message (optional){% endif %}</label>
-        <textarea name="note" class="form-control" rows="4" placeholder="Add a short note…"></textarea>
+        <label class="form-label" for="id_note">
+          {% if mode == "reminder" %}Reminder message{% else %}Message (optional){% endif %}
+        </label>
+        <textarea
+          id="id_note"
+          name="note"
+          class="form-control"
+          rows="4"
+          placeholder="{% if mode == 'reminder' %}Friendly reminder about your estimate…{% else %}Add a short note to your client…{% endif %}"
+        >{{ request.POST.note }}</textarea>
+        <div class="form-text">
+          We’ll include a view link{% if attach_pdf %} and attach a PDF{% endif %}.
+        </div>
       </div>
-      <button class="btn btn-primary">{% if mode == "reminder" %}Send reminder{% else %}Send estimate{% endif %}</button>
-      <a class="btn btn-outline-secondary" href="{% url 'core:estimate_detail' est.pk %}">Cancel</a>
+
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit">
+          {% if mode == "reminder" %}Send reminder{% else %}Send estimate{% endif %}
+        </button>
+        <a class="btn btn-outline-secondary" href="{% url 'core:estimate_detail' est.pk %}">Cancel</a>
+      </div>
     </form>
   </div>
 </div>

@@ -1,12 +1,21 @@
-New suggestion submitted:
+New suggestion submitted
 
-Name: {{ s.name|default:"(none)" }}
-Email: {{ s.email|default:"(none)" }}
-Company: {{ s.company|default:"(none)" }}
-User: {{ s.user|default:"(anon)" }}
-From URL: {{ s.page_url|default:"(n/a)" }}
+ID: {{ s.pk }}
+Subject: {{ s.subject|default_if_none:""|default:"(none)" }}
 
-Subject: {{ s.subject }}
+From (public fields)
+- Name: {{ s.name|default_if_none:""|default:"(none)" }}
+- Email: {{ s.email|default_if_none:""|default:"(none)" }}
+- Company: {{ s.company|default_if_none:""|default:"(none)" }}
+- From URL: {{ s.page_url|default_if_none:""|default:"(n/a)" }}
 
-Message:
-{{ s.message }}
+Authenticated user (if any)
+{% if s.user %}
+- User: {{ s.user }}{% if s.user.email %} <{{ s.user.email }}>{% endif %}
+{% else %}
+- User: (anon)
+{% endif %}
+
+Message
+-------
+{{ s.message|default_if_none:""|default:"(no message provided)" }}

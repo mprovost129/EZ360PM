@@ -1,12 +1,30 @@
 {% extends "base.html" %}
+
 {% block content %}
-<div class="container py-5" style="max-width:640px">
-  <h1 class="h4 mb-3">Create your company</h1>
-  <form method="post" enctype="multipart/form-data">
+<div class="container py-5" style="max-width: 640px">
+  {# Onboarding progress indicator #}
+  {% include "onboarding/_progress.html" with step="company" %}
+  <h1 class="h4 mb-3">Create Your Company</h1>
+  <p class="text-muted mb-4">
+    Add your company name, logo, and contact details. You can update these settings later from your profile.
+  </p>
+
+  <form method="post" enctype="multipart/form-data" novalidate>
     {% csrf_token %}
-    {{ form.as_p }}
+
+    {# Render visible fields with Bootstrap form styling #}
+    {% for field in form.visible_fields %}
+      <div class="mb-3">
+        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+        {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+      </div>
+    {% endfor %}
+    {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+
     <div class="d-flex gap-2">
-      <button class="btn btn-primary">Continue</button>
+      <button type="submit" class="btn btn-primary">Continue</button>
     </div>
   </form>
 </div>

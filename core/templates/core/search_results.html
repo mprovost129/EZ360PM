@@ -3,7 +3,10 @@
 {% block app_content %}
 
 <form class="d-flex mb-3" method="get" action="{% url 'core:search' %}" role="search" style="max-width:600px">
-  <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Search clients, projects, invoices… (try inv:1234)">
+  <label for="search-q" class="visually-hidden">Search</label>
+  <input id="search-q" class="form-control" type="search" name="q"
+         value="{{ q|default_if_none:'' }}"
+         placeholder="Search clients, projects, invoices… (try inv:1234)">
   <button class="btn btn-primary ms-2">Search</button>
 </form>
 
@@ -22,12 +25,18 @@
       <tbody>
         {% for r in results %}
         <tr>
-          <td><span class="badge bg-secondary">{{ r.kind }}</span></td>
-          <td class="fw-semibold">{{ r.title }}</td>
-          <td class="text-muted">{{ r.subtitle }}</td>
-          <td>{{ r.date|date:"Y-m-d" }}</td>
+          <td><span class="badge bg-secondary text-capitalize">{{ r.kind }}</span></td>
+          <td class="fw-semibold text-truncate" style="max-width:420px">{{ r.title }}</td>
+          <td class="text-muted text-truncate" style="max-width:520px">{{ r.subtitle }}</td>
+          <td>
+            {% if r.date %}{{ r.date|date:"Y-m-d" }}{% else %}—{% endif %}
+          </td>
           <td class="text-end">
-            <a class="btn btn-sm btn-outline-primary" href="{{ r.url }}">Open</a>
+            {% if r.url %}
+              <a class="btn btn-sm btn-outline-primary" href="{{ r.url }}">Open</a>
+            {% else %}
+              <span class="text-muted small">—</span>
+            {% endif %}
           </td>
         </tr>
         {% empty %}

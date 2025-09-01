@@ -1,30 +1,48 @@
 {% extends "_app_shell.html" %}
+
 {% block page_title %}Invoice {{ inv.number }}{% endblock %}
+
 {% block app_content %}
 <div class="row g-3">
   <div class="col-lg-8">
     <div class="card shadow-sm">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-start">
-          <div>
+          <div class="me-3">
             <div class="text-muted small">Client</div>
             <div class="fw-semibold">{{ inv.client }}</div>
-            <div class="text-muted small">Project</div>
-            <div>{{ inv.project }}</div>
+            <div class="text-muted small mt-2">Project</div>
+            <div>{{ inv.project|default:"—" }}</div>
           </div>
           <div class="text-end">
             <div class="text-muted small">Status</div>
-            <div class="text-capitalize">{{ inv.status }}</div>
-            <div class="text-muted small">Issued</div>
+            <div>
+              <span class="badge
+                {% if inv.status == 'paid' %}bg-success
+                {% elif inv.status == 'sent' %}bg-primary
+                {% elif inv.status == 'void' %}bg-dark
+                {% else %}bg-secondary{% endif %}
+              text-capitalize">{{ inv.status }}</span>
+            </div>
+            <div class="text-muted small mt-2">Issued</div>
             <div>{{ inv.issue_date|date:'Y-m-d' }}</div>
-            <div class="text-muted small">Due</div>
-            <div>{{ inv.due_date|date:'Y-m-d' }}</div>
+            <div class="text-muted small mt-2">Due</div>
+            <div>{{ inv.due_date|date:'Y-m-d'|default:"—" }}</div>
           </div>
         </div>
+
         <hr>
+
         <div class="table-responsive">
           <table class="table align-middle">
-            <thead><tr><th>Description</th><th class="text-end">Qty</th><th class="text-end">Unit</th><th class="text-end">Line</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th class="text-end">Qty</th>
+                <th class="text-end">Unit</th>
+                <th class="text-end">Line</th>
+              </tr>
+            </thead>
             <tbody>
               {% for it in inv.items.all %}
                 <tr>
@@ -46,6 +64,7 @@
             </tfoot>
           </table>
         </div>
+
         {% if inv.notes %}
           <div class="mt-3">
             <div class="fw-semibold">Notes</div>
@@ -53,39 +72,49 @@
           </div>
         {% endif %}
       </div>
-      <div class="card-footer d-flex justify-content-between">
-        <div class="d-flex gap-2">
+
+      <div class="card-footer d-flex flex-wrap gap-2 justify-content-between">
+        <div class="d-flex flex-wrap gap-2">
           <a class="btn btn-outline-secondary" href="{% url 'core:invoice_update' inv.pk %}">Edit</a>
-          <a class="btn btn-outline-secondary" href="{% url 'core:invoice_pdf' inv.pk %}" target="_blank">PDF</a>
-          <a class="btn btn-primary" href="{% url 'core:invoice_email' inv.pk %}">Email</a>
-          {% with balance=(inv.total|default:0) |add:"-"|(inv.amount_paid|default:0) %}
-          {% if inv.status != inv.SENT %}
-          <a class="btn btn-sm btn-outline-primary" href="{% url 'core:invoice_send_email' inv.pk %}">Send</a>
-          {% elif balance|floatformat:2 > 0 and inv.status != inv.VOID %}
-          <a class="btn btn-sm btn-outline-primary" href="{% url 'core:invoice_send_reminder' inv.pk %}">Send reminder</a>
+          <a class="btn btn-outline-secondary" href="{% url 'core:invoice_pdf' inv.pk %}" target="_blank" rel="noopener">PDF</a>
+
+          {# Email actions #}
+          <a class="btn btn-primary" href="{% url 'core:invoice_email' inv.pk %}">Email…</a>
+          {% if inv.status == inv.DRAFT %}
+            <a class="btn btn-sm btn-outline-primary" href="{% url 'core:invoice_send_email' inv.pk %}">Send now</a>
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:invoice_mark_sent' inv.pk %}">Mark sent</a>
           {% endif %}
-          {% endwith %}
-          <a class="btn btn-outline-primary" href="{% url 'core:invoice_mark_sent' inv.pk %}">Mark Sent</a>
+          {% if inv.balance > 0 and inv.status != inv.VOID %}
+            <a class="btn btn-sm btn-outline-primary" href="{% url 'core:invoice_send_reminder' inv.pk %}">Send reminder</a>
+          {% endif %}
+
           {% if inv.amount_paid and inv.amount_paid|floatformat:2 != "0.00" %}
-          <a class="btn btn-sm btn-outline-danger" href="{% url 'core:invoice_refund' inv.pk %}">Refund</a>
+            <a class="btn btn-sm btn-outline-danger" href="{% url 'core:invoice_refund' inv.pk %}">Refund</a>
           {% endif %}
-          <a class="btn btn-outline-danger" href="{% url 'core:invoice_void' inv.pk %}">Void</a>
+
+          {% if inv.status != inv.VOID %}
+            <a class="btn btn-outline-danger" href="{% url 'core:invoice_void' inv.pk %}">Void</a>
+          {% endif %}
         </div>
-        <a class="btn btn-primary" href="{% url 'core:payment_create' inv.pk %}">Add Payment</a>
+
+        <a class="btn btn-success" href="{% url 'core:payment_create' inv.pk %}">Add Payment</a>
       </div>
     </div>
 
     <div class="card shadow-sm mt-3">
       <div class="card-body">
-        <div class="fw-semibold mb-2">Payments</div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fw-semibold">Payments</div>
+          {% if inv.balance > 0 %}<div class="small text-muted">Outstanding: <strong>${{ inv.balance }}</strong></div>{% endif %}
+        </div>
         <div class="table-responsive">
           <table class="table mb-0 align-middle">
             <thead><tr><th>When</th><th>Method</th><th class="text-end">Amount</th></tr></thead>
             <tbody>
-              {% for p in inv.payments.all|dictsortreversed:'received_at' %}
+              {% for p in inv.payments.all %}
                 <tr>
                   <td>{{ p.received_at|date:'Y-m-d H:i' }}</td>
-                  <td>{{ p.method }}</td>
+                  <td>{{ p.method|default:"—" }}</td>
                   <td class="text-end">${{ p.amount }}</td>
                 </tr>
               {% empty %}
@@ -105,10 +134,35 @@
         <div class="d-grid gap-2 mt-2">
           <a class="btn btn-outline-secondary" href="{% url 'core:invoices' %}">Back to Invoices</a>
           <a class="btn btn-outline-primary" href="{% url 'core:payment_create' inv.pk %}">Record a Payment</a>
-          <a class="btn btn-outline-secondary" href="{% url 'core:invoice_public' inv.public_token %}" target="_blank">Open Public Link</a>
+          <a class="btn btn-outline-secondary" href="{% url 'core:invoice_public' inv.public_token %}" target="_blank" rel="noopener">Open Public Link</a>
+          {% if inv.balance > 0 %}
+            <a class="btn btn-primary" href="{% url 'core:invoice_checkout' inv.public_token %}" target="_blank" rel="noopener">Pay ${{ inv.balance }}</a>
+          {% endif %}
+          <button class="btn btn-outline-secondary" type="button" id="copy-public-link" data-url="{% url 'core:invoice_public' inv.public_token %}">Copy Public Link</button>
         </div>
       </div>
     </div>
   </div>
 </div>
+
+<script>
+(function(){
+  const btn = document.getElementById('copy-public-link');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    try {
+      const url = btn.dataset.url || window.location.href;
+      await navigator.clipboard.writeText(url);
+      btn.classList.remove('btn-outline-secondary');
+      btn.classList.add('btn-success');
+      btn.textContent = 'Copied!';
+      setTimeout(() => {
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-outline-secondary');
+        btn.textContent = 'Copy Public Link';
+      }, 1500);
+    } catch (e) {}
+  });
+})();
+</script>
 {% endblock %}

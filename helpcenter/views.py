@@ -1,22 +1,40 @@
-from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 
 def index(request):
     """
-    Public help directory. Logged out and logged in users can read it.
+    Public Help Center FAQ.
+    Both logged-out and logged-in users can access.
     """
     sections = [
-        {"slug": "getting-started", "title": "Getting started", "items": [
-            {"q": "Create your first project", "a": "Go to Projects → New Project…"},
-            {"q": "Invite a team member", "a": "Company → Team → Invite…"},
-        ]},
-        {"slug": "billing", "title": "Billing & subscriptions", "items": [
-            {"q": "Pick a plan", "a": "Open Plans and choose the tier that fits."},
-            {"q": "Cancel or change plan", "a": "Use the Customer Portal from Plans."},
-        ]},
-        {"slug": "invoices", "title": "Invoices & payments", "items": [
-            {"q": "Email an invoice", "a": "Open an invoice → Email."},
-            {"q": "Record a payment", "a": "Open an invoice → Add payment."},
-        ]},
+        {
+            "slug": "getting-started",
+            "title": "Getting Started",
+            "items": [
+                {"q": "How do I create my first project?",
+                 "a": "Go to <em>Projects</em> → <em>New Project</em>, then fill in name, client, and budget."},
+                {"q": "How do I invite a team member?",
+                 "a": "Go to <em>Company</em> → <em>Team</em> → <em>Invite</em>, and enter their email."},
+            ],
+        },
+        {
+            "slug": "billing",
+            "title": "Billing & Subscriptions",
+            "items": [
+                {"q": "How do I pick a plan?",
+                 "a": "Open <em>Plans</em> under Billing and choose the tier that fits."},
+                {"q": "How do I cancel or change my plan?",
+                 "a": "Use the <em>Customer Portal</em> from the Plans page."},
+            ],
+        },
+        {
+            "slug": "invoices",
+            "title": "Invoices & Payments",
+            "items": [
+                {"q": "How do I email an invoice?",
+                 "a": "Open an invoice and click <em>Email</em>."},
+                {"q": "How do I record a payment?",
+                 "a": "Open an invoice and click <em>Add Payment</em>."},
+            ],
+        },
     ]
     return render(request, "helpcenter/index.html", {"sections": sections})

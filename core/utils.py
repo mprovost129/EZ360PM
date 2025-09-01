@@ -3,12 +3,11 @@ from __future__ import annotations
 
 from calendar import monthrange
 from datetime import date, datetime, time, timedelta
-from typing import Optional, Sequence
+from typing import Optional, TypedDict
 
+from django.db.models.query import QuerySet
 from django.http import HttpRequest
 from django.utils import timezone
-from django.db.models import Max, Q
-from typing import TypedDict
 
 from .models import (
     Company,
@@ -21,13 +20,36 @@ from .models import (
 
 ACTIVE_COMPANY_SESSION_KEY = "active_company_id"
 
+__all__ = [
+    "get_user_companies",
+    "get_active_company",
+    "set_active_company",
+    "user_role_in_company",
+    "require_company_admin",
+    "generate_invoice_number",
+    "generate_estimate_number",
+    "generate_project_number",
+    "parse_date",
+    "default_range_last_30",
+    "add_months",
+    "advance_schedule",
+    "week_range",
+    "combine_midday",
+    "get_user_profile",
+    "get_user_membership",
+    "user_has_active_subscription",
+    "OnboardingStatus",
+    "get_onboarding_status",
+]
+
 
 # ---------------------------------------------------------------------
 # Company selection / roles
 # ---------------------------------------------------------------------
-def get_user_companies(user) -> "Company.objects.none.__class__ | Sequence[Company]": # type: ignore
+
+def get_user_companies(user) -> QuerySet[Company]:
     """
-    Returns all companies the user owns OR is a member of.
+    Return all Companies the user owns or is a member of.
     Anonymous users get an empty queryset.
     """
     if not getattr(user, "is_authenticated", False):
@@ -40,8 +62,9 @@ def get_user_companies(user) -> "Company.objects.none.__class__ | Sequence[Compa
 def get_active_company(request: HttpRequest) -> Optional[Company]:
     """
     Resolve the active company for this request, in order:
-      1) session-selected company,
-      2) first company the user owns or belongs to.
+      1) Session-selected company,
+      2) First company the user owns or belongs to.
+
     Returns None for anonymous users.
     """
     user = getattr(request, "user", None)
@@ -57,19 +80,19 @@ def get_active_company(request: HttpRequest) -> Optional[Company]:
             pass
 
     companies = get_user_companies(user)
-    return companies.first() if companies else None # type: ignore
+    return companies.first() if companies.exists() else None
 
 
 def set_active_company(request: HttpRequest, company: Company) -> None:
-    """Stores the active company id in session (no membership check here)."""
+    """Store the active company ID in session (no membership check here)."""
     request.session[ACTIVE_COMPANY_SESSION_KEY] = int(company.id)  # type: ignore[arg-type]
 
 
 def user_role_in_company(user, company: Company) -> Optional[str]:
-    """Returns 'owner' | 'admin' | 'member' | None."""
+    """Return 'owner' | 'admin' | 'member' | None."""
     if not getattr(user, "is_authenticated", False) or not company:
         return None
-    if company.owner_id == getattr(user, "id", None): # type: ignore
+    if company.owner_id == getattr(user, "id", None):  # type: ignore
         return CompanyMember.OWNER
     m = CompanyMember.objects.filter(company=company, user=user).only("role").first()
     return m.role if m else None
@@ -91,6 +114,7 @@ def require_company_admin(user, company: Optional[Company]) -> bool:
 # ---------------------------------------------------------------------
 # Number generators
 # ---------------------------------------------------------------------
+
 def generate_invoice_number(company: Company) -> str:
     """
     Format: INV-YYYYMM-#### (per company, per month).
@@ -139,7 +163,6 @@ def generate_project_number(company: Company) -> str:
     Simple per-company sequence like 0001, 0002, ...
     Uses count as a fallback when prior numbers are non-numeric.
     """
-    # Try to find the highest fully-numeric number first
     nums = (
         Project.objects
         .filter(company=company)
@@ -166,19 +189,27 @@ def generate_project_number(company: Company) -> str:
 # ---------------------------------------------------------------------
 # Date utilities
 # ---------------------------------------------------------------------
+
 def parse_date(value: Optional[str]) -> Optional[date]:
-    """Parses ISO-like dates (YYYY-MM-DD). Returns None on failure."""
+    """
+    Parse ISO-like dates (YYYY-MM-DD or ISO datetime). Return None on failure.
+    Accepts full ISO strings and extracts the date portion.
+    """
     if not value:
         return None
+    # Try full ISO first (allows 'YYYY-MM-DD' or 'YYYY-MM-DDTHH:MM:SS[.fff][Z]')
     try:
-        # Allow full ISO strings (date or datetime)
-        dt = datetime.fromisoformat(value)
-        return dt.date()
+        # fromisoformat supports 'YYYY-MM-DD' and naive datetimes.
+        # We ignore TZ suffixes here for simplicity; callers pass simple values.
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))  # tolerate trailing 'Z'
+        return (dt.date() if isinstance(dt, datetime) else dt)  # type: ignore[return-value]
     except Exception:
-        try:
-            return datetime.strptime(value, "%Y-%m-%d").date()
-        except Exception:
-            return None
+        pass
+    # Strict date
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except Exception:
+        return None
 
 
 def default_range_last_30() -> tuple[date, date]:
@@ -234,27 +265,36 @@ def combine_midday(d: date) -> datetime:
 # ---------------------------------------------------------------------
 # User helpers
 # ---------------------------------------------------------------------
+
 def get_user_profile(user) -> UserProfile:
     """
-    Ensures a profile exists for the user and returns it.
+    Ensure a profile exists for the user and return it.
     Anonymous users are not supported; call sites should guard.
     """
-    # If you ever allow anonymous here, return a dummy profile object
-    # or None. For now, keep it strict to surface integration mistakes.
     profile, _ = UserProfile.objects.get_or_create(user=user)
     return profile
 
 
 def get_user_membership(user, company: Optional[Company]) -> Optional[CompanyMember]:
+    """Return the CompanyMember row tying user to company, if any."""
     if not company or not getattr(user, "is_authenticated", False):
         return None
     return CompanyMember.objects.filter(company=company, user=user).first()
 
 
 def user_has_active_subscription(company) -> bool:
+    """
+    Lightweight check that the attached subscription object is active/trialing.
+    This avoids coupling to a billing app.
+    """
     sub = getattr(company, "subscription", None)
     status = getattr(sub, "status", "") if sub else ""
     return bool(sub) and status in {"active", "trialing"}
+
+
+# ---------------------------------------------------------------------
+# Onboarding status
+# ---------------------------------------------------------------------
 
 class OnboardingStatus(TypedDict):
     has_company: bool
@@ -265,14 +305,15 @@ class OnboardingStatus(TypedDict):
     is_subscribed: bool
     complete: bool
 
+
 def get_onboarding_status(user, company) -> OnboardingStatus:
     """
-    No migrations required. Computes a simple checklist using current DB state.
+    Computes a simple onboarding checklist using current DB state.
+    No migrations required.
     """
-    from .models import Company, CompanyMember, Client, Project, TimeEntry, Expense, Invoice
-    from .utils import user_has_active_subscription  # you already have this
+    from .models import Client, TimeEntry, Expense  # local import to avoid cycles
 
-    # Find *some* company the user belongs to if none active yet
+    # Find some company the user belongs to if none active yet
     if not company:
         owned = Company.objects.filter(owner=user).first()
         if owned:

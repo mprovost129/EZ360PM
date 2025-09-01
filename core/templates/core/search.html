@@ -6,7 +6,7 @@
   <div class="card-body">
     <form class="row g-2 mb-3" method="get" action="{% url 'core:search' %}">
       <div class="col-12 col-md-8">
-        <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Search clients, projects, invoices, estimates, expenses…">
+        <input class="form-control" type="search" name="q" value="{{ q|default_if_none:'' }}" placeholder="Search clients, projects, invoices, estimates, expenses…">
       </div>
       <div class="col-12 col-md-auto">
         <button class="btn btn-primary">Search</button>
@@ -29,8 +29,10 @@
           <ul class="list-group">
             {% for c in clients %}
               <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span>{{ c.org|default:('-' if not c.org) }} {% if c.first_name or c.last_name %}— {{ c.first_name }} {{ c.last_name }}{% endif %}</span>
-                <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:clients' %}?q={{ c.org|default_if_none:''|urlencode }}">Open</a>
+                <span>
+                  {{ c.org|default:"-" }}{% if c.first_name or c.last_name %} — {{ c.first_name }} {{ c.last_name }}{% endif %}
+                </span>
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:client_update' c.pk %}">Open</a>
               </li>
             {% endfor %}
           </ul>
@@ -88,9 +90,9 @@
                   <tr>
                     <td><a href="{% url 'core:invoice_detail' inv.pk %}">{{ inv.number }}</a></td>
                     <td>{{ inv.client }}</td>
-                    <td>{{ inv.project }}</td>
+                    <td>{{ inv.project|default:"—" }}</td>
                     <td>{{ inv.issue_date|date:'Y-m-d' }}</td>
-                    <td class="text-capitalize">{{ inv.status }}</td>
+                    <td><span class="badge text-bg-secondary text-capitalize">{{ inv.status }}</span></td>
                     <td class="text-end">
                       <a class="btn btn-sm btn-outline-primary" href="{% url 'core:invoice_detail' inv.pk %}">Open</a>
                     </td>
@@ -121,9 +123,9 @@
                   <tr>
                     <td><a href="{% url 'core:estimate_detail' est.pk %}">{{ est.number }}</a></td>
                     <td>{{ est.client }}</td>
-                    <td>{{ est.project }}</td>
+                    <td>{{ est.project|default:"—" }}</td>
                     <td>{{ est.issue_date|date:'Y-m-d' }}</td>
-                    <td class="text-capitalize">{{ est.status }}</td>
+                    <td><span class="badge text-bg-secondary text-capitalize">{{ est.status }}</span></td>
                     <td class="text-end">
                       <a class="btn btn-sm btn-outline-primary" href="{% url 'core:estimate_detail' est.pk %}">Open</a>
                     </td>
@@ -148,15 +150,15 @@
         {% if expenses %}
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
-              <thead><tr><th>Date</th><th>Description</th><th>Project</th><th>Vendor</th><th>Amount</th></tr></thead>
+              <thead><tr><th>Date</th><th>Description</th><th>Project</th><th>Vendor</th><th class="text-end">Amount</th></tr></thead>
               <tbody>
                 {% for ex in expenses %}
                   <tr>
                     <td>{{ ex.date|date:'Y-m-d' }}</td>
                     <td>{{ ex.description }}</td>
-                    <td>{{ ex.project }}</td>
-                    <td>{{ ex.vendor }}</td>
-                    <td>${{ ex.amount }}</td>
+                    <td>{{ ex.project|default:"—" }}</td>
+                    <td>{{ ex.vendor|default:"—" }}</td>
+                    <td class="text-end">${{ ex.amount|floatformat:2 }}</td>
                   </tr>
                 {% endfor %}
               </tbody>

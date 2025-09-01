@@ -1,8 +1,11 @@
 {% extends "base_public.html" %}
+
 {% block content %}
 <div class="container py-4" style="max-width: 980px">
-  <h1 class="h3 mb-3">Terms of Service</h1>
-  <p class="text-muted">Effective {{ effective_date }}</p>
+  <header class="mb-3">
+    <h1 class="h3 mb-1">Terms of Service</h1>
+    <p class="text-muted mb-0">Effective {{ effective_date|date:"Y-m-d" }}</p>
+  </header>
 
   <p class="small text-muted">
     This document is a general template and does not constitute legal advice. Please consult qualified counsel
@@ -11,7 +14,31 @@
 
   <hr class="my-4">
 
-  <h2 class="h5">1) About These Terms</h2>
+  <!-- Table of contents -->
+  <nav aria-label="Contents" class="mb-4">
+    <ol class="small mb-0">
+      <li><a href="#about">About These Terms</a></li>
+      <li><a href="#eligibility">Eligibility &amp; Account</a></li>
+      <li><a href="#billing">Subscriptions, Billing, and Taxes</a></li>
+      <li><a href="#cancellation">Cancellation &amp; Termination</a></li>
+      <li><a href="#acceptable-use">Acceptable Use</a></li>
+      <li><a href="#your-content">Your Content</a></li>
+      <li><a href="#ip">Intellectual Property</a></li>
+      <li><a href="#confidentiality">Confidentiality</a></li>
+      <li><a href="#privacy">Privacy</a></li>
+      <li><a href="#third-parties">Third-Party Services</a></li>
+      <li><a href="#disclaimers">Warranties &amp; Disclaimers</a></li>
+      <li><a href="#liability">Limitation of Liability</a></li>
+      <li><a href="#indemnification">Indemnification</a></li>
+      <li><a href="#modifications">Modifications</a></li>
+      <li><a href="#law">Governing Law; Dispute Resolution</a></li>
+      <li><a href="#force-majeure">Force Majeure</a></li>
+      <li><a href="#notices">Notices &amp; Contact</a></li>
+      <li><a href="#entire-agreement">Entire Agreement</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="about" class="h5">1) About These Terms</h2>
   <p>
     These Terms of Service (“<strong>Terms</strong>”) govern your access to and use of the website, applications, and
     services provided by {{ company_name }} (“<strong>{{ company_name }}</strong>,” “we,” “us,” or “our”) available at
@@ -19,7 +46,7 @@
     you agree to be bound by these Terms and our <a href="{% url 'dashboard:privacy' %}">Privacy Policy</a>.
   </p>
 
-  <h2 class="h5">2) Eligibility & Account</h2>
+  <h2 id="eligibility" class="h5">2) Eligibility &amp; Account</h2>
   <ul>
     <li>You must be at least 18 years old and capable of forming a binding contract.</li>
     <li>You are responsible for the accuracy of your account information and for maintaining the confidentiality
@@ -27,9 +54,9 @@
     <li>We may refuse registration, close accounts, or change eligibility requirements at our sole discretion.</li>
   </ul>
 
-  <h2 class="h5">3) Subscriptions, Billing, and Taxes</h2>
+  <h2 id="billing" class="h5">3) Subscriptions, Billing, and Taxes</h2>
   <ul>
-    <li><strong>Plans & Fees.</strong> Certain features require a paid subscription. Plan prices, features, and limits are
+    <li><strong>Plans &amp; Fees.</strong> Certain features require a paid subscription. Plan prices, features, and limits are
         described in the Service and may change from time to time.</li>
     <li><strong>Auto-Renewal.</strong> Subscriptions renew automatically at the end of each billing cycle unless canceled.</li>
     <li><strong>Payments.</strong> We use third-party processors (e.g., Stripe) to handle payments. By subscribing, you authorize
@@ -39,7 +66,7 @@
     <li><strong>Taxes.</strong> Fees are exclusive of taxes. You are responsible for all applicable taxes, duties, and levies.</li>
   </ul>
 
-  <h2 class="h5">4) Cancellation & Termination</h2>
+  <h2 id="cancellation" class="h5">4) Cancellation &amp; Termination</h2>
   <ul>
     <li><strong>You may cancel</strong> at any time via the account or billing portal. Your access continues until the end of
         the then-current paid period; no further renewals will be charged.</li>
@@ -49,7 +76,7 @@
         <a href="{% url 'dashboard:privacy' %}">Privacy Policy</a> and internal policies unless required otherwise by law.</li>
   </ul>
 
-  <h2 class="h5">5) Acceptable Use</h2>
+  <h2 id="acceptable-use" class="h5">5) Acceptable Use</h2>
   <p>You agree not to, and will not permit others to:</p>
   <ul>
     <li>Use the Service in any unlawful, harmful, fraudulent, infringing, or abusive manner.</li>
@@ -60,7 +87,7 @@
     <li>Infringe or misappropriate intellectual property or privacy rights of others.</li>
   </ul>
 
-  <h2 class="h5">6) Your Content</h2>
+  <h2 id="your-content" class="h5">6) Your Content</h2>
   <ul>
     <li><strong>Ownership.</strong> As between you and {{ company_name }}, you retain all rights to content you upload or submit
         to the Service (“<strong>Your Content</strong>”).</li>
@@ -70,14 +97,14 @@
         with the Service and that Your Content does not violate law or third-party rights.</li>
   </ul>
 
-  <h2 class="h5">7) Intellectual Property</h2>
+  <h2 id="ip" class="h5">7) Intellectual Property</h2>
   <p>
     The Service, including software, design, text, graphics, logos, and documentation, is owned by or licensed to
     {{ company_name }} and is protected by intellectual property laws. Except for the limited rights expressly granted in
     these Terms, no rights are granted, and all rights are reserved.
   </p>
 
-  <h2 class="h5">8) Confidentiality</h2>
+  <h2 id="confidentiality" class="h5">8) Confidentiality</h2>
   <p>
     Each party may receive non-public information from the other marked or reasonably understood as confidential
     (“<strong>Confidential Information</strong>”). The receiving party will use the same degree of care it uses to protect its
@@ -85,26 +112,33 @@
     not use or disclose it except as permitted by these Terms.
   </p>
 
-  <h2 class="h5">9) Privacy</h2>
+  <h2 id="privacy" class="h5">9) Privacy</h2>
   <p>
     Please review our <a href="{% url 'dashboard:privacy' %}">Privacy Policy</a>, which explains how we collect, use, share, and protect personal data.
     By using the Service, you consent to our data practices described there.
+    {% if subprocessors_url %}
+      See also our <a href="{{ subprocessors_url }}">Subprocessors</a> list.
+    {% endif %}
+    {% if do_not_sell_url %}
+      If you are entitled to opt-out of “sale” or “sharing” under applicable privacy laws, you may do so
+      <a href="{{ do_not_sell_url }}">here</a>.
+    {% endif %}
   </p>
 
-  <h2 class="h5">10) Third-Party Services</h2>
+  <h2 id="third-parties" class="h5">10) Third-Party Services</h2>
   <p>
     The Service may rely on third-party services (e.g., hosting, email, analytics, payments). We are not responsible for
     third-party services and disclaim all liability for acts or omissions of third parties.
   </p>
 
-  <h2 class="h5">11) Warranties & Disclaimers</h2>
+  <h2 id="disclaimers" class="h5">11) Warranties &amp; Disclaimers</h2>
   <ul>
     <li>The Service is provided “<strong>as is</strong>” and “<strong>as available</strong>.” To the fullest extent permitted by law, we disclaim all warranties,
         express or implied, including merchantability, fitness for a particular purpose, and non-infringement.</li>
     <li>We do not warrant that the Service will be uninterrupted, secure, or error-free, or that data will be preserved without loss.</li>
   </ul>
 
-  <h2 class="h5">12) Limitation of Liability</h2>
+  <h2 id="liability" class="h5">12) Limitation of Liability</h2>
   <p>
     To the fullest extent permitted by law, {{ company_name }} will not be liable for indirect, incidental, special, consequential,
     exemplary, or punitive damages, or for lost profits, revenues, or data, even if we have been advised of the possibility.
@@ -112,42 +146,45 @@
     (a) the amounts you paid to us in the 12 months preceding the event giving rise to liability or (b) USD $100.
   </p>
 
-  <h2 class="h5">13) Indemnification</h2>
+  <h2 id="indemnification" class="h5">13) Indemnification</h2>
   <p>
     You will defend, indemnify, and hold harmless {{ company_name }} and its affiliates, officers, directors, employees, and agents
     from and against any claims, liabilities, damages, losses, and expenses (including reasonable attorneys’ fees) arising
     from or related to your use of the Service, Your Content, or your violation of these Terms or applicable law.
   </p>
 
-  <h2 class="h5">14) Modifications</h2>
+  <h2 id="modifications" class="h5">14) Modifications</h2>
   <p>
     We may update these Terms from time to time. We will post the updated Terms and update the “Effective” date above.
     Your continued use after changes become effective constitutes acceptance of the updated Terms.
   </p>
 
-  <h2 class="h5">15) Governing Law; Dispute Resolution</h2>
+  <h2 id="law" class="h5">15) Governing Law; Dispute Resolution</h2>
   <p>
     These Terms are governed by the laws of {{ governing_law }}, without regard to its conflict of law principles.
     The exclusive venue for disputes arising out of or relating to these Terms or the Service will be the courts located
     in {{ governing_law }}. Each party consents to the personal jurisdiction and venue of these courts.
   </p>
 
-  <h2 class="h5">16) Force Majeure</h2>
+  <h2 id="force-majeure" class="h5">16) Force Majeure</h2>
   <p>
     We will not be liable for delays or failures caused by events beyond our reasonable control, including acts of God,
     labor disputes, internet failures, governmental actions, or third-party service interruptions.
   </p>
 
-  <h2 class="h5">17) Notices & Contact</h2>
+  <h2 id="notices" class="h5">17) Notices &amp; Contact</h2>
   <p>
     Notices may be sent to {{ company_address }} or <a href="mailto:{{ support_email }}">{{ support_email }}</a>. You consent to receiving
     communications electronically.
   </p>
 
-  <h2 class="h5">18) Entire Agreement</h2>
+  <h2 id="entire-agreement" class="h5">18) Entire Agreement</h2>
   <p>
     These Terms and the documents referenced herein are the entire agreement between you and {{ company_name }} regarding the Service
     and supersede all prior or contemporaneous agreements on the subject.
   </p>
+
+  <hr class="my-4">
+  <p class="small text-muted mb-0">Last updated: {{ effective_date|date:"Y-m-d" }}</p>
 </div>
 {% endblock %}

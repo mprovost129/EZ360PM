@@ -1,0 +1,50 @@
+{# App top bar / header #}
+<header class="app-topbar border-bottom px-3 py-2 d-flex align-items-center justify-content-between"
+        role="banner" aria-label="Topbar">
+  <div class="d-flex align-items-center gap-2">
+    {# Optional: mobile sidebar toggle (hook up if you add offcanvas later) #}
+    {# <button class="btn btn-sm btn-outline-secondary d-md-none" type="button"
+              data-bs-toggle="offcanvas" data-bs-target="#offcanvasSidebar"
+              aria-controls="offcanvasSidebar" aria-label="Toggle navigation">
+        <i class="bi bi-list"></i>
+      </button> #}
+
+    <form class="d-flex me-2" method="get" action="{% url 'core:search' %}" role="search" aria-label="Quick search" autocomplete="off">
+      <input class="form-control form-control-sm" type="search" name="q" placeholder="Search…" aria-label="Search">
+    </form>
+  </div>
+
+  <div class="d-flex align-items-center gap-2">
+    {# Notifications #}
+    <a class="btn btn-sm btn-outline-secondary position-relative"
+       href="{% url 'core:notifications' %}"
+       title="Notifications" aria-label="Notifications">
+      <span class="d-inline-block" style="line-height:1">
+        <i class="bi bi-bell" aria-hidden="true"></i>
+      </span>
+      {% if unread_notifications_count %}
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+          {{ unread_notifications_count }}
+          <span class="visually-hidden">unread notifications</span>
+        </span>
+      {% endif %}
+    </a>
+
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'dashboard:help_index' %}">Help</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'dashboard:contact' %}">Contact</a>
+
+    <div class="dropdown">
+      <button class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+        Profile
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="{% url 'core:my_profile' %}">User profile</a></li>
+        <li><a class="dropdown-item" href="{% url 'accounts:password_change' %}">Change password</a></li>
+        <li><a class="dropdown-item" href="{% url 'billing:plans' %}">Billing &amp; Upgrade</a></li>
+        <li><a class="dropdown-item" href="{% url 'dashboard:refer' %}">Refer a Friend</a></li>
+        <li><hr class="dropdown-divider" /></li>
+        <li><a class="dropdown-item" href="{% url 'accounts:logout' %}">Log out</a></li>
+      </ul>
+    </div>
+  </div>
+</header>

@@ -1,35 +1,65 @@
 # billing/views.py
+from __future__ import annotations
+
+from decimal import Decimal
+from typing import Any, Optional
+
 import stripe
+from stripe import SignatureVerificationError
+
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
-from django.http import HttpResponse, JsonResponse
+from django.contrib.auth.decorators import login_required
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from decimal import Decimal
-
-from core.utils import get_active_company
-from .models import SubscriptionTier, CompanySubscription, WebhookLog
 from django.views.decorators.csrf import csrf_exempt
-from stripe import SignatureVerificationError
 
-from core.models import Invoice, Payment, Notification  # add Payment/Notification here
+from core.models import Invoice, Payment, Notification
 from core.services import recalc_invoice, notify_company
+from core.utils import get_active_company
+from .models import CompanySubscription, SubscriptionTier, WebhookLog
 
-
+# Configure Stripe
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
+
+# ---------- Helpers ----------
+def _site_url(request: HttpRequest) -> str:
+    """Prefer settings.SITE_URL, fall back to request absolute base."""
+    base = getattr(settings, "SITE_URL", "").rstrip("/")
+    if base:
+        return base
+    return f"{request.scheme}://{request.get_host()}"
+
+def _dec_from_cents(amount_cents: Optional[int]) -> Decimal:
+    if amount_cents is None:
+        return Decimal("0.00")
+    return (Decimal(amount_cents) / Decimal("100")).quantize(Decimal("0.01"))
+
+
+# ---------- Customer-facing views ----------
 @login_required
-def plans(request):
+def plans(request: HttpRequest) -> HttpResponse:
     tiers = SubscriptionTier.objects.order_by("sort")
     company = get_active_company(request)
     sub = getattr(company, "subscription", None) if company else None
-    return render(request, "billing/plans.html", {"tiers": tiers, "company": company, "sub": sub, "stripe_pk": settings.STRIPE_PUBLIC_KEY})
+    return render(
+        request,
+        "billing/plans.html",
+        {
+            "tiers": tiers,
+            "company": company,
+            "sub": sub,
+            "stripe_pk": getattr(settings, "STRIPE_PUBLIC_KEY", ""),
+        },
+    )
+
 
 @login_required
-def subscribe(request, slug: str):
+def subscribe(request: HttpRequest, slug: str) -> HttpResponse:
     company = get_active_company(request)
     if not company:
         messages.error(request, "No active company.")
@@ -37,71 +67,42 @@ def subscribe(request, slug: str):
 
     tier = get_object_or_404(SubscriptionTier, slug=slug)
 
-    success_url = f"{settings.SITE_URL}{reverse('billing:plans')}?success=1"
-    cancel_url = f"{settings.SITE_URL}{reverse('billing:plans')}?canceled=1"
+    success_url = f"{_site_url(request)}{reverse('billing:plans')}?success=1"
+    cancel_url = f"{_site_url(request)}{reverse('billing:plans')}?canceled=1"
 
-    # Ensure we have or will get a customer record
-    customer_kwargs = {}
-    if hasattr(company, "subscription") and company.subscription.stripe_customer_id: # type: ignore
-        customer_kwargs["customer"] = company.subscription.stripe_customer_id # type: ignore
+    customer_kwargs: dict[str, Any] = {}
+    if getattr(company, "subscription", None) and company.subscription.stripe_customer_id:  # type: ignore[attr-defined]
+        customer_kwargs["customer"] = company.subscription.stripe_customer_id  # type: ignore[attr-defined]
 
     session = stripe.checkout.Session.create(
         mode="subscription",
         line_items=[{"price": tier.stripe_price_id, "quantity": 1}],
         success_url=success_url,
         cancel_url=cancel_url,
+        metadata={"company_id": str(company.id), "tier_slug": tier.slug},  # type: ignore[arg-type]
         **customer_kwargs,
-        metadata={
-            "company_id": str(company.id), # type: ignore
-            "tier_slug": tier.slug,
-        },
     )
-    return redirect(session.url)
+    return redirect(session.url)  # type: ignore[attr-defined]
+
 
 @login_required
-def portal(request):
+def portal(request: HttpRequest) -> HttpResponse:
     company = get_active_company(request)
-    if not company or not getattr(company, "subscription", None) or not company.subscription.stripe_customer_id: # type: ignore
+    sub = getattr(company, "subscription", None)
+    if not (company and sub and sub.stripe_customer_id):
         messages.info(request, "No customer found yet. Start a subscription first.")
         return redirect("billing:plans")
 
     portal = stripe.billing_portal.Session.create(
-        customer=company.subscription.stripe_customer_id, # type: ignore
-        return_url=f"{settings.SITE_URL}{reverse('billing:plans')}",
+        customer=sub.stripe_customer_id,
+        return_url=f"{_site_url(request)}{reverse('billing:plans')}",
     )
-    return redirect(portal.url)
+    return redirect(portal.url)  # type: ignore[attr-defined]
 
-# --- Webhook ---
 
-def _handle_invoice_payment(session_or_intent: dict) -> dict:
-    """
-    Handle payment from checkout.session.completed (mode=payment) or payment_intent.succeeded.
-    Returns a dict for logging: {"invoice": inv or None, "amount": Decimal, "external_id": str}
-    """
-    meta = session_or_intent.get("metadata") or {}
-    inv = _find_invoice_from_metadata(meta)
-    result = {"invoice": inv, "amount": Decimal("0.00"), "external_id": ""}
-
-    if not inv:
-        return result
-
-    external_id = ""
-    amount_cents = None
-
-    if session_or_intent.get("object") == "checkout.session":
-        external_id = session_or_intent.get("payment_intent") or ""
-        amount_cents = session_or_intent.get("amount_total")
-    elif session_or_intent.get("object") == "payment_intent":
-        external_id = session_or_intent.get("id") or ""
-        amount_cents = session_or_intent.get("amount_received")
-
-    paid = _record_payment(inv, amount_cents, external_id=external_id, method="Stripe")
-    result.update({"amount": paid, "external_id": external_id})
-    return result
-    
-
+# ---------- Webhook ----------
 @csrf_exempt
-def webhook_stripe(request):
+def webhook_stripe(request: HttpRequest) -> HttpResponse:
     payload = request.body
     sig = request.headers.get("Stripe-Signature", "")
 
@@ -114,7 +115,7 @@ def webhook_stripe(request):
     data = event["data"]["object"]
     event_id = event.get("id") or ""
 
-    # Pre-create log record
+    # Pre-create log
     log = WebhookLog.objects.create(
         stripe_event_id=event_id,
         type=type_ or "",
@@ -122,7 +123,7 @@ def webhook_stripe(request):
     )
 
     try:
-        info = {"invoice": None, "amount": Decimal("0.00"), "external_id": ""}
+        info: dict[str, Any] = {"invoice": None, "amount": Decimal("0.00"), "external_id": ""}
 
         if type_ == "checkout.session.completed":
             mode = (data.get("mode") or "").lower()
@@ -137,7 +138,7 @@ def webhook_stripe(request):
         elif type_ in {"charge.refunded", "charge.refund.updated"}:
             info = _handle_refund_from_charge(data)
 
-        elif type_ in {"refund.succeeded"}:
+        elif type_ == "refund.succeeded":
             info = _handle_refund_from_refund(data)
 
         elif type_ in {
@@ -163,10 +164,12 @@ def webhook_stripe(request):
 
     return HttpResponse(status=200)
 
-# --- Handlers ---
 
-def _handle_checkout_completed(session):
-    # We expect mode=subscription
+# ---------- Webhook helpers ----------
+def _handle_checkout_completed(session: dict[str, Any]) -> None:
+    """
+    mode=subscription; creates/updates CompanySubscription and syncs status/period.
+    """
     customer_id = session.get("customer")
     subscription_id = session.get("subscription")
     meta = session.get("metadata") or {}
@@ -175,7 +178,8 @@ def _handle_checkout_completed(session):
     if not (company_id and customer_id and subscription_id):
         return
 
-    from core.models import Company
+    from core.models import Company  # local import to avoid cycles
+
     try:
         company = Company.objects.get(id=company_id)
     except Company.DoesNotExist:
@@ -186,15 +190,18 @@ def _handle_checkout_completed(session):
     sub.tier = tier
     sub.stripe_customer_id = customer_id
     sub.stripe_subscription_id = subscription_id
-    # Pull subscription to get status/period
+
+    # Pull subscription to sync dates/status
     s = stripe.Subscription.retrieve(subscription_id)
     sub.status = s.status
-    sub.current_period_end = timezone.datetime.fromtimestamp(s.current_period_end, tz=timezone.utc) # type: ignore
+    sub.current_period_end = timezone.datetime.fromtimestamp(  # type: ignore[assignment]
+        s.current_period_end, tz=timezone.utc # type: ignore
+    )
     sub.cancel_at_period_end = bool(getattr(s, "cancel_at_period_end", False))
     sub.save()
 
 
-def _handle_subscription_event(s):
+def _handle_subscription_event(s: dict[str, Any]) -> None:
     subscription_id = s.get("id")
     status = s.get("status")
     current_period_end = s.get("current_period_end")
@@ -205,15 +212,45 @@ def _handle_subscription_event(s):
     except CompanySubscription.DoesNotExist:
         return
 
-    from django.utils import timezone as tz
-    sub.status = status
+    sub.status = status # type: ignore
     if current_period_end:
-        sub.current_period_end = tz.datetime.fromtimestamp(current_period_end, tz=tz.utc)
+        sub.current_period_end = timezone.datetime.fromtimestamp(  # type: ignore[assignment]
+            current_period_end, tz=timezone.utc
+        )
     sub.cancel_at_period_end = bool(cancel_at_period_end)
     sub.save()
-    
-    
-def _find_invoice_from_metadata(meta: dict) -> Invoice | None:
+
+
+def _handle_invoice_payment(obj: dict[str, Any]) -> dict[str, Any]:
+    """
+    Handle:
+      - checkout.session.completed (mode=payment)
+      - payment_intent.succeeded
+    Returns log info: {"invoice": inv or None, "amount": Decimal, "external_id": str}
+    """
+    meta = obj.get("metadata") or {}
+    inv = _find_invoice_from_metadata(meta)
+    result = {"invoice": inv, "amount": Decimal("0.00"), "external_id": ""}
+
+    if not inv:
+        return result
+
+    external_id = ""
+    amount_cents: Optional[int] = None
+
+    if obj.get("object") == "checkout.session":
+        external_id = obj.get("payment_intent") or ""
+        amount_cents = obj.get("amount_total")
+    elif obj.get("object") == "payment_intent":
+        external_id = obj.get("id") or ""
+        amount_cents = obj.get("amount_received")
+
+    paid = _record_payment(inv, amount_cents, external_id=external_id, method="Stripe")
+    result.update({"amount": paid, "external_id": external_id})
+    return result
+
+
+def _find_invoice_from_metadata(meta: dict[str, Any]) -> Invoice | None:
     if not meta:
         return None
     invoice_id = meta.get("invoice_id")
@@ -228,13 +265,19 @@ def _find_invoice_from_metadata(meta: dict) -> Invoice | None:
     return None
 
 
-def _record_payment(inv: Invoice, amount_cents: int | None, *, external_id: str = "", method: str = "Stripe"):
-    if amount_cents is None:
-        return Decimal("0.00")
+def _record_payment(
+    inv: Invoice,
+    amount_cents: Optional[int],
+    *,
+    external_id: str = "",
+    method: str = "Stripe",
+) -> Decimal:
+    """
+    Create a Payment (idempotent if external_id provided), recalc invoice,
+    and emit a notification. Returns Decimal amount recorded (positive).
+    """
+    amount = _dec_from_cents(amount_cents)
 
-    amount = (Decimal(amount_cents) / Decimal("100")).quantize(Decimal("0.01"))
-
-    # Idempotency: avoid duplicate rows on Stripe retries
     if external_id:
         Payment.objects.get_or_create(
             company=inv.company,
@@ -270,29 +313,25 @@ def _record_payment(inv: Invoice, amount_cents: int | None, *, external_id: str 
             exclude_actor=False,
         )
     except Exception:
+        # Don't break on notification failures
         pass
 
     return amount
 
 
-@staff_member_required
-def webhook_logs(request):
-    logs = WebhookLog.objects.order_by("-created_at")[:200]
-    return render(request, "billing/webhook_logs.html", {"logs": logs})
-
-
-def _handle_refund_from_charge(charge: dict) -> dict:
+def _handle_refund_from_charge(charge: dict[str, Any]) -> dict[str, Any]:
     """
-    Handle refund events from a Charge object (event types: charge.refunded, charge.refund.updated).
+    Handle refund events where the object is a Charge:
+      - charge.refunded
+      - charge.refund.updated
     Creates negative Payments for each refund (idempotent via external_id).
     """
     pi = charge.get("payment_intent") or ""
     refunds = (charge.get("refunds") or {}).get("data", [])
-    found_inv = None
+    found_inv: Optional[Invoice] = None
     last_amount = Decimal("0.00")
     last_ext_id = ""
 
-    # Find the original positive payment by Payment.external_id == payment_intent_id
     orig_payment = Payment.objects.filter(external_id=pi).select_related("invoice", "company").first()
     if not orig_payment:
         return {"invoice": None, "amount": Decimal("0.00"), "external_id": ""}
@@ -305,10 +344,9 @@ def _handle_refund_from_charge(charge: dict) -> dict:
         amt_cents = r.get("amount")
         if not refund_id or amt_cents is None:
             continue
-        amount = (Decimal(amt_cents) / Decimal("100")).quantize(Decimal("0.01"))
+        amount = _dec_from_cents(amt_cents)
         ext = f"{pi}:refund:{refund_id}"
 
-        # Idempotent negative Payment
         Payment.objects.get_or_create(
             company=inv.company,
             invoice=inv,
@@ -339,14 +377,13 @@ def _handle_refund_from_charge(charge: dict) -> dict:
     return {"invoice": found_inv, "amount": -last_amount, "external_id": last_ext_id}
 
 
-def _handle_refund_from_refund(refund: dict) -> dict:
+def _handle_refund_from_refund(refund: dict[str, Any]) -> dict[str, Any]:
     """
-    Handle refund.succeeded events (object is a Refund).
+    Handle refund.succeeded events where the object is a Refund.
     """
     refund_id = refund.get("id") or ""
     charge_id = refund.get("charge") or ""
-    amt_cents = refund.get("amount")
-    amount = (Decimal(amt_cents or 0) / Decimal("100")).quantize(Decimal("0.01"))
+    amount = _dec_from_cents(refund.get("amount"))
 
     # Need the PaymentIntent ID → fetch charge to read payment_intent
     pi = ""
@@ -391,3 +428,10 @@ def _handle_refund_from_refund(refund: dict) -> dict:
         pass
 
     return {"invoice": inv, "amount": -amount, "external_id": ext}
+
+
+# ---------- Admin utility ----------
+@staff_member_required
+def webhook_logs(request: HttpRequest) -> HttpResponse:
+    logs = WebhookLog.objects.order_by("-created_at")[:200]
+    return render(request, "billing/webhook_logs.html", {"logs": logs})

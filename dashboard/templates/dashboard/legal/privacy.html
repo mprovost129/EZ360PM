@@ -1,8 +1,11 @@
 {% extends "base_public.html" %}
+
 {% block content %}
-<div class="container py-4" style="max-width: 980px">
-  <h1 class="h3 mb-3">Privacy Policy</h1>
-  <p class="text-muted">Effective {{ effective_date }}</p>
+<div class="container py-4" style="max-width:980px">
+  <header class="mb-3">
+    <h1 class="h3 mb-1">Privacy Policy</h1>
+    <p class="text-muted mb-0">Effective {{ effective_date|date:"Y-m-d" }}</p>
+  </header>
 
   <p class="small text-muted">
     This policy describes how {{ company_name }} (“we,” “us,” “our”) collects, uses, discloses, and protects information
@@ -11,7 +14,27 @@
 
   <hr class="my-4">
 
-  <h2 class="h5">1) Information We Collect</h2>
+  <!-- Table of contents -->
+  <nav aria-label="Contents" class="mb-4">
+    <ol class="small mb-0">
+      <li><a href="#collect">Information We Collect</a></li>
+      <li><a href="#use">How We Use Information</a></li>
+      <li><a href="#legal-bases">Legal Bases (EEA/UK)</a></li>
+      <li><a href="#sharing">Sharing &amp; Disclosure</a></li>
+      <li><a href="#cookies">Cookies &amp; Analytics</a></li>
+      <li><a href="#transfers">International Transfers</a></li>
+      <li><a href="#retention">Data Retention</a></li>
+      <li><a href="#security">Security</a></li>
+      <li><a href="#rights">Your Rights</a></li>
+      <li><a href="#do-not-sell">“Do Not Sell or Share” (CPRA)</a></li>
+      <li><a href="#children">Children’s Privacy</a></li>
+      <li><a href="#subprocessors">Subprocessors</a></li>
+      <li><a href="#changes">Changes to This Policy</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="collect" class="h5">1) Information We Collect</h2>
   <ul>
     <li><strong>Account Data:</strong> Email address, name, password hash, and organization information you provide.</li>
     <li><strong>Billing Data:</strong> Payment method details and transaction data processed by our payment provider (e.g., Stripe).
@@ -19,10 +42,10 @@
     <li><strong>Usage Data:</strong> Log files, IP address, device/browser info, pages viewed, time spent, and other analytics events.</li>
     <li><strong>Content You Provide:</strong> Client records, projects, time entries, invoices, expenses, and other data you upload.</li>
     <li><strong>Support Communications:</strong> Messages, email address, and metadata associated with support requests.</li>
-    <li><strong>Cookies & Similar Tech:</strong> Session cookies for authentication; optional analytics cookies for product improvement.</li>
+    <li><strong>Cookies &amp; Similar Tech:</strong> Session cookies for authentication; optional analytics cookies for product improvement.</li>
   </ul>
 
-  <h2 class="h5">2) How We Use Information</h2>
+  <h2 id="use" class="h5">2) How We Use Information</h2>
   <ul>
     <li>Provide, operate, maintain, and improve the Service.</li>
     <li>Authenticate users and secure accounts; prevent fraud and abuse.</li>
@@ -32,7 +55,7 @@
     <li>Comply with legal obligations and enforce our Terms.</li>
   </ul>
 
-  <h2 class="h5">3) Legal Bases (EEA/UK users)</h2>
+  <h2 id="legal-bases" class="h5">3) Legal Bases (EEA/UK users)</h2>
   <p>For users in the EEA/UK, we rely on the following legal bases under GDPR/UK GDPR:</p>
   <ul>
     <li><strong>Contract:</strong> To provide the Service you request.</li>
@@ -41,42 +64,42 @@
     <li><strong>Legal Obligation:</strong> To comply with applicable law and regulatory requests.</li>
   </ul>
 
-  <h2 class="h5">4) Sharing & Disclosure</h2>
+  <h2 id="sharing" class="h5">4) Sharing &amp; Disclosure</h2>
   <ul>
     <li><strong>Service Providers:</strong> We share information with vendors who help deliver the Service (e.g., hosting, email,
         analytics, and payments). They are bound by confidentiality and use restrictions.</li>
-    <li><strong>Compliance & Safety:</strong> We may disclose information to comply with law, protect rights and safety, and prevent fraud.</li>
+    <li><strong>Compliance &amp; Safety:</strong> We may disclose information to comply with law, protect rights and safety, and prevent fraud.</li>
     <li><strong>Business Transfers:</strong> In a merger, acquisition, financing, or sale of assets, your information may be transferred.</li>
     <li><strong>With Your Direction:</strong> You may choose to share information with third parties or integrate third-party apps.</li>
   </ul>
 
-  <h2 class="h5">5) Cookies & Analytics</h2>
+  <h2 id="cookies" class="h5">5) Cookies &amp; Analytics</h2>
   <p>
     We use essential cookies for authentication and security. Where applicable, we use analytics to understand feature usage
     and improve the Service. You can control cookies in your browser settings. If required by your jurisdiction, we will obtain
     consent for non-essential cookies.
   </p>
 
-  <h2 class="h5">6) International Transfers</h2>
+  <h2 id="transfers" class="h5">6) International Transfers</h2>
   <p>
     We may process data in countries other than your own. Where required, we rely on appropriate safeguards (e.g., Standard
     Contractual Clauses) for transfers from the EEA/UK/Switzerland.
   </p>
 
-  <h2 class="h5">7) Data Retention</h2>
+  <h2 id="retention" class="h5">7) Data Retention</h2>
   <p>
     We retain personal data for as long as necessary to provide the Service and for legitimate business or legal purposes
     (e.g., accounting, security, dispute resolution). We apply criteria such as the type of data, the duration of your account,
     and legal requirements. You may request deletion as described below.
   </p>
 
-  <h2 class="h5">8) Security</h2>
+  <h2 id="security" class="h5">8) Security</h2>
   <p>
     We use technical and organizational measures designed to protect personal data (e.g., encryption in transit, access controls).
     No method of transmission or storage is 100% secure; we cannot guarantee absolute security.
   </p>
 
-  <h2 class="h5">9) Your Rights</h2>
+  <h2 id="rights" class="h5">9) Your Rights</h2>
   <ul>
     <li><strong>EEA/UK/Swiss users:</strong> You may request access, correction, deletion, restriction, portability, or object to processing.
         You may withdraw consent at any time where processing is based on consent.</li>
@@ -89,37 +112,40 @@
     You can also lodge a complaint with your local supervisory authority.
   </p>
 
-  <h2 class="h5">10) “Do Not Sell or Share” (CPRA)</h2>
+  <h2 id="do-not-sell" class="h5">10) “Do Not Sell or Share” (CPRA)</h2>
   <p>
     We do not “sell” personal information as defined by the California Consumer Privacy Act (CCPA/CPRA). If we engage in
     sharing for cross-context behavioral advertising, you may opt out using available controls or by visiting:
     {% if do_not_sell_url %}<a href="{{ do_not_sell_url }}">{{ do_not_sell_url }}</a>{% else %}<em>(link to your Do-Not-Sell/Share page)</em>{% endif %}.
   </p>
 
-  <h2 class="h5">11) Children’s Privacy</h2>
+  <h2 id="children" class="h5">11) Children’s Privacy</h2>
   <p>
     The Service is not directed to children under 16, and we do not knowingly collect personal data from them. If you believe
     a child has provided us personal data, contact us and we will take appropriate steps.
   </p>
 
-  <h2 class="h5">12) Subprocessors</h2>
+  <h2 id="subprocessors" class="h5">12) Subprocessors</h2>
   <p>
     We use trusted subprocessors to provide the Service (e.g., cloud hosting, email delivery, payment processing). For transparency,
     we may publish a list here:
     {% if subprocessors_url %}<a href="{{ subprocessors_url }}">{{ subprocessors_url }}</a>{% else %}<em>(add your subprocessors page)</em>{% endif %}.
   </p>
 
-  <h2 class="h5">13) Changes to This Policy</h2>
+  <h2 id="changes" class="h5">13) Changes to This Policy</h2>
   <p>
     We may update this Privacy Policy from time to time. We will post updates here and revise the “Effective” date above.
     If changes are material, we will provide additional notice as required by law.
   </p>
 
-  <h2 class="h5">14) Contact</h2>
+  <h2 id="contact" class="h5">14) Contact</h2>
   <p>
     {{ company_name }}<br>
     {{ company_address }}<br>
     <a href="mailto:{{ support_email }}">{{ support_email }}</a>
   </p>
+
+  <hr class="my-4">
+  <p class="small text-muted mb-0">Last updated: {{ effective_date|date:"Y-m-d" }}</p>
 </div>
 {% endblock %}

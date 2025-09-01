@@ -1,10 +1,38 @@
 {% extends "_app_shell.html" %}
 {% block page_title %}Delete Expense{% endblock %}
+
 {% block app_content %}
 <div class="card shadow-sm">
   <div class="card-body">
-    <p>Are you sure you want to delete <strong>{{ obj.description }}</strong> ({{ obj.date|date:'Y-m-d' }})?</p>
-    <form method="post">{% csrf_token %}
+    {# If the expense has already been rebilled, deleting it won’t change a sent invoice #}
+    {% if obj.invoice %}
+      <div class="alert alert-warning" role="alert">
+        This expense is linked to
+        <strong>
+          <a class="alert-link" href="{% url 'core:invoice_detail' obj.invoice.pk %}">Invoice {{ obj.invoice.number }}</a>
+        </strong>.
+        Deleting the expense here won’t change that invoice.
+      </div>
+    {% endif %}
+
+    <p class="mb-3">
+      Are you sure you want to delete
+      <strong>{{ obj.description }}</strong>
+      ({{ obj.date|date:'Y-m-d' }})?
+    </p>
+
+    <div class="border rounded p-3 mb-3 bg-light">
+      <div class="row g-2 small">
+        <div class="col-md-3"><span class="text-muted">Amount</span><div class="fw-semibold">${{ obj.amount }}</div></div>
+        <div class="col-md-3"><span class="text-muted">Project</span><div>{{ obj.project|default:"—" }}</div></div>
+        <div class="col-md-3"><span class="text-muted">Vendor</span><div>{{ obj.vendor|default:"—" }}</div></div>
+        <div class="col-md-3"><span class="text-muted">Category</span><div>{{ obj.category|default:"—" }}</div></div>
+        <div class="col-md-3"><span class="text-muted">Billable</span><div>{% if obj.is_billable %}Yes{% else %}No{% endif %}</div></div>
+      </div>
+    </div>
+
+    <form method="post" class="d-flex gap-2">
+      {% csrf_token %}
       <a class="btn btn-outline-secondary" href="{% url 'core:expenses' %}">Cancel</a>
       <button class="btn btn-danger" type="submit">Delete</button>
     </form>

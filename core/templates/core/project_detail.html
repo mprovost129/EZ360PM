@@ -1,8 +1,12 @@
 {% extends "_app_shell.html" %}
+
 {% block page_title %}Project {{ obj.number }} — {{ obj.name }}{% endblock %}
+
 {% block app_content %}
 <div class="row g-3">
+  <!-- Main column -->
   <div class="col-lg-8">
+    <!-- Overview -->
     <div class="card shadow-sm">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-start">
@@ -15,32 +19,39 @@
             <div class="text-capitalize">
               {% firstof obj.get_billing_type_display obj.billing_type|capfirst %}
             </div>
+            {% if obj.billing_type == 'hourly' and obj.hourly_rate %}
+              <div class="small text-muted">Rate: ${{ obj.hourly_rate|floatformat:2 }}</div>
+            {% endif %}
           </div>
         </div>
+
         <hr>
-        <p class="mb-1"><strong>Details</strong></p>
+
+        <p class="mb-1 fw-semibold">Details</p>
         <p class="text-muted mb-3">{{ obj.details|default:"—"|linebreaksbr }}</p>
+
         <div class="row g-3">
           <div class="col-md-4">
-            <span class="text-muted small">Budget</span>
+            <div class="text-muted small">Budget</div>
             <div>${{ obj.budget|default:"0"|floatformat:2 }}</div>
           </div>
           <div class="col-md-4">
-            <span class="text-muted small">Estimated Hours</span>
+            <div class="text-muted small">Estimated Hours</div>
             <div>{{ obj.estimated_hours|default:"0"|floatformat:2 }}</div>
           </div>
           <div class="col-md-2">
-            <span class="text-muted small">Start</span>
+            <div class="text-muted small">Start</div>
             <div>{{ obj.start_date|date:'Y-m-d'|default:"—" }}</div>
           </div>
           <div class="col-md-2">
-            <span class="text-muted small">Due</span>
+            <div class="text-muted small">Due</div>
             <div>{{ obj.due_date|date:'Y-m-d'|default:"—" }}</div>
           </div>
         </div>
       </div>
     </div>
 
+    <!-- Time entries -->
     <div class="card shadow-sm mt-3">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
@@ -58,8 +69,7 @@
               <a class="btn btn-outline-primary" href="{% url 'core:project_timer_start' obj.pk %}">Start Timer</a>
             {% endif %}
             <a class="btn btn-primary" href="{% url 'core:timeentry_create' obj.pk %}">Add Time</a>
-
-            <a class="btn btn-sm btn-outline-primary" href="{% url 'core:project_invoice_time' obj.pk %}">
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'core:project_invoice_time' obj.pk %}">
               Invoice unbilled time
             </a>
             {% if unbilled_expenses_count %}
@@ -83,17 +93,17 @@
                 <tr>
                   <td>
                     {{ t.started_at|date:'Y-m-d H:i' }}
-                    {% if t.ended_at %}<span class="text-muted">– {{ t.ended_at|date:'H:i' }}</span>{% endif %}
+                    {% if t.ended_at %}
+                      <span class="text-muted">– {{ t.ended_at|date:'H:i' }}</span>
+                    {% endif %}
                   </td>
-                  <td>{% firstof t.user.profile.display_name t.user.email %}</td>
-                  <td>{{ t.note|default:"" }}</td>
+                  <td>{% firstof t.user.get_full_name t.user.email %}</td>
+                  <td>{{ t.notes|default:"" }}</td>
                   <td class="text-end">{{ t.hours|floatformat:2 }}</td>
                 </tr>
               {% empty %}
                 <tr>
-                  <td colspan="4" class="text-center text-muted py-3">
-                    No time entries yet.
-                  </td>
+                  <td colspan="4" class="text-center text-muted py-3">No time entries yet.</td>
                 </tr>
               {% endfor %}
             </tbody>
@@ -104,13 +114,14 @@
     </div>
   </div>
 
+  <!-- Side column -->
   <div class="col-lg-4">
     <div class="card shadow-sm">
       <div class="card-body">
         <div class="fw-semibold mb-2">Team</div>
         <ul class="list-unstyled mb-0">
           {% for u in obj.team.all %}
-            <li>{% firstof u.profile.display_name u.email %}</li>
+            <li>{% firstof u.get_full_name u.email %}</li>
           {% empty %}
             <li class="text-muted">No team members yet.</li>
           {% endfor %}

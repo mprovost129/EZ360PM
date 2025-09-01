@@ -1,13 +1,24 @@
 {% extends "base.html" %}
+
 {% block content %}
-<div class="container py-5">
+<div class="container py-5" style="max-width: 720px">
   <h1 class="h4 mb-3">Time Tracking</h1>
-  <p class="text-muted">A quick overview of time tracking and logging.</p>
-  <ol>
-    <li>Start a timer.</li>
-    <li>Stop a timer.</li>
-    <li>Log time.</li>
+  <p class="text-muted mb-4">
+    Track your work hours in {{ APP_NAME }} with timers or manual logs. You can manage time directly from projects
+    and roll it into invoices when ready.
+  </p>
+
+  <ol class="mb-4">
+    <li><strong>Start a timer:</strong> Open a project and click <em>Start Timer</em>. The timer runs until you stop it.</li>
+    <li><strong>Stop a timer:</strong> When you finish working, click <em>Stop</em>. The time entry is saved automatically.</li>
+    <li><strong>Log time manually:</strong> From the <em>Time</em> section, add hours and notes without using a timer.</li>
   </ol>
+
+  <div class="alert alert-info small mb-4">
+    <strong>Tip:</strong> View all logged hours under <em>Time &gt; Entries</em>. Unbilled time can be
+    added to invoices with a single click.
+  </div>
+
   <a class="btn btn-outline-secondary" href="{% url 'dashboard:help_index' %}">Back to Help</a>
 </div>
 {% endblock %}

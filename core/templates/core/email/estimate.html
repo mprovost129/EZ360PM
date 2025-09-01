@@ -1,20 +1,49 @@
 <!doctype html>
-<html>
-  <body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;line-height:1.5">
-    <h2 style="margin:0 0 12px 0;">
-      {% if mode == "reminder" %}Reminder: {% endif %}Estimate {{ est.number }}
-    </h2>
-    <p style="margin:0 0 12px 0;">from <strong>{{ est.company.name }}</strong></p>
-    {% if est.valid_until %}<p style="margin:0 0 12px 0;">Valid until: <strong>{{ est.valid_until|date:"Y-m-d" }}</strong></p>{% endif %}
-    <p style="margin:0 0 16px 0;">
-      <a href="{{ public_url }}"
-         style="display:inline-block;padding:10px 14px;background:#0d6efd;color:#fff;text-decoration:none;border-radius:6px;">
-        View Estimate
-      </a>
-    </p>
-    {% if note %}
-    <p style="white-space:pre-wrap;border-left:3px solid #eee;padding-left:10px;color:#555">{{ note }}</p>
-    {% endif %}
-    <p style="color:#888;margin-top:24px;">Sent via {{ APP_NAME }}.</p>
+<html lang="en">
+  <body style="margin:0;padding:0;background:#ffffff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;line-height:1.5;color:#111;">
+    <!-- preheader (hidden in most clients) -->
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
+      {% if mode == "reminder" %}Reminder: {% endif %}Estimate {{ est.number }} from {{ est.company.name }}
+    </div>
+
+    <div style="max-width:600px;margin:0 auto;padding:24px;">
+      <h2 style="margin:0 0 8px 0;">
+        {% if mode == "reminder" %}Reminder: {% endif %}Estimate {{ est.number }}
+      </h2>
+      <p style="margin:0 0 12px 0;">from <strong>{{ est.company.name }}</strong></p>
+
+      <p style="margin:0 0 12px 0;">
+        Issued:
+        <strong>{{ est.issue_date|date:"Y-m-d" }}</strong>
+        {% if est.valid_until %} · Valid until:
+          <strong>{{ est.valid_until|date:"Y-m-d" }}</strong>
+        {% endif %}
+      </p>
+
+      <p style="margin:0 0 16px 0;">
+        Total:
+        <strong>${{ est.total|default:"0"|floatformat:2 }}</strong>
+      </p>
+
+      <p style="margin:0 0 16px 0;">
+        <a href="{{ public_url }}"
+           style="display:inline-block;padding:10px 14px;background:#0d6efd;color:#ffffff;text-decoration:none;border-radius:6px;">
+          View Estimate
+        </a>
+      </p>
+
+      {% if note %}
+      <p style="white-space:pre-wrap;border-left:3px solid #eee;padding-left:10px;color:#555;margin:0 0 16px 0;">
+        {{ note }}
+      </p>
+      {% endif %}
+
+      <p style="color:#888;margin:16px 0 0 0;font-size:12px;">
+        If the button above doesn’t work, copy and paste this URL into your browser:<br>
+        <a href="{{ public_url }}" style="color:#0d6efd;text-decoration:none;">{{ public_url }}</a>
+      </p>
+
+      <p style="color:#888;margin-top:24px;">Sent via {{ APP_NAME }}.</p>
+    </div>
   </body>
 </html>

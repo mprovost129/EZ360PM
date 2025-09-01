@@ -1,13 +1,23 @@
-# core/views_onboarding.py (or keep in core/views.py if you prefer)
-from django.contrib.auth.decorators import login_required
+# core/views_onboarding.py
+from __future__ import annotations
+
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render, redirect
+
 from .forms import CompanyForm
 from .utils import get_user_companies, set_active_company
 
-@login_required
-def onboarding_company(request):
-    if get_user_companies(request.user).exists(): # type: ignore
+
+@login_required(login_url="accounts:login")
+def onboarding_company(request: HttpRequest) -> HttpResponse:
+    """
+    Onboarding step: prompt a new user to create their first Company.
+    If the user already has one, skip to dashboard.
+    """
+    if get_user_companies(request.user).exists():  # type: ignore[attr-defined]
+        messages.info(request, "You already have a company.")
         return redirect("dashboard:home")
 
     if request.method == "POST":

@@ -1,8 +1,13 @@
 {% extends "base_public.html" %}
+
 {% block content %}
 <div class="container py-4" style="max-width:720px">
   <h1 class="h4 mb-3">Cookie Preferences</h1>
-  <form method="post" action="{% url 'dashboard:cookie_consent_set' %}">
+  <p class="text-muted">
+    Manage your cookie settings below. Essential cookies are always active; other categories are optional.
+  </p>
+
+  <form method="post" action="{% url 'dashboard:cookie_consent_set' %}" role="form">
     {% csrf_token %}
     <input type="hidden" name="choice" value="custom">
 
@@ -27,9 +32,12 @@
     </div>
 
     <div class="d-flex gap-2">
-      <button class="btn btn-primary">Save preferences</button>
+      <button type="submit" class="btn btn-primary">Save preferences</button>
       <a class="btn btn-outline-secondary" href="{% url 'dashboard:cookies' %}">Cancel</a>
     </div>
   </form>
+
+  <hr class="my-4">
+  <p class="small text-muted mb-0">Last updated: {{ effective_date|date:"Y-m-d" }}</p>
 </div>
 {% endblock %}

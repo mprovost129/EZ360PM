@@ -1,65 +1,83 @@
+# config/settings.py
+from __future__ import annotations
+
 from pathlib import Path
 import os
+from urllib.parse import urlparse
+
 from dotenv import load_dotenv
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+# -----------------------------------------------------------------------------
+# Paths & Env
+# -----------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR / ".env")  # load .env if present
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
+# -----------------------------------------------------------------------------
+# Core
+# -----------------------------------------------------------------------------
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-insecure")
-
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "1") == "1"
 
-ALLOWED_HOSTS = "127.0.0.1", "localhost"
+# Comma-separated in env (e.g. "127.0.0.1,localhost,example.com")
+ALLOWED_HOSTS = tuple(
+    h.strip() for h in os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if h.strip()
+)
 
+# Site URL (use full origin incl. scheme in prod, e.g. "https://app.EZ360PM.com")
+SITE_URL = os.getenv("SITE_URL", "http://127.0.0.1:8000").rstrip("/")
 
-# Application definition
+# Derive CSRF_TRUSTED_ORIGINS from SITE_URL automatically
+_parsed = urlparse(SITE_URL if "://" in SITE_URL else f"https://{SITE_URL}")
+CSRF_TRUSTED_ORIGINS = [f"{_parsed.scheme}://{_parsed.hostname}"]
+if _parsed.port:
+    CSRF_TRUSTED_ORIGINS.append(f"{_parsed.scheme}://{_parsed.hostname}:{_parsed.port}")
 
+# -----------------------------------------------------------------------------
+# Apps
+# -----------------------------------------------------------------------------
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+    # Django
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "django.contrib.humanize",
     "django.contrib.postgres",
-    # local
+
+    # Local apps
     "accounts",
-    'core.apps.CoreConfig',
+    "core.apps.CoreConfig",
     "billing",
     "dashboard",
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "dashboard.middleware.OnboardingRedirectMiddleware",
 ]
 
-ROOT_URLCONF = 'config.urls'
+ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / "templates"],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
                 "core.context_processors.active_company",
                 "core.context_processors.notifications",
                 "core.context_processors.branding",
@@ -70,19 +88,19 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'config.wsgi.application'
+WSGI_APPLICATION = "config.wsgi.application"
 
-
+# -----------------------------------------------------------------------------
 # Database
-# https://docs.djangoproject.com/en/5.1/ref/settings/#databases
-
-# DB (Postgres or SQLite for dev)
+# -----------------------------------------------------------------------------
+# DB_ENGINE: "postgres" or "sqlite"
 DB_ENGINE = os.getenv("DB_ENGINE", "sqlite").lower()
+
 if DB_ENGINE == "postgres":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv("DB_NAME", "local_market"),
+            "NAME": os.getenv("DB_NAME", "EZ360PM"),
             "USER": os.getenv("DB_USER", "postgres"),
             "PASSWORD": os.getenv("DB_PASSWORD", ""),
             "HOST": os.getenv("DB_HOST", "127.0.0.1"),
@@ -97,55 +115,38 @@ else:
         }
     }
 
-
+# -----------------------------------------------------------------------------
+# Auth
+# -----------------------------------------------------------------------------
 AUTH_USER_MODEL = "accounts.User"
 
 AUTHENTICATION_BACKENDS = [
-    "accounts.backends.EmailBackend",
-    "django.contrib.auth.backends.ModelBackend",
+    "accounts.backends.EmailBackend",                   # email-based login
+    "django.contrib.auth.backends.ModelBackend",        # admin permissions etc.
 ]
 
-
-# Password validation
-# https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
+LOGIN_URL = "accounts:login"
+LOGIN_REDIRECT_URL = "dashboard:home"
+LOGOUT_REDIRECT_URL = "accounts:login"
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-     },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}
-    },
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/5.1/topics/i18n/
-
-LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
-
+# -----------------------------------------------------------------------------
+# I18N / TZ
+# -----------------------------------------------------------------------------
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = os.getenv("TIME_ZONE", "America/New_York")
 USE_I18N = True
-
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.1/howto/static-files/
-
+# -----------------------------------------------------------------------------
+# Static / Media
+# -----------------------------------------------------------------------------
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
@@ -153,68 +154,100 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# -----------------------------------------------------------------------------
+# Email
+# -----------------------------------------------------------------------------
+# For dev: console backend prints emails to the runserver console.
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "EZ360PM <no-reply@localhost>")
+EMAIL_SUBJECT_PREFIX = os.getenv("EMAIL_SUBJECT_PREFIX", "[EZ360PM] ")
 
+# (Optional) Production SMTP example (uncomment + set env vars)
+# EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+# EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+# EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+# EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+# EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+# EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "1") == "1"
+# SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+# -----------------------------------------------------------------------------
 # Stripe
+# -----------------------------------------------------------------------------
 STRIPE_PUBLIC_KEY = os.getenv("STRIPE_PUBLIC_KEY", "pk_test_...")
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "sk_test_...")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_...")
 
-LOGIN_URL = "accounts:login"
-LOGIN_REDIRECT_URL = "dashboard:home"
-LOGOUT_REDIRECT_URL = "accounts:login"
+# -----------------------------------------------------------------------------
+# App Settings (EZ360PM)
+# -----------------------------------------------------------------------------
+APP_NAME = os.getenv("APP_NAME", "EZ360PM")
 
-ESTIMATE_PUBLIC_AUTO_INVOICE = True  # or False if you only want status change
+# Estimates -> invoice behavior
+ESTIMATE_PUBLIC_AUTO_INVOICE = os.getenv("ESTIMATE_PUBLIC_AUTO_INVOICE", "1") == "1"
 
-APP_NAME = "EZ360PM"
-EMAIL_SUBJECT_PREFIX = "[EZ360PM] "
-DEFAULT_FROM_EMAIL = "EZ360PM <no-reply@localhost>"
+# Invoices reminders: day offsets relative to due date
+INVOICE_REMINDER_SCHEDULE = [int(x) for x in os.getenv("INVOICE_REMINDER_SCHEDULE", "-3,0,3,7,14").split(",")]
 
-INVOICE_REMINDER_SCHEDULE = [-3, 0, 3, 7, 14]
-
-COMPANY_NAME = "EZ360PM"
-COMPANY_ADDRESS = "6 K Marie Drive, Attleboro, MA 02703"
-SUPPORT_EMAIL = "mike@provosthomedesign.com"
-SITE_URL = "www.ez360pm.com"
-LEGAL_EFFECTIVE_DATE = "08-31-25"  # YYYY-MM-DD
-GOVERNING_LAW = "Massachusetts, USA"
+# Brand/legal
+COMPANY_NAME = os.getenv("COMPANY_NAME", "EZ360PM")
+COMPANY_ADDRESS = os.getenv("COMPANY_ADDRESS", "6 K Marie Drive, Attleboro, MA 02703")
+SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "support@example.com")
+LEGAL_EFFECTIVE_DATE = os.getenv("LEGAL_EFFECTIVE_DATE", "2025-08-31")  # YYYY-MM-DD
+GOVERNING_LAW = os.getenv("GOVERNING_LAW", "Massachusetts, USA")
 
 # Public links
-DO_NOT_SELL_URL = ""              # e.g. "/privacy/opt-out/"
-SUBPROCESSORS_URL = "/legal/subprocessors/"
+DO_NOT_SELL_URL = os.getenv("DO_NOT_SELL_URL", "")
+SUBPROCESSORS_URL = os.getenv("SUBPROCESSORS_URL", "/legal/subprocessors/")
 
-# ---- Cookie consent
-COOKIE_CONSENT_NAME = "cookie_consent"     # not HttpOnly—frontend must read it
-COOKIE_CONSENT_MAX_AGE = 60 * 60 * 24 * 365  # 1 year
+# Cookie consent (frontend reads this value; non-HttpOnly)
+COOKIE_CONSENT_NAME = os.getenv("COOKIE_CONSENT_NAME", "cookie_consent")
+COOKIE_CONSENT_MAX_AGE = int(os.getenv("COOKIE_CONSENT_MAX_AGE", str(60 * 60 * 24 * 365)))  # 1 year
 
-# Example analytics config (only loaded if analytics consent = ON)
-PLAUSIBLE_DOMAIN = ""       # e.g. "ez360pm.com" (leave blank to skip)
-GA_MEASUREMENT_ID = ""      # e.g. "G-XXXXXXX" (leave blank to skip)
+# Analytics (loaded only if user has consented)
+PLAUSIBLE_DOMAIN = os.getenv("PLAUSIBLE_DOMAIN", "")   # e.g. "EZ360PM.com"
+GA_MEASUREMENT_ID = os.getenv("GA_MEASUREMENT_ID", "") # e.g. "G-XXXXXXX"
 
-# ---- Optional: publish subprocessors (name, purpose, data, location, dpa_url)
+# Publish subprocessors (used by a legal page)
 SUBPROCESSORS = [
     {
         "name": "Amazon Web Services (AWS)",
         "purpose": "Cloud hosting, storage, networking",
         "data": "Application data, metadata, logs",
         "location": "United States (with regional variants)",
-        "dpa_url": "https://aws.amazon.com/compliance/data-privacy-faq/"
+        "dpa_url": "https://aws.amazon.com/compliance/data-privacy-faq/",
     },
     {
         "name": "Stripe, Inc.",
         "purpose": "Payments, subscriptions, invoicing",
         "data": "Billing info, customer identifiers, metadata",
         "location": "United States/EU",
-        "dpa_url": "https://stripe.com/legal/dpa"
+        "dpa_url": "https://stripe.com/legal/dpa",
     },
     {
         "name": "SendGrid / Twilio",
         "purpose": "Transactional email delivery",
         "data": "Recipient email, message metadata",
         "location": "United States",
-        "dpa_url": "https://www.twilio.com/legal/data-protection-addendum"
+        "dpa_url": "https://www.twilio.com/legal/data-protection-addendum",
     },
 ]
+
+# -----------------------------------------------------------------------------
+# Security (recommended for production)
+# -----------------------------------------------------------------------------
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # If behind a proxy/ELB that sets X-Forwarded-Proto:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    # HSTS (enable once you're sure HTTPS is fully working)
+    SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+    # Content Security Policy can be added via middleware or web server
+    # X_FRAME_OPTIONS, etc., may also be enforced at the proxy

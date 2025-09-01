@@ -1,12 +1,21 @@
+{# templates/core/estimates_list.html #}
 {% extends "_app_shell.html" %}
 {% block page_title %}Estimates{% endblock %}
+
 {% block app_content %}
 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
   <form class="d-flex" method="get" role="search" style="max-width:520px; width:100%">
     <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Search by number, client, project…">
+    {% if templates %}
+      <input type="hidden" name="templates" value="1">
+    {% endif %}
   </form>
   <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary" href="{% url 'core:estimates' %}?templates=1">Templates</a>
+    {% if templates %}
+      <a class="btn btn-outline-secondary" href="{% url 'core:estimates' %}">All Estimates</a>
+    {% else %}
+      <a class="btn btn-outline-secondary" href="{% url 'core:estimates' %}?templates=1">Templates</a>
+    {% endif %}
     <a class="btn btn-primary" href="{% url 'core:estimate_create' %}">New Estimate</a>
   </div>
 </div>
@@ -14,16 +23,23 @@
 <div class="card shadow-sm">
   <div class="table-responsive">
     <table class="table align-middle mb-0">
-      <thead><tr>
-        <th>#</th><th>Client</th><th>Project</th><th>Status</th>
-        <th>Issued</th><th>Valid until</th><th class="text-end">Total</th><th></th>
-      </tr></thead>
+      <thead>
+        <tr>
+          <th>#</th><th>Client</th><th>Project</th><th>Status</th>
+          <th>Issued</th><th>Valid until</th><th class="text-end">Total</th><th></th>
+        </tr>
+      </thead>
       <tbody>
         {% for e in estimates %}
         <tr>
-          <td><a href="{% url 'core:estimate_detail' e.pk %}">{{ e.number }}</a>{% if e.is_template %} <span class="badge bg-secondary">Template</span>{% endif %}</td>
+          <td>
+            <a href="{% url 'core:estimate_detail' e.pk %}">{{ e.number }}</a>
+            {% if e.is_template %}
+              <span class="badge bg-secondary">Template</span>
+            {% endif %}
+          </td>
           <td>{{ e.client }}</td>
-          <td>{{ e.project }}</td>
+          <td>{{ e.project|default:"—" }}</td>
           <td class="text-capitalize">{{ e.status }}</td>
           <td>{{ e.issue_date|date:'Y-m-d' }}</td>
           <td>{{ e.valid_until|date:'Y-m-d' }}</td>
@@ -38,7 +54,9 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="8" class="text-center text-muted py-4">No estimates yet.</td></tr>
+          <tr><td colspan="8" class="text-center text-muted py-4">
+            {% if templates %}No templates yet.{% else %}No estimates yet.{% endif %}
+          </td></tr>
         {% endfor %}
       </tbody>
     </table>

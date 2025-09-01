@@ -1,5 +1,6 @@
 {% extends "_app_shell.html" %}
 {% block page_title %}Estimate {{ est.number }}{% endblock %}
+
 {% block app_content %}
 <div class="row g-3">
   <div class="col-lg-8">
@@ -7,43 +8,61 @@
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-start">
           <div>
+            {% if est.is_template %}
+              <span class="badge bg-secondary mb-2">Template</span>
+            {% endif %}
             <div class="text-muted small">Client</div>
             <div class="fw-semibold">{{ est.client }}</div>
-            <div class="text-muted small">Project</div>
-            <div>{{ est.project }}</div>
+
+            {% if est.project %}
+              <div class="text-muted small mt-2">Project</div>
+              <div>{{ est.project }}</div>
+            {% endif %}
           </div>
           <div class="text-end">
             <div class="text-muted small">Status</div>
-            <div class="text-capitalize">{{ est.status }}</div>
-            <div class="text-muted small">Issued</div>
+            <div class="text-capitalize">{% firstof est.get_status_display est.status %}</div>
+            <div class="text-muted small mt-2">Issued</div>
             <div>{{ est.issue_date|date:'Y-m-d' }}</div>
-            <div class="text-muted small">Valid until</div>
-            <div>{{ est.valid_until|date:'Y-m-d' }}</div>
+            {% if est.valid_until %}
+              <div class="text-muted small mt-2">Valid until</div>
+              <div>{{ est.valid_until|date:'Y-m-d' }}</div>
+            {% endif %}
           </div>
         </div>
+
         <hr>
+
         <div class="table-responsive">
           <table class="table align-middle">
-            <thead><tr><th>Description</th><th class="text-end">Qty</th><th class="text-end">Unit</th><th class="text-end">Line</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th class="text-end">Qty</th>
+                <th class="text-end">Unit</th>
+                <th class="text-end">Line</th>
+              </tr>
+            </thead>
             <tbody>
               {% for it in est.items.all %}
                 <tr>
                   <td>{{ it.description }}</td>
-                  <td class="text-end">{{ it.qty }}</td>
-                  <td class="text-end">${{ it.unit_price }}</td>
-                  <td class="text-end">${{ it.line_total }}</td>
+                  <td class="text-end">{{ it.qty|floatformat:2 }}</td>
+                  <td class="text-end">${{ it.unit_price|floatformat:2 }}</td>
+                  <td class="text-end">${{ it.line_total|floatformat:2 }}</td>
                 </tr>
               {% empty %}
                 <tr><td colspan="4" class="text-center text-muted py-3">No items.</td></tr>
               {% endfor %}
             </tbody>
             <tfoot>
-              <tr><th colspan="3" class="text-end">Subtotal</th><th class="text-end">${{ est.subtotal }}</th></tr>
-              <tr><th colspan="3" class="text-end">Tax</th><th class="text-end">${{ est.tax }}</th></tr>
-              <tr><th colspan="3" class="text-end">Total</th><th class="text-end">${{ est.total }}</th></tr>
+              <tr><th colspan="3" class="text-end">Subtotal</th><th class="text-end">${{ est.subtotal|floatformat:2 }}</th></tr>
+              <tr><th colspan="3" class="text-end">Tax</th><th class="text-end">${{ est.tax|floatformat:2 }}</th></tr>
+              <tr><th colspan="3" class="text-end">Total</th><th class="text-end">${{ est.total|floatformat:2 }}</th></tr>
             </tfoot>
           </table>
         </div>
+
         {% if est.notes %}
           <div class="mt-3">
             <div class="fw-semibold">Notes</div>
@@ -51,46 +70,49 @@
           </div>
         {% endif %}
       </div>
-      <div class="card-footer d-flex justify-content-between">
-        <div class="d-flex gap-2">
+
+      <div class="card-footer d-flex justify-content-between flex-wrap gap-2">
+        <div class="d-flex gap-2 flex-wrap">
           <a class="btn btn-outline-secondary" href="{% url 'core:estimate_update' est.pk %}">Edit</a>
-          <a class="btn btn-outline-secondary" href="{% url 'core:estimate_pdf' est.pk %}" target="_blank">PDF</a>
           <a class="btn btn-primary" href="{% url 'core:estimate_email' est.pk %}">Email</a>
+
           {% if est.status != est.SENT %}
-          <a class="btn btn-sm btn-outline-primary" href="{% url 'core:estimate_send_email' est.pk %}">Send</a>
+            <a class="btn btn-sm btn-outline-primary" href="{% url 'core:estimate_send_email' est.pk %}">Send</a>
+            <a class="btn btn-outline-primary" href="{% url 'core:estimate_mark_sent' est.pk %}">Mark Sent</a>
           {% elif est.status not in (est.ACCEPTED, est.DECLINED) %}
-          <a class="btn btn-sm btn-outline-primary" href="{% url 'core:estimate_send_email' est.pk %}?mode=reminder">Send reminder</a>
+            <a class="btn btn-sm btn-outline-primary" href="{% url 'core:estimate_send_email' est.pk %}?mode=reminder">Send reminder</a>
           {% endif %}
-          {# Optional: copy public link #}
-          <button class="btn btn-sm btn-outline-secondary"
-            type="button"
-            onclick="navigator.clipboard.writeText('{{ request.build_absolute_uri|slice:':-1' }}{% url 'core:estimate_public' est.public_token %}')">
-            Copy public link
-          </button>
-          <a class="btn btn-outline-primary" href="{% url 'core:estimate_mark_sent' est.pk %}">Mark Sent</a>
-          <a class="btn btn-outline-success" href="{% url 'core:estimate_accept' est.pk %}">Accept</a>
-          <a class="btn btn-outline-warning" href="{% url 'core:estimate_decline' est.pk %}">Decline</a>
+
+          {% if est.is_template %}
+            <a class="btn btn-outline-primary" href="{% url 'core:estimate_create_from' est.pk %}">Use as Template</a>
+          {% endif %}
+
+          {% if est.status == est.ACCEPTED and not est.project_id %}
+            <a class="btn btn-sm btn-outline-success" href="{% url 'core:estimate_convert_to_project' est.pk %}">Convert to Project</a>
+          {% endif %}
+
+          {% if not est.converted_invoice_id %}
+            <a class="btn btn-primary" href="{% url 'core:estimate_convert' est.pk %}">Convert to Invoice</a>
+          {% else %}
+            <a class="btn btn-outline-primary" href="{% url 'core:invoice_detail' est.converted_invoice_id %}">View Invoice</a>
+          {% endif %}
         </div>
-        {% if est.status == est.ACCEPTED and not est.project_id %}
-        <a class="btn btn-sm btn-outline-success" href="{% url 'core:estimate_convert_to_project' est.pk %}">
-          Convert to Project
-        </a>
-        {% endif %}
-        {% if not est.converted_invoice_id %}
-          <a class="btn btn-primary" href="{% url 'core:estimate_convert' est.pk %}">Convert to Invoice</a>
-        {% else %}
-          <a class="btn btn-outline-primary" href="{% url 'core:invoice_detail' est.converted_invoice_id %}">View Invoice</a>
-        {% endif %}
       </div>
+
       <div class="mt-3">
         <label class="form-label small text-muted">Public link</label>
         <div class="input-group">
-          <input class="form-control" value="{{ request.build_absolute_uri|slice:':0' }}{% url 'core:estimate_public' est.public_token %}" readonly id="publicLink">
-          <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('publicLink').value)">Copy</button>
+          {% url 'core:estimate_public' est.public_token as est_public_path %}
+          <input class="form-control" value="{{ request.scheme }}://{{ request.get_host }}{{ est_public_path }}" readonly id="publicLink">
+          <button class="btn btn-outline-secondary" type="button"
+                  onclick="navigator.clipboard.writeText(document.getElementById('publicLink').value)">
+            Copy
+          </button>
         </div>
       </div>
     </div>
   </div>
+
   <div class="col-lg-4">
     <div class="card shadow-sm">
       <div class="card-body">

@@ -1,13 +1,27 @@
 {% extends "base.html" %}
+
 {% block content %}
-<div class="container py-5">
+<div class="container py-5" style="max-width: 720px">
   <h1 class="h4 mb-3">Invoices</h1>
-  <p class="text-muted">A quick overview of setting up your invoices.</p>
-  <ol>
-    <li>Create an invoice.</li>
-    <li>Save an invoice as a template.</li>
-    <li>Send an invoice.</li>
+  <p class="text-muted mb-4">
+    Learn how to create and manage invoices in {{ APP_NAME }}. You can save drafts, reuse templates,
+    and send invoices directly to clients.
+  </p>
+
+  <ol class="mb-4">
+    <li><strong>Create an invoice:</strong> Go to the <em>Invoices</em> section and click <em>New Invoice</em>.
+        Fill in client details, line items, and due dates.</li>
+    <li><strong>Save as a template:</strong> If you often reuse the same format, you can save an invoice
+        as a template for quick creation in the future.</li>
+    <li><strong>Send an invoice:</strong> Once finalized, send the invoice via email or share the secure link.
+        Clients can pay online if payments are enabled.</li>
   </ol>
+
+  <div class="alert alert-info small mb-4">
+    <strong>Tip:</strong> You can track whether invoices are viewed and paid. Automated reminders help
+    you follow up with clients faster.
+  </div>
+
   <a class="btn btn-outline-secondary" href="{% url 'dashboard:help_index' %}">Back to Help</a>
 </div>
 {% endblock %}

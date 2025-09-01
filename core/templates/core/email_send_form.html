@@ -1,32 +1,81 @@
-<!-- core/templates/core/email_send_form.html -->
+{# core/templates/core/email_send_form.html #}
 {% extends "_app_shell.html" %}
+{% load widget_tweaks %}
+
 {% block page_title %}Send {{ kind|title }} Email{% endblock %}
+
 {% block app_content %}
 <div class="card shadow-sm">
   <div class="card-body">
-    <form method="post" class="row g-3">
-      {% csrf_token %}
-      <div class="col-12 col-md-6">
-        <label class="form-label">To</label>
-        {{ form.to|add_class:"form-control" }}
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger mb-3">
+        {{ form.non_field_errors }}
       </div>
+    {% endif %}
+
+    <form method="post" class="row g-3" novalidate>
+      {% csrf_token %}
+
+      {# To #}
       <div class="col-12 col-md-6">
-        <label class="form-label">CC</label>
-        {{ form.cc|add_class:"form-control" }}
+        <label class="form-label" for="{{ form.to.id_for_label }}">To</label>
+        {% if form.to.errors %}
+          {% render_field form.to class+="form-control is-invalid" %}
+          <div class="invalid-feedback">{{ form.to.errors|striptags }}</div>
+        {% else %}
+          {% render_field form.to class+="form-control" %}
+        {% endif %}
+      </div>
+
+      {# CC #}
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.cc.id_for_label }}">CC</label>
+        {% if form.cc.errors %}
+          {% render_field form.cc class+="form-control is-invalid" placeholder="alice@example.com, bob@example.com" %}
+          <div class="invalid-feedback">{{ form.cc.errors|striptags }}</div>
+        {% else %}
+          {% render_field form.cc class+="form-control" placeholder="alice@example.com, bob@example.com" %}
+        {% endif %}
         <div class="form-text">Comma-separated</div>
       </div>
+
+      {# Subject #}
       <div class="col-12">
-        <label class="form-label">Subject</label>
-        {{ form.subject|add_class:"form-control" }}
+        <label class="form-label" for="{{ form.subject.id_for_label }}">Subject</label>
+        {% if form.subject.errors %}
+          {% render_field form.subject class+="form-control is-invalid" %}
+          <div class="invalid-feedback">{{ form.subject.errors|striptags }}</div>
+        {% else %}
+          {% render_field form.subject class+="form-control" %}
+        {% endif %}
       </div>
+
+      {# Message #}
       <div class="col-12">
-        <label class="form-label">Message (optional)</label>
-        {{ form.message|add_class:"form-control" }}
+        <label class="form-label" for="{{ form.message.id_for_label }}">Message (optional)</label>
+        {% if form.message.errors %}
+          {% render_field form.message class+="form-control is-invalid" rows="6" %}
+          <div class="invalid-feedback">{{ form.message.errors|striptags }}</div>
+        {% else %}
+          {% render_field form.message class+="form-control" rows="6" %}
+        {% endif %}
         <div class="form-text">Leave blank to use the default message.</div>
       </div>
+
+      {# Helpful note about attachments #}
+      <div class="col-12">
+        <div class="small text-muted">
+          {% if kind == 'invoice' %}A PDF copy of the invoice will be attached.{% endif %}
+          {% if kind == 'estimate' %}A PDF copy of the estimate will be attached.{% endif %}
+        </div>
+      </div>
+
       <div class="col-12 d-flex gap-2">
         <button class="btn btn-primary">Send</button>
-        <a class="btn btn-outline-secondary" href="{% if kind == 'invoice' %}{% url 'core:invoice_detail' obj.pk %}{% else %}{% url 'core:estimate_detail' obj.pk %}{% endif %}">Cancel</a>
+        <a class="btn btn-outline-secondary"
+           href="{% if kind == 'invoice' %}{% url 'core:invoice_detail' obj.pk %}{% else %}{% url 'core:estimate_detail' obj.pk %}{% endif %}">
+          Cancel
+        </a>
       </div>
     </form>
   </div>

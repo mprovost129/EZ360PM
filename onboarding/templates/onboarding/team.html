@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5" style="max-width:640px">
+  {# Onboarding progress indicator #}
+  {% include "onboarding/_progress.html" with step="team" %}
+
+  <h1 class="h4 mb-3">Invite Your Team</h1>
+  <p class="text-muted mb-4">
+    Invite teammates so they can track time, manage projects, and help invoice clients. You can do this later as well.
+  </p>
+
+  <div class="border rounded p-3 mb-4">
+    <p class="mb-2"><strong>How to invite</strong></p>
+    <ol class="mb-0">
+      <li>Go to <a href="{% url 'core:team_list' %}">Team</a>.</li>
+      <li>Click <em>Invite</em> and enter their email address.</li>
+      <li>Choose a role (Admin, Manager, or Member).</li>
+    </ol>
+  </div>
+
+  <form method="post" class="d-flex gap-2">
+    {% csrf_token %}
+    <a class="btn btn-primary" href="{% url 'core:team_list' %}">Open Team</a>
+    <button type="submit" class="btn btn-outline-secondary" name="skip" value="1">Skip</button>
+  </form>
+</div>
+{% endblock %}

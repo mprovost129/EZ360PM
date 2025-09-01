@@ -1,37 +1,38 @@
 # core/views.py
 from __future__ import annotations
 
-from datetime import timedelta, date
+# --- Stdlib ---
+from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 from uuid import uuid4
-from core.decorators import subscription_or_landing
 
+# --- Third-party / Django ---
 import stripe
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.contrib.postgres.search import (
+    SearchQuery,
+    SearchRank,
+    SearchVector,
+    TrigramSimilarity,
+)
 from django.core.mail import EmailMessage
 from django.core.paginator import Paginator
-from django.db.models import Q, Sum, F, Value
+from django.db.models import F, Q, Sum, Value, DecimalField, IntegerField, Case, When
 from django.db.models.functions import Coalesce, Greatest
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_http_methods
-from django.template.loader import render_to_string
 
-from django.contrib.postgres.search import (
-    SearchVector,
-    SearchQuery,
-    SearchRank,
-    TrigramSimilarity,
-)
-
+# --- Local ---
 from core.decorators import require_subscription
-from .emails import send_invoice_email, send_estimate_email
+from .emails import send_estimate_email, send_invoice_email
 from .forms import (
     ClientForm,
     CompanyForm,
@@ -46,13 +47,13 @@ from .forms import (
     PaymentForm,
     ProjectForm,
     RecurringPlanForm,
+    RefundForm,
     SendEmailForm,
     TimeEntryForm,
-    TimeToInvoiceForm,
     TimesheetSubmitForm,
     TimesheetWeekForm,
+    TimeToInvoiceForm,
     UserProfileForm,
-    RefundForm,
 )
 from .models import (
     Client,
@@ -76,6 +77,7 @@ from .services import (
     email_invoice_default,
     generate_invoice_from_plan,
     mark_all_read,
+    notify_company,
     recalc_estimate,
     recalc_invoice,
 )
@@ -94,14 +96,13 @@ from .utils import (
     set_active_company,
     week_range,
 )
-from .services import notify_company
 
 # --- Plan helpers (features & limits) ---
 try:
     from billing.utils import (  # type: ignore
-        enforce_limit_or_upsell, # type: ignore
-        require_feature, # type: ignore
-        require_tier_at_least, # type: ignore
+        enforce_limit_or_upsell,  # type: ignore
+        require_feature,  # type: ignore
+        require_tier_at_least,  # type: ignore
     )
 except Exception:
     def enforce_limit_or_upsell(company, key: str, current_count: int):
@@ -110,33 +111,23 @@ except Exception:
     def require_feature(key: str):
         def _deco(fn):
             return fn
-
         return _deco
 
     def require_tier_at_least(slug: str):
         def _deco(fn):
             return fn
-
         return _deco
 
 
+# --- Stripe ---
 User = get_user_model()
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
-@login_required
-@subscription_or_landing(
-    "core/landing_generic.html",
-    context={"title": "Clients", "lead": "A simple CRM for people you work with.",
-             "cta_primary_label": "See plans", "cta_secondary_label": "Learn more",
-             "icon": "people"},
-    context_cb=lambda r: {
-        "cta_primary_url": reverse("billing:plans"),
-        "cta_secondary_url": reverse("dashboard:home") + "#features",
-    },
-)
 
+# =============================================================================
+# Clients
+# =============================================================================
 
-# ---------- Clients ----------
 @login_required
 def clients_list(request):
     company = get_active_company(request)
@@ -151,8 +142,7 @@ def clients_list(request):
         )
 
     paginator = Paginator(qs.order_by("-created_at"), 15)
-    page = request.GET.get("page")
-    clients = paginator.get_page(page)
+    clients = paginator.get_page(request.GET.get("page"))
     return render(request, "core/clients_list.html", {"clients": clients, "q": q})
 
 
@@ -166,7 +156,8 @@ def client_create(request):
     ok, limit = enforce_limit_or_upsell(company, "max_clients", count)
     if not ok:
         messages.warning(
-            request, f"You've reached your plan’s limit of {limit} clients. Upgrade to add more."
+            request,
+            f"You've reached your plan’s limit of {limit} clients. Upgrade to add more.",
         )
         return redirect("billing:plans")
 
@@ -196,7 +187,11 @@ def client_update(request, pk: int):
             return redirect("core:clients")
     else:
         form = ClientForm(instance=obj)
-    return render(request, "core/client_form.html", {"form": form, "mode": "edit", "obj": obj})
+    return render(
+        request,
+        "core/client_form.html",
+        {"form": form, "mode": "edit", "obj": obj},
+    )
 
 
 @login_required
@@ -211,41 +206,70 @@ def client_delete(request, pk: int):
     return render(request, "core/client_confirm_delete.html", {"obj": obj})
 
 
-# ---------- Projects ----------
+# =============================================================================
+# Projects
+# =============================================================================
 
 @login_required
-@require_subscription
 def projects_list(request):
     company = get_active_company(request)
+    if not company:
+        return redirect("core:onboarding_company")
+
     q = (request.GET.get("q") or "").strip()
     sort = (request.GET.get("sort") or "recent").lower()
+    page = int(request.GET.get("page") or 1)
 
     qs = (
-        Project.objects.filter(company=company)
+        Project.objects
+        .filter(company=company)
         .select_related("client")
-        .prefetch_related("team")
-        .annotate(logged_hours=Sum("time_entries__hours"))
+        .annotate(
+            logged_hours=Coalesce(
+                Sum("time_entries__hours"),
+                Value(Decimal("0.00")),
+                output_field=DecimalField(max_digits=9, decimal_places=2),
+            )
+        )
     )
 
     if q:
         qs = qs.filter(
-            Q(name__icontains=q)
-            | Q(number__icontains=q)
-            | Q(client__org__icontains=q)
-            | Q(client__first_name__icontains=q)
-            | Q(client__last_name__icontains=q)
+            Q(name__icontains=q) |
+            Q(number__icontains=q) |
+            Q(client__org__icontains=q) |
+            Q(client__first_name__icontains=q) |
+            Q(client__last_name__icontains=q)
         )
 
-    order_map = {
-        "recent": "-created_at",
-        "number": "number",
-        "client": "client__org",
-        "due": "due_date",
-        "name": "name",
-    }
-    qs = qs.order_by(order_map.get(sort, "-created_at"))
+    # sorting
+    if sort == "number":
+        qs = qs.order_by("number", "-created_at")
+    elif sort == "client":
+        qs = qs.order_by("client__org", "client__last_name", "client__first_name", "-created_at")
+    elif sort == "due":
+        # nulls last
+        qs = qs.annotate(_due_isnull=Case(
+            When(due_date__isnull=True, then=1),
+            default=0,
+            output_field=IntegerField(),
+        )).order_by("_due_isnull", "due_date", "-created_at")
+    elif sort == "name":
+        qs = qs.order_by("name", "-created_at")
+    else:  # recent/default
+        qs = qs.order_by("-created_at", "-id")
 
-    return render(request, "core/projects_list.html", {"projects": qs, "q": q, "sort": sort})
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(page)
+
+    return render(request, "core/projects_list.html", {
+        "projects": page_obj.object_list,
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "q": q,
+        "sort": sort,
+        "today": timezone.localdate(),
+    })
 
 
 @login_required
@@ -270,7 +294,8 @@ def _project_create(request, default_type: str):
     ok, limit = enforce_limit_or_upsell(company, "max_projects", count)
     if not ok:
         messages.warning(
-            request, f"You've reached your plan’s limit of {limit} projects. Upgrade to add more."
+            request,
+            f"You've reached your plan’s limit of {limit} projects. Upgrade to add more.",
         )
         return redirect("billing:plans")
 
@@ -294,7 +319,9 @@ def _project_create(request, default_type: str):
     else:
         form = ProjectForm(initial={"billing_type": default_type})
     return render(
-        request, "core/project_form.html", {"form": form, "mode": "create", "default_type": default_type}
+        request,
+        "core/project_form.html",
+        {"form": form, "mode": "create", "default_type": default_type},
     )
 
 
@@ -311,7 +338,11 @@ def project_update(request, pk: int):
             return redirect("core:project_detail", pk=obj.pk)
     else:
         form = ProjectForm(instance=obj)
-    return render(request, "core/project_form.html", {"form": form, "mode": "edit", "obj": obj})
+    return render(
+        request,
+        "core/project_form.html",
+        {"form": form, "mode": "edit", "obj": obj},
+    )
 
 
 @login_required
@@ -330,7 +361,9 @@ def project_delete(request, pk: int):
 @require_subscription
 def project_detail(request, pk: int):
     company = get_active_company(request)
-    obj = get_object_or_404(Project.objects.select_related("client"), pk=pk, company=company)
+    obj = get_object_or_404(
+        Project.objects.select_related("client"), pk=pk, company=company
+    )
 
     # Active timer for current user
     active = (
@@ -340,9 +373,14 @@ def project_detail(request, pk: int):
     )
 
     # Totals
-    total_hours = TimeEntry.objects.filter(project=obj).aggregate(s=Sum("hours")).get("s") or 0
+    total_hours = (
+        TimeEntry.objects.filter(project=obj).aggregate(s=Sum("hours")).get("s") or 0
+    )
     unbilled_hours = (
-        TimeEntry.objects.filter(project=obj, invoice__isnull=True).aggregate(s=Sum("hours")).get("s") or 0
+        TimeEntry.objects.filter(project=obj, invoice__isnull=True)
+        .aggregate(s=Sum("hours"))
+        .get("s")
+        or 0
     )
     unbilled_expenses_count = Expense.objects.filter(
         project=obj, is_billable=True, invoice__isnull=True
@@ -365,7 +403,9 @@ def project_detail(request, pk: int):
     )
 
 
-# ---------- Invoices ----------
+# =============================================================================
+# Invoices
+# =============================================================================
 
 @login_required
 def invoices_list(request):
@@ -408,7 +448,8 @@ def invoice_create(request):
     ok, limit = enforce_limit_or_upsell(company, "max_invoices", count)
     if not ok:
         messages.warning(
-            request, f"You've reached your plan’s limit of {limit} invoices. Upgrade to add more."
+            request,
+            f"You've reached your plan’s limit of {limit} invoices. Upgrade to add more.",
         )
         return redirect("billing:plans")
 
@@ -419,7 +460,7 @@ def invoice_create(request):
             inv = form.save(commit=False)
             inv.company = company
             if not inv.number:
-                inv.number = generate_invoice_number(company) # type: ignore
+                inv.number = generate_invoice_number(company)  # type: ignore
             inv.save()
             formset.instance = inv
             formset.save()
@@ -434,9 +475,15 @@ def invoice_create(request):
             messages.success(request, "Invoice created.")
             return redirect("core:invoice_detail", pk=inv.pk)
     else:
-        form = InvoiceForm(company=company, initial={"number": generate_invoice_number(company)}) # type: ignore
+        form = InvoiceForm(
+            company=company, initial={"number": generate_invoice_number(company)}  # type: ignore
+        )
         formset = InvoiceItemFormSet()
-    return render(request, "core/invoice_form.html", {"form": form, "formset": formset, "mode": "create"})
+    return render(
+        request,
+        "core/invoice_form.html",
+        {"form": form, "formset": formset, "mode": "create"},
+    )
 
 
 @login_required
@@ -457,7 +504,9 @@ def invoice_update(request, pk: int):
         form = InvoiceForm(instance=inv, company=company)
         formset = InvoiceItemFormSet(instance=inv)
     return render(
-        request, "core/invoice_form.html", {"form": form, "formset": formset, "mode": "edit", "inv": inv}
+        request,
+        "core/invoice_form.html",
+        {"form": form, "formset": formset, "mode": "edit", "inv": inv},
     )
 
 
@@ -466,9 +515,7 @@ def invoice_update(request, pk: int):
 def invoice_detail(request, pk: int):
     company = get_active_company(request)
     inv = get_object_or_404(
-        Invoice.objects.select_related("client", "project"),
-        pk=pk,
-        company=company,
+        Invoice.objects.select_related("client", "project"), pk=pk, company=company
     )
     recalc_invoice(inv)
     return render(request, "core/invoice_detail.html", {"inv": inv})
@@ -512,8 +559,7 @@ def invoice_void(request, pk: int):
 
 def _get_invoice_by_token(token):
     return get_object_or_404(
-        Invoice.objects.select_related("client", "project"),
-        public_token=token,
+        Invoice.objects.select_related("client", "project"), public_token=token
     )
 
 
@@ -535,7 +581,9 @@ def invoice_checkout(request, token):
         return redirect("core:invoice_public", token=token)
 
     # One-time payment for the outstanding balance
-    balance = (inv.balance or Decimal("0")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)  # type: ignore[attr-defined]
+    balance = (inv.balance or Decimal("0")).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )  # type: ignore[attr-defined]
     amount_cents = int(balance * 100)
     session = stripe.checkout.Session.create(
         mode="payment",
@@ -565,9 +613,12 @@ def invoice_pay_success(request, token):
     return render(request, "core/invoice_pay_success.html", {"inv": inv})
 
 
-# ---------- Payments ----------
+# =============================================================================
+# Payments
+# =============================================================================
 
 @login_required
+@require_subscription
 def payments_list(request):
     return render(request, "core/payments_list.html")
 
@@ -599,9 +650,12 @@ def payment_create(request, pk: int):
     return render(request, "core/payment_form.html", {"form": form, "inv": inv})
 
 
-# ---------- Time tracking ----------
+# =============================================================================
+# Time tracking
+# =============================================================================
 
 @login_required
+@require_subscription
 def time_list(request):
     return render(request, "core/time_list.html")
 
@@ -617,7 +671,9 @@ def project_timer_start(request, pk: int):
     if existing:
         messages.warning(request, "You already have a running timer on this project.")
         return redirect("core:project_detail", pk=pk)
-    TimeEntry.objects.create(project=project, user=request.user, started_at=timezone.now())
+    TimeEntry.objects.create(
+        project=project, user=request.user, started_at=timezone.now()
+    )
     messages.success(request, "Timer started.")
     return redirect("core:project_detail", pk=pk)
 
@@ -628,7 +684,9 @@ def project_timer_stop(request, pk: int):
     company = get_active_company(request)
     project = get_object_or_404(Project, pk=pk, company=company)
     entry = (
-        TimeEntry.objects.filter(project=project, user=request.user, ended_at__isnull=True)
+        TimeEntry.objects.filter(
+            project=project, user=request.user, ended_at__isnull=True
+        )
         .order_by("-started_at")
         .first()
     )
@@ -638,7 +696,7 @@ def project_timer_stop(request, pk: int):
 
     entry.ended_at = timezone.now()
     delta: timedelta = entry.ended_at - entry.started_at  # type: ignore
-    entry.hours = round(delta.total_seconds() / 3600, 2) # type: ignore
+    entry.hours = round(delta.total_seconds() / 3600, 2)  # type: ignore
     entry.save(update_fields=["ended_at", "hours"])
     messages.success(request, f"Timer stopped. Added {entry.hours}h.")
     return redirect("core:project_detail", pk=pk)
@@ -671,10 +729,14 @@ def timeentry_create(request, pk: int):
             return redirect("core:project_detail", pk=pk)
     else:
         form = TimeEntryForm()
-    return render(request, "core/timeentry_form.html", {"form": form, "project": project})
+    return render(
+        request, "core/timeentry_form.html", {"form": form, "project": project}
+    )
 
 
-# ---------- Expenses ----------
+# =============================================================================
+# Expenses
+# =============================================================================
 
 @login_required
 def expenses_list(request):
@@ -715,7 +777,8 @@ def expense_create(request):
     ok, limit = enforce_limit_or_upsell(company, "max_expenses", count)
     if not ok:
         messages.warning(
-            request, f"You've reached your plan’s limit of {limit} expenses. Upgrade to add more."
+            request,
+            f"You've reached your plan’s limit of {limit} expenses. Upgrade to add more.",
         )
         return redirect("billing:plans")
 
@@ -752,7 +815,9 @@ def expense_update(request, pk: int):
             return redirect("core:expenses")
     else:
         form = ExpenseForm(instance=obj)
-    return render(request, "core/expense_form.html", {"form": form, "mode": "edit", "obj": obj})
+    return render(
+        request, "core/expense_form.html", {"form": form, "mode": "edit", "obj": obj}
+    )
 
 
 @login_required
@@ -767,7 +832,9 @@ def expense_delete(request, pk: int):
     return render(request, "core/expense_confirm_delete.html", {"obj": obj})
 
 
-# ---------- Reports ----------
+# =============================================================================
+# Reports
+# =============================================================================
 
 @login_required
 @require_subscription
@@ -789,10 +856,14 @@ def report_pnl(request):
 
     # Income
     if basis == "accrual":
-        income_qs = Invoice.objects.filter(company=company, issue_date__range=(start, end))
+        income_qs = Invoice.objects.filter(
+            company=company, issue_date__range=(start, end)
+        )
         income_total = income_qs.aggregate(s=Sum("total")).get("s") or Decimal("0")
     else:  # cash
-        pay_qs = Payment.objects.filter(company=company, received_at__date__range=(start, end))
+        pay_qs = Payment.objects.filter(
+            company=company, received_at__date__range=(start, end)
+        )
         income_total = pay_qs.aggregate(s=Sum("amount")).get("s") or Decimal("0")
 
     # Expenses
@@ -828,10 +899,14 @@ def report_pnl_csv(request):
         start, end = default_range_last_30()
 
     if basis == "accrual":
-        income_qs = Invoice.objects.filter(company=company, issue_date__range=(start, end))
+        income_qs = Invoice.objects.filter(
+            company=company, issue_date__range=(start, end)
+        )
         income_total = income_qs.aggregate(s=Sum("total")).get("s") or Decimal("0")
     else:
-        pay_qs = Payment.objects.filter(company=company, received_at__date__range=(start, end))
+        pay_qs = Payment.objects.filter(
+            company=company, received_at__date__range=(start, end)
+        )
         income_total = pay_qs.aggregate(s=Sum("amount")).get("s") or Decimal("0")
 
     exp_qs = Expense.objects.filter(company=company, date__range=(start, end))
@@ -854,9 +929,7 @@ def report_pnl_csv(request):
     w.writerow([])
     w.writerow(["Category", "Total"])
     for row in (
-        exp_qs.values_list("category")
-        .annotate(total=Sum("amount"))
-        .order_by("category")
+        exp_qs.values_list("category").annotate(total=Sum("amount")).order_by("category")
     ):
         w.writerow([row[0] or "(Uncategorized)", f"{row[1]}"])
 
@@ -865,7 +938,9 @@ def report_pnl_csv(request):
     return res
 
 
-# ---------- Company / Team ----------
+# =============================================================================
+# Company / Team
+# =============================================================================
 
 @login_required
 def company_profile(request):
@@ -874,12 +949,16 @@ def company_profile(request):
     if company:
         role = (
             CompanyMember.OWNER
-            if company.owner_id == request.user.id # type: ignore
+            if company.owner_id == request.user.id  # type: ignore
             else CompanyMember.objects.filter(company=company, user=request.user)
             .values_list("role", flat=True)
             .first()
         )
-    invites = company.invites.filter(status=CompanyInvite.PENDING).order_by("-sent_at") if company else []  # type: ignore[attr-defined]
+    invites = (
+        company.invites.filter(status=CompanyInvite.PENDING).order_by("-sent_at") # type: ignore
+        if company
+        else []
+    )  # type: ignore[attr-defined]
     members = (
         CompanyMember.objects.filter(company=company)
         .select_related("user")
@@ -932,7 +1011,9 @@ def team_list(request):
         else []
     )
     invites = (
-        CompanyInvite.objects.filter(company=company, status=CompanyInvite.PENDING).order_by("-sent_at")
+        CompanyInvite.objects.filter(
+            company=company, status=CompanyInvite.PENDING
+        ).order_by("-sent_at")
         if company
         else []
     )
@@ -940,7 +1021,12 @@ def team_list(request):
     return render(
         request,
         "core/team_list.html",
-        {"company": company, "members": members, "invites": invites, "can_manage": can_manage},
+        {
+            "company": company,
+            "members": members,
+            "invites": invites,
+            "can_manage": can_manage,
+        },
     )
 
 
@@ -959,7 +1045,9 @@ def invite_create(request):
             inv.invited_by = request.user
             inv.save()
             # Dev UX: show the invite link directly (and you can also email it)
-            invite_url = request.build_absolute_uri(redirect("core:invite_accept", token=inv.token).url)
+            invite_url = request.build_absolute_uri(
+                redirect("core:invite_accept", token=inv.token).url
+            )
             messages.success(request, f"Invite sent to {inv.email}. Link: {invite_url}")
             print("Invite URL:", invite_url)
             return redirect("core:team_list")
@@ -1011,7 +1099,9 @@ def company_switch(request, company_id: int):
     return redirect("core:company_profile")
 
 
-# ---------- Estimates ----------
+# =============================================================================
+# Estimates
+# =============================================================================
 
 try:
     _require_estimates = require_feature("estimates")  # type: ignore
@@ -1042,7 +1132,9 @@ def estimates_list(request):
 
     qs = qs.select_related("client", "project").order_by("-issue_date", "-id")
     return render(
-        request, "core/estimates_list.html", {"estimates": qs, "q": q, "show_templates": show_templates}
+        request,
+        "core/estimates_list.html",
+        {"estimates": qs, "q": q, "show_templates": show_templates},
     )
 
 
@@ -1057,7 +1149,8 @@ def estimate_create(request):
     ok, limit = enforce_limit_or_upsell(company, "max_estimates", count)
     if not ok:
         messages.warning(
-            request, f"You've reached your plan’s limit of {limit} estimates. Upgrade to add more."
+            request,
+            f"You've reached your plan’s limit of {limit} estimates. Upgrade to add more.",
         )
         return redirect("billing:plans")
 
@@ -1068,7 +1161,7 @@ def estimate_create(request):
             est = form.save(commit=False)
             est.company = company
             if not est.number:
-                est.number = generate_estimate_number(company) # type: ignore
+                est.number = generate_estimate_number(company)  # type: ignore
             est.save()
             notify_company(
                 company,
@@ -1083,39 +1176,57 @@ def estimate_create(request):
             messages.success(request, "Estimate created.")
             return redirect("core:estimate_detail", pk=est.pk)
     else:
-        form = EstimateForm(company=company, initial={"number": generate_estimate_number(company)}) # type: ignore
+        form = EstimateForm(
+            company=company, initial={"number": generate_estimate_number(company)}  # type: ignore
+        )
         formset = EstimateItemFormSet()
-    return render(request, "core/estimate_form.html", {"form": form, "formset": formset, "mode": "create"})
+    return render(
+        request,
+        "core/estimate_form.html",
+        {"form": form, "formset": formset, "mode": "create"},
+    )
 
 
 @login_required
 @require_subscription
 @_require_estimates
 def estimate_create_from(request, pk: int):
+    """
+    Create a new estimate pre-populated from a template estimate (pk).
+    """
     company = get_active_company(request)
-    src = get_object_or_404(Estimate, pk=pk, company=company)
+    tmpl = get_object_or_404(
+        Estimate.objects.select_related("client", "project").prefetch_related("items"),
+        pk=pk, company=company, is_template=True
+    )
 
-    # Plan limit: max_estimates when creating from template as well
+    # Plan limit: count only non-templates
     count = Estimate.objects.filter(company=company, is_template=False).count()
     ok, limit = enforce_limit_or_upsell(company, "max_estimates", count)
     if not ok:
         messages.warning(
-            request, f"You've reached your plan’s limit of {limit} estimates. Upgrade to add more."
+            request,
+            f"You've reached your plan’s limit of {limit} estimates. Upgrade to add more.",
         )
         return redirect("billing:plans")
 
     if request.method == "POST":
         form = EstimateForm(request.POST, company=company)
-        formset = EstimateItemFormSet(request.POST)
+        formset = EstimateItemFormSet(request.POST, prefix="items")
         if form.is_valid() and formset.is_valid():
-            est = form.save(commit=False)
-            est.company = company
-            if not est.number:
-                est.number = generate_estimate_number(company) # type: ignore
-            est.save()
-            formset.instance = est
-            formset.save()
-            recalc_estimate(est)
+            with transaction.atomic(): # type: ignore
+                est = form.save(commit=False)
+                est.company = company
+                est.is_template = False  # ensure we're creating a real estimate
+                est.status = Estimate.DRAFT
+                if not est.number:
+                    est.number = generate_estimate_number(company)  # type: ignore
+                est.save()
+
+                formset.instance = est
+                formset.save()
+
+                recalc_estimate(est)
             messages.success(request, "Estimate created from template.")
             return redirect("core:estimate_detail", pk=est.pk)
     else:
@@ -1123,21 +1234,35 @@ def estimate_create_from(request, pk: int):
             instance=None,
             company=company,
             initial={
-                "client": src.client_id,  # type: ignore
-                "project": src.project_id,  # type: ignore
-                "number": generate_estimate_number(company), # type: ignore
+                "client": tmpl.client_id, # type: ignore
+                "project": tmpl.project_id, # type: ignore
+                "number": generate_estimate_number(company),  # type: ignore
                 "status": Estimate.DRAFT,
                 "issue_date": timezone.now().date(),
-                "valid_until": src.valid_until,
-                "tax": src.tax,
-                "notes": src.notes,
+                "valid_until": tmpl.valid_until,
+                "tax": tmpl.tax,
+                "notes": tmpl.notes,
+                "is_template": False,
             },
         )
-        formset = EstimateItemFormSet(instance=None, queryset=EstimateItem.objects.none())
+
+        # Seed line items from template
+        initial_items = [
+            {"description": it.description, "qty": it.qty, "unit_price": it.unit_price}
+            for it in tmpl.items.all() # type: ignore
+        ]
+        # Use an unsaved instance to satisfy inline formset expectations and keep prefix stable
+        formset = EstimateItemFormSet(
+            prefix="items",
+            instance=Estimate(),  # unsaved placeholder
+            queryset=EstimateItem.objects.none(),
+            initial=initial_items,
+        )
+
     return render(
         request,
         "core/estimate_form.html",
-        {"form": form, "formset": formset, "mode": "create_from", "src": src},
+        {"form": form, "formset": formset, "mode": "create_from", "src": tmpl},
     )
 
 
@@ -1172,7 +1297,9 @@ def estimate_update(request, pk: int):
         form = EstimateForm(instance=est, company=company)
         formset = EstimateItemFormSet(instance=est)
     return render(
-        request, "core/estimate_form.html", {"form": form, "formset": formset, "mode": "edit", "est": est}
+        request,
+        "core/estimate_form.html",
+        {"form": form, "formset": formset, "mode": "edit", "est": est},
     )
 
 
@@ -1243,7 +1370,7 @@ def estimate_convert(request, pk: int):
     inv = convert_estimate_to_invoice(est)
     # assign invoice number now
     if not inv.number:
-        inv.number = generate_invoice_number(company) # type: ignore
+        inv.number = generate_invoice_number(company)  # type: ignore
         inv.save(update_fields=["number"])
         notify_company(
             company,
@@ -1260,7 +1387,9 @@ def estimate_convert(request, pk: int):
 # --- Public estimate views (no auth) ---
 
 def _get_estimate_by_token(token):
-    return get_object_or_404(Estimate.objects.select_related("client", "project"), public_token=token)
+    return get_object_or_404(
+        Estimate.objects.select_related("client", "project"), public_token=token
+    )
 
 
 def estimate_public(request, token):
@@ -1275,9 +1404,7 @@ def estimate_public(request, token):
         can_act = False
 
     return render(
-        request,
-        "core/estimate_public.html",
-        {"est": est, "items": items, "can_act": can_act},
+        request, "core/estimate_public.html", {"est": est, "items": items, "can_act": can_act}
     )
 
 
@@ -1345,7 +1472,9 @@ def estimate_public_decline(request, token):
     return redirect("core:estimate_public", token=token)
 
 
-# ---------- PDF helpers ----------
+# =============================================================================
+# PDF helpers
+# =============================================================================
 
 def _render_pdf_from_html(html: str, base_url: str) -> bytes:
     """
@@ -1359,7 +1488,7 @@ def _render_pdf_from_html(html: str, base_url: str) -> bytes:
             "or configure an alternate PDF engine."
         ) from e
 
-    return HTML(string=html, base_url=base_url).write_pdf() # type: ignore
+    return HTML(string=html, base_url=base_url).write_pdf()  # type: ignore
 
 
 @login_required
@@ -1367,9 +1496,7 @@ def _render_pdf_from_html(html: str, base_url: str) -> bytes:
 def invoice_pdf(request, pk: int):
     company = get_active_company(request)
     inv = get_object_or_404(
-        Invoice.objects.select_related("client", "project"),
-        pk=pk,
-        company=company,
+        Invoice.objects.select_related("client", "project"), pk=pk, company=company
     )
     recalc_invoice(inv)
     html = render_to_string("core/pdf/invoice.html", {"inv": inv})
@@ -1384,9 +1511,7 @@ def invoice_pdf(request, pk: int):
 def estimate_pdf(request, pk: int):
     company = get_active_company(request)
     est = get_object_or_404(
-        Estimate.objects.select_related("client", "project"),
-        pk=pk,
-        company=company,
+        Estimate.objects.select_related("client", "project"), pk=pk, company=company
     )
     recalc_estimate(est)
     html = render_to_string("core/pdf/estimate.html", {"est": est})
@@ -1396,7 +1521,9 @@ def estimate_pdf(request, pk: int):
     return resp
 
 
-# ---------- Email (attach PDF + include public link) ----------
+# =============================================================================
+# Email (attach PDF + include public link)
+# =============================================================================
 
 @login_required
 @require_subscription
@@ -1404,9 +1531,7 @@ def estimate_pdf(request, pk: int):
 def invoice_email(request, pk: int):
     company = get_active_company(request)
     inv = get_object_or_404(
-        Invoice.objects.select_related("client", "project"),
-        pk=pk,
-        company=company,
+        Invoice.objects.select_related("client", "project"), pk=pk, company=company
     )
     recalc_invoice(inv)
 
@@ -1424,8 +1549,7 @@ def invoice_email(request, pk: int):
         cc = [e.strip() for e in cc_raw.split(",") if e.strip()]
         subject = form.cleaned_data["subject"]
         body = form.cleaned_data["message"] or render_to_string(
-            "core/email/invoice_email.txt",
-            {"inv": inv, "site_url": settings.SITE_URL},
+            "core/email/invoice_email.txt", {"inv": inv, "site_url": settings.SITE_URL}
         )
 
         # PDF attachment
@@ -1443,11 +1567,16 @@ def invoice_email(request, pk: int):
         email.attach(filename, pdf_bytes, "application/pdf")
         email.send(fail_silently=False)
         messages.success(
-            request, f"Invoice emailed to {to[0]}{(' (cc: ' + ', '.join(cc) + ')' if cc else '')}."
+            request,
+            f"Invoice emailed to {to[0]}{(' (cc: ' + ', '.join(cc) + ')' if cc else '')}.",
         )
         return redirect("core:invoice_detail", pk=pk)
 
-    return render(request, "core/email_send_form.html", {"form": form, "obj": inv, "kind": "invoice"})
+    return render(
+        request,
+        "core/email_send_form.html",
+        {"form": form, "obj": inv, "kind": "invoice"},
+    )
 
 
 @login_required
@@ -1456,9 +1585,7 @@ def invoice_email(request, pk: int):
 def estimate_email(request, pk: int):
     company = get_active_company(request)
     est = get_object_or_404(
-        Estimate.objects.select_related("client", "project"),
-        pk=pk,
-        company=company,
+        Estimate.objects.select_related("client", "project"), pk=pk, company=company
     )
     recalc_estimate(est)
 
@@ -1476,8 +1603,7 @@ def estimate_email(request, pk: int):
         cc = [e.strip() for e in cc_raw.split(",") if e.strip()]
         subject = form.cleaned_data["subject"]
         body = form.cleaned_data["message"] or render_to_string(
-            "core/email/estimate_email.txt",
-            {"est": est, "site_url": settings.SITE_URL},
+            "core/email/estimate_email.txt", {"est": est, "site_url": settings.SITE_URL}
         )
 
         html = render_to_string("core/pdf/estimate.html", {"est": est})
@@ -1494,11 +1620,16 @@ def estimate_email(request, pk: int):
         email.attach(filename, pdf_bytes, "application/pdf")
         email.send(fail_silently=False)
         messages.success(
-            request, f"Estimate emailed to {to[0]}{(' (cc: ' + ', '.join(cc) + ')' if cc else '')}."
+            request,
+            f"Estimate emailed to {to[0]}{(' (cc: ' + ', '.join(cc) + ')' if cc else '')}.",
         )
         return redirect("core:estimate_detail", pk=pk)
 
-    return render(request, "core/email_send_form.html", {"form": form, "obj": est, "kind": "estimate"})
+    return render(
+        request,
+        "core/email_send_form.html",
+        {"form": form, "obj": est, "kind": "estimate"},
+    )
 
 
 @login_required
@@ -1506,9 +1637,7 @@ def estimate_email(request, pk: int):
 def invoice_send_reminder(request, pk: int):
     company = get_active_company(request)
     inv = get_object_or_404(
-        Invoice.objects.select_related("client", "project"),
-        pk=pk,
-        company=company,
+        Invoice.objects.select_related("client", "project"), pk=pk, company=company
     )
     recalc_invoice(inv)
 
@@ -1555,25 +1684,20 @@ def invoice_send_reminder(request, pk: int):
     public_url = f"{settings.SITE_URL}{reverse('core:invoice_public', kwargs={'token': str(inv.public_token)})}"
     body = render_to_string(
         "core/email/invoice_reminder_email.txt",
-        {
-            "inv": inv,
-            "site_url": settings.SITE_URL,
-            "public_url": public_url,
-            "days": days,
-        },
+        {"inv": inv, "site_url": settings.SITE_URL, "public_url": public_url, "days": days},
     )
 
     # --- PDF (attempt helper, fall back to local)
     pdf_bytes = None
     try:
-        from core.pdf import render_invoice_pdf  # type: ignore # optional helper
+        from core.pdf import render_invoice_pdf  # type: ignore  # optional helper
         try:
             pdf_bytes = render_invoice_pdf(inv, request=request)  # type: ignore[arg-type]
         except TypeError:
             pdf_bytes = render_invoice_pdf(inv)
     except Exception:
         try:
-            html = render_to_string("core/pdf/invoice.html", {"inv": inv}) # type: ignore
+            html = render_to_string("core/pdf/invoice.html", {"inv": inv})  # type: ignore
             from core.pdf import _render_pdf_from_html as alt_render  # type: ignore
             pdf_bytes = alt_render(html, base_url=request.build_absolute_uri("/"))
         except Exception:
@@ -1613,7 +1737,9 @@ def invoice_send_reminder(request, pk: int):
     return redirect("core:invoice_detail", pk=pk)
 
 
-# ---------- Recurring Invoices ----------
+# =============================================================================
+# Recurring Invoices
+# =============================================================================
 
 @login_required
 def recurring_list(request):
@@ -1641,7 +1767,9 @@ def recurring_create(request):
             return redirect("core:recurring_list")
     else:
         form = RecurringPlanForm(initial={})
-    return render(request, "core/recurring_form.html", {"form": form, "mode": "create"})
+    return render(
+        request, "core/recurring_form.html", {"form": form, "mode": "create"}
+    )
 
 
 @login_required
@@ -1668,7 +1796,11 @@ def recurring_update(request, pk: int):
 def recurring_toggle_status(request, pk: int):
     company = get_active_company(request)
     plan = get_object_or_404(RecurringPlan, pk=pk, company=company)
-    plan.status = RecurringPlan.PAUSED if plan.status == RecurringPlan.ACTIVE else RecurringPlan.ACTIVE
+    plan.status = (
+        RecurringPlan.PAUSED
+        if plan.status == RecurringPlan.ACTIVE
+        else RecurringPlan.ACTIVE
+    )
     plan.save(update_fields=["status"])
     messages.success(
         request, f"Plan {'paused' if plan.status == RecurringPlan.PAUSED else 'activated'}."
@@ -1700,7 +1832,9 @@ def recurring_run_now(request, pk: int):
 
     advance_plan_after_run(plan)
 
-    messages.success(request, f"Generated invoice {inv.number} from plan “{plan.title}”.")
+    messages.success(
+        request, f"Generated invoice {inv.number} from plan “{plan.title}”."
+    )
     return redirect("core:invoice_detail", pk=inv.pk)
 
 
@@ -1716,7 +1850,9 @@ def recurring_delete(request, pk: int):
     return render(request, "core/recurring_confirm_delete.html", {"plan": plan})
 
 
-# ---------- User Profile ----------
+# =============================================================================
+# User Profile
+# =============================================================================
 
 @login_required
 def my_profile(request):
@@ -1785,7 +1921,11 @@ def my_profile_edit(request):
             form.fields.pop("first_name", None)
             form.fields.pop("last_name", None)
 
-    return render(request, "core/profile_form.html", {"form": form, "company": company, "profile": profile})
+    return render(
+        request,
+        "core/profile_form.html",
+        {"form": form, "company": company, "profile": profile},
+    )
 
 
 @login_required
@@ -1805,10 +1945,14 @@ def member_edit(request, member_id: int):
     else:
         form = MemberForm(instance=m)
 
-    return render(request, "core/member_form.html", {"form": form, "member": m, "company": company})
+    return render(
+        request, "core/member_form.html", {"form": form, "member": m, "company": company}
+    )
 
 
-# ---------- Search ----------
+# =============================================================================
+# Search
+# =============================================================================
 
 @login_required
 def search(request):
@@ -1851,7 +1995,9 @@ def search(request):
         .annotate(
             sv=c_vec,
             rank=SearchRank(c_vec, query),
-            sim=Greatest(TrigramSimilarity("org", q), TrigramSimilarity("email", q)),
+            sim=Greatest(
+                TrigramSimilarity("org", q), TrigramSimilarity("email", q)
+            ),
             score=Coalesce(F("rank"), Value(0.0)) + Coalesce(F("sim"), Value(0.0)),
         )
         .filter(Q(sv=query) | Q(sim__gt=0.25))
@@ -1868,7 +2014,9 @@ def search(request):
         .annotate(
             sv=p_vec,
             rank=SearchRank(p_vec, query),
-            sim=Greatest(TrigramSimilarity("name", q), TrigramSimilarity("number", q)),
+            sim=Greatest(
+                TrigramSimilarity("name", q), TrigramSimilarity("number", q)
+            ),
             score=Coalesce(F("rank"), Value(0.0)) + Coalesce(F("sim"), Value(0.0)),
         )
         .filter(Q(sv=query) | Q(sim__gt=0.25))
@@ -1917,7 +2065,9 @@ def search(request):
         .annotate(
             sv=x_vec,
             rank=SearchRank(x_vec, query),
-            sim=Greatest(TrigramSimilarity("description", q), TrigramSimilarity("vendor", q)),
+            sim=Greatest(
+                TrigramSimilarity("description", q), TrigramSimilarity("vendor", q)
+            ),
             score=Coalesce(F("rank"), Value(0.0)) + Coalesce(F("sim"), Value(0.0)),
         )
         .filter(Q(sv=query) | Q(sim__gt=0.3))
@@ -1945,12 +2095,16 @@ def search(request):
     return render(request, "core/search.html", context)
 
 
-# --- Notifications ---
+# =============================================================================
+# Notifications
+# =============================================================================
 
 @login_required
 def notifications(request):
     company = get_active_company(request)
-    qs = Notification.objects.for_company_user(company, request.user).order_by("-created_at")  # type: ignore[attr-defined]
+    qs = Notification.objects.for_company_user(  # type: ignore[attr-defined]
+        company, request.user
+    ).order_by("-created_at")
     return render(request, "core/notifications.html", {"items": qs})
 
 
@@ -1958,7 +2112,9 @@ def notifications(request):
 @require_POST
 def notification_read(request, pk: int):
     company = get_active_company(request)
-    n = get_object_or_404(Notification, pk=pk, company=company, recipient=request.user)
+    n = get_object_or_404(
+        Notification, pk=pk, company=company, recipient=request.user
+    )
     n.mark_read()
     return redirect(request.META.get("HTTP_REFERER") or "core:notifications")
 
@@ -1974,7 +2130,9 @@ def notifications_read_all(request):
 @login_required
 def notifications_list(request):
     company = get_active_company(request)
-    qs = Notification.objects.filter(company=company, recipient=request.user).order_by("-created_at")[:300]
+    qs = Notification.objects.filter(
+        company=company, recipient=request.user
+    ).order_by("-created_at")[:300]
     return render(request, "core/notifications_list.html", {"notifications": qs})
 
 
@@ -1982,22 +2140,31 @@ def notifications_list(request):
 @require_http_methods(["POST"])
 def notifications_mark_all_read(request):
     company = get_active_company(request)
-    Notification.objects.filter(company=company, recipient=request.user, read_at__isnull=True).update(
-        read_at=timezone.now()
+    Notification.objects.filter(
+        company=company, recipient=request.user, read_at__isnull=True
+    ).update(read_at=timezone.now())
+    next_url = (
+        request.POST.get("next")
+        or request.META.get("HTTP_REFERER")
+        or reverse("core:notifications")
     )
-    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or reverse("core:notifications")
     return redirect(next_url)
 
 
-# Legacy convenience: direct send via util (kept for compatibility with any existing links)
+# --- Legacy convenience: direct send via util (kept for compatibility) ---
 
 @login_required
 @require_subscription
 def invoice_send_email(request, pk: int):
     company = get_active_company(request)
-    inv = get_object_or_404(Invoice.objects.select_related("client"), pk=pk, company=company)
+    inv = get_object_or_404(
+        Invoice.objects.select_related("client"), pk=pk, company=company
+    )
 
-    default_to = (getattr(inv.client, "email", "") or getattr(request.user, "email", "") or "").strip()
+    default_to = (
+        (getattr(inv.client, "email", "") or getattr(request.user, "email", "") or "")
+        .strip()
+    )
 
     if request.method == "POST":
         to = (request.POST.get("to") or default_to).strip()
@@ -2028,7 +2195,9 @@ def invoice_send_email(request, pk: int):
             return redirect("core:invoice_detail", pk=pk)
 
     return render(
-        request, "core/invoice_send_email.html", {"inv": inv, "default_to": default_to, "mode": "initial"}
+        request,
+        "core/invoice_send_email.html",
+        {"inv": inv, "default_to": default_to, "mode": "initial"},
     )
 
 
@@ -2036,9 +2205,14 @@ def invoice_send_email(request, pk: int):
 @require_subscription
 def estimate_send_email(request, pk: int):
     company = get_active_company(request)
-    est = get_object_or_404(Estimate.objects.select_related("client", "project"), pk=pk, company=company)
+    est = get_object_or_404(
+        Estimate.objects.select_related("client", "project"), pk=pk, company=company
+    )
 
-    default_to = (getattr(est.client, "email", "") or getattr(request.user, "email", "") or "").strip()
+    default_to = (
+        (getattr(est.client, "email", "") or getattr(request.user, "email", "") or "")
+        .strip()
+    )
 
     if request.method == "POST":
         to = (request.POST.get("to") or default_to).strip()
@@ -2065,31 +2239,43 @@ def estimate_send_email(request, pk: int):
             return redirect("core:estimate_detail", pk=pk)
 
     return render(
-        request, "core/estimate_send_email.html", {"est": est, "default_to": default_to, "mode": "initial"}
+        request,
+        "core/estimate_send_email.html",
+        {"est": est, "default_to": default_to, "mode": "initial"},
     )
 
 
-# ---------- Estimate -> Project ----------
+# =============================================================================
+# Estimate -> Project
+# =============================================================================
 
 @login_required
 @require_subscription
 @_require_estimates
 def estimate_convert_to_project(request, pk: int):
     company = get_active_company(request)
-    est = get_object_or_404(Estimate.objects.select_related("client", "project"), pk=pk, company=company)
+    est = get_object_or_404(
+        Estimate.objects.select_related("client", "project"), pk=pk, company=company
+    )
 
     initial_mode = (
-        ConvertEstimateToProjectForm.MODE_ATTACH if est.project_id else ConvertEstimateToProjectForm.MODE_NEW  # type: ignore[attr-defined]
+        ConvertEstimateToProjectForm.MODE_ATTACH
+        if est.project_id # type: ignore
+        else ConvertEstimateToProjectForm.MODE_NEW  # type: ignore[attr-defined]
     )
 
     initial = {
         "mode": initial_mode,
         "new_name": (
             est.project.name  # type: ignore[union-attr]
-            if est.project_id # type: ignore
-            else (est.project.name if getattr(est, "project", None) else f"{est.client or 'Client'} — {est.number}") # type: ignore
+            if est.project_id  # type: ignore
+            else (
+                est.project.name # type: ignore
+                if getattr(est, "project", None)
+                else f"{est.client or 'Client'} — {est.number}"
+            )
         ),
-        "new_number": generate_project_number(company), # type: ignore
+        "new_number": generate_project_number(company),  # type: ignore
     }
 
     form = ConvertEstimateToProjectForm(
@@ -2103,14 +2289,15 @@ def estimate_convert_to_project(request, pk: int):
         mode = form.cleaned_data["mode"]
         if mode == ConvertEstimateToProjectForm.MODE_ATTACH:
             proj = form.cleaned_data["existing_project"]
-            if proj.company_id != company.id: # type: ignore
+            if proj.company_id != company.id:  # type: ignore
                 messages.error(request, "Project must belong to your company.")
                 return redirect("core:estimate_detail", pk=pk)
         else:
             proj = Project.objects.create(
                 company=company,
                 client=est.client,
-                number=form.cleaned_data.get("new_number") or generate_project_number(company), # type: ignore
+                number=form.cleaned_data.get("new_number")
+                or generate_project_number(company),  # type: ignore
                 name=form.cleaned_data.get("new_name") or f"Project from {est.number}",
                 billing_type=form.cleaned_data.get("new_billing_type") or Project.HOURLY,
                 estimated_hours=form.cleaned_data.get("new_estimated_hours") or 0,
@@ -2119,7 +2306,7 @@ def estimate_convert_to_project(request, pk: int):
                 due_date=form.cleaned_data.get("new_due_date"),
             )
 
-        est.project = proj # type: ignore
+        est.project = proj  # type: ignore
         if est.status != Estimate.ACCEPTED:
             est.status = Estimate.ACCEPTED
         est.save(update_fields=["project", "status"])
@@ -2136,95 +2323,125 @@ def estimate_convert_to_project(request, pk: int):
             pass
 
         messages.success(
-            request, f"Estimate {est.number} is now linked to project {proj.number} — {proj.name}."
+            request,
+            f"Estimate {est.number} is now linked to project {proj.number} — {proj.name}.",
         )
         return redirect("core:project_detail", pk=proj.pk)
 
     return render(request, "core/estimate_convert_project.html", {"est": est, "form": form})
 
 
-# ---------- Time → Invoice (wizard) ----------
+# =============================================================================
+# Time → Invoice (wizard)
+# =============================================================================
 
 @login_required
-@require_subscription
-def project_invoice_time(request, pk: int):
+def project_invoice_time(request, pk):
     company = get_active_company(request)
-    project = get_object_or_404(Project, pk=pk, company=company)
+    if not company:
+        return redirect("core:onboarding_company")
 
+    project = get_object_or_404(Project.objects.select_related("client"), pk=pk, company=company)
+
+    # sensible GET defaults
     start_default, end_default = default_range_last_30()
-    default_only_approved = bool(getattr(company, "require_time_approval", False))
 
     if request.method == "POST":
         form = TimeToInvoiceForm(request.POST)
         if form.is_valid():
+            cd = form.cleaned_data
+
             inv = create_invoice_from_time(
                 project=project,
                 company=company,
-                start=form.cleaned_data["start"],
-                end=form.cleaned_data["end"],
-                group_by=form.cleaned_data["group_by"],
-                rounding=form.cleaned_data["rounding"],
-                override_rate=form.cleaned_data.get("override_rate"),
-                description_prefix=form.cleaned_data.get("description") or "",
-                include_expenses=form.cleaned_data.get("include_expenses") or False,
-                expense_group_by=form.cleaned_data.get("expense_group_by") or "category",
-                expense_markup_override=form.cleaned_data.get("expense_markup_override"),
-                expense_label_prefix=form.cleaned_data.get("expense_label_prefix") or "",
-                only_approved=form.cleaned_data.get("include_only_approved") or False,
+                start=cd["start"],
+                end=cd["end"],
+                group_by=cd["group_by"],
+                rounding=cd["rounding"],
+                override_rate=cd.get("override_rate"),
+                description_prefix=cd.get("description") or "",
+                include_expenses=cd.get("include_expenses", True),
+                expense_group_by=cd.get("expense_group_by") or "category",
+                expense_markup_override=cd.get("expense_markup_override"),
+                expense_label_prefix=cd.get("expense_label_prefix") or "",
+                # NOTE: Your form has this field but the template doesn’t render it.
+                # Default to True if it’s absent so approvals are respected by default.
+                only_approved=cd.get("include_only_approved", True),
             )
-            if not inv.number:
-                inv.number = generate_invoice_number(company) # type: ignore
-                inv.save(update_fields=["number"])
-            messages.success(request, f"Created invoice {inv.number} from unbilled items.")
-            return redirect("core:invoice_detail", pk=inv.pk)
+
+            messages.success(request, f"Draft invoice {inv.number} created.")
+            return redirect("core:invoice_detail", inv.pk)
     else:
-        form = TimeToInvoiceForm(
-            initial={
-                "start": start_default,
-                "end": end_default,
-                "include_expenses": True,
-                "expense_group_by": "category",
-                "include_only_approved": default_only_approved,
-            }
-        )
+        form = TimeToInvoiceForm(initial={
+            "start": start_default,
+            "end": end_default,
+            "rounding": "0.25",
+            "group_by": "day",
+            "include_expenses": True,
+            "include_only_approved": True,  # default behavior
+        })
 
-    # Preview
-    start = form.initial.get("start", start_default)
-    end = form.initial.get("end", end_default)
-    only_approved = form.initial.get("include_only_approved", default_only_approved)
+    # --- Preview totals (no rounding) ---
+    # Pull current (bound) values when valid, otherwise fall back to defaults
+    if form.is_bound and form.is_valid():
+        cd = form.cleaned_data
+        start = cd["start"]
+        end = cd["end"]
+        include_only_approved = cd.get("include_only_approved", True)
+        include_expenses = cd.get("include_expenses", True)
+        markup_override = cd.get("expense_markup_override")
+    else:
+        start, end = start_default, end_default
+        include_only_approved = True
+        include_expenses = True
+        markup_override = None
 
+    # Unbilled, billable time (no rounding)
     time_qs = project.time_entries.filter( # type: ignore
-        is_billable=True, invoice__isnull=True, started_at__date__gte=start, started_at__date__lte=end
+        is_billable=True,
+        invoice__isnull=True,
+        started_at__date__gte=start,
+        started_at__date__lte=end,
     )
-    if only_approved:
+    if include_only_approved:
         time_qs = time_qs.filter(approved_at__isnull=False)
 
-    preview_hours = time_qs.aggregate(s=Sum("hours")).get("s") or Decimal("0.00")
-
-    exp_qs = Expense.objects.filter(
-        project=project,
-        company=company,
-        invoice__isnull=True,
-        is_billable=True,
-        date__gte=start,
-        date__lte=end,
-    )
-    preview_expenses = exp_qs.aggregate(s=Sum("amount")).get("s") or Decimal("0.00")
-
-    return render(
-        request,
-        "core/project_invoice_time.html",
-        {
-            "project": project,
-            "form": form,
-            "preview_hours": preview_hours,
-            "preview_expenses": preview_expenses,
-            "project_rate": project.hourly_rate,
-        },
+    preview_hours = (
+        time_qs.aggregate(s=Coalesce(Sum("hours"), Value(Decimal("0.00")), output_field=DecimalField()))
+        .get("s") or Decimal("0.00")
     )
 
+    # Unbilled, billable expenses (apply markup preview)
+    preview_expenses = Decimal("0.00")
+    if include_expenses:
+        exp_qs = Expense.objects.filter(
+            project=project,
+            company=company,
+            invoice__isnull=True,
+            is_billable=True,
+            date__gte=start,
+            date__lte=end,
+        ).only("amount", "billable_markup_pct")
 
-# ---------- Timesheets & Approvals ----------
+        for e in exp_qs:
+            base = Decimal(str(e.amount or 0))
+            pct = Decimal(str(markup_override if markup_override is not None else e.billable_markup_pct or 0))
+            price = (base * (Decimal("1.00") + (pct / Decimal("100.00")))).quantize(Decimal("0.01"))
+            preview_expenses += price
+
+    context = {
+        "project": project,
+        "form": form,
+        "project_rate": project.hourly_rate or Decimal("0.00"),
+        "preview_hours": preview_hours.quantize(Decimal("0.01")),
+        "preview_expenses": preview_expenses.quantize(Decimal("0.01")) if include_expenses else None,
+    }
+    return render(request, "core/project_invoice_time.html", context)
+
+
+# =============================================================================
+# Timesheets & Approvals
+# =============================================================================
 
 @login_required
 @require_subscription
@@ -2270,7 +2487,9 @@ def timesheet_week(request):
                             te.started_at = combine_midday(d)
                         te.status = TimeEntry.DRAFT
                         te.notes = f"{note} (Timesheet)".strip()
-                        te.save(update_fields=["hours", "started_at", "status", "notes"])
+                        te.save(
+                            update_fields=["hours", "started_at", "status", "notes"]
+                        )
                         updated += 1
                     else:
                         TimeEntry.objects.create(
@@ -2283,10 +2502,14 @@ def timesheet_week(request):
                             status=TimeEntry.DRAFT,
                         )
                         created += 1
-            messages.success(request, f"Timesheet saved. Created {created}, updated {updated}.")
+            messages.success(
+                request, f"Timesheet saved. Created {created}, updated {updated}."
+            )
             return redirect("core:timesheet_week")
     else:
-        form = TimesheetWeekForm(company=company, user=request.user, initial={"week": default_week})
+        form = TimesheetWeekForm(
+            company=company, user=request.user, initial={"week": default_week}
+        )
 
     mon, sun = week_range(form.initial.get("week") or default_week)
     entries = (
@@ -2300,7 +2523,9 @@ def timesheet_week(request):
         .order_by("project__name", "started_at")
     )
     return render(
-        request, "core/timesheet_week.html", {"form": form, "entries": entries, "week_start": mon, "week_end": sun}
+        request,
+        "core/timesheet_week.html",
+        {"form": form, "entries": entries, "week_start": mon, "week_end": sun},
     )
 
 
@@ -2345,10 +2570,10 @@ def approvals_list(request):
     )
 
     # Build groups: {(user_id, week_monday): {...}}
-    groups = {}
+    groups: dict[tuple[int, date], dict] = {}
     for t in pending:
         wk, _ = week_range(t.started_at.date())
-        key = (t.user_id, wk) # type: ignore
+        key = (t.user_id, wk)  # type: ignore
         groups.setdefault(key, {"user": t.user, "week": wk, "entries": []})
         groups[key]["entries"].append(t)
 
@@ -2386,7 +2611,9 @@ def approvals_decide(request):
 
     now = timezone.now()
     if action == "approve":
-        updated = qs.update(status=TimeEntry.APPROVED, approved_at=now, approved_by_id=request.user.id)
+        updated = qs.update(
+            status=TimeEntry.APPROVED, approved_at=now, approved_by_id=request.user.id
+        )
         messages.success(request, f"Approved {updated} entries for week starting {wk}.")
     elif action == "reject":
         updated = qs.update(status=TimeEntry.REJECTED, reject_reason=reason)
@@ -2396,19 +2623,22 @@ def approvals_decide(request):
     return redirect("core:approvals_list")
 
 
+# =============================================================================
+# Refunds
+# =============================================================================
+
 @login_required
 @require_subscription
 @require_http_methods(["GET", "POST"])
 def invoice_refund(request, pk: int):
     company = get_active_company(request)
     inv = get_object_or_404(
-        Invoice.objects.select_related("client", "project"),
-        pk=pk, company=company
+        Invoice.objects.select_related("client", "project"), pk=pk, company=company
     )
     recalc_invoice(inv)
 
     # Max refundable = net amount paid (can be reduced by prior refunds)
-    refundable = (inv.amount_paid or Decimal("0.00"))
+    refundable = inv.amount_paid or Decimal("0.00")
 
     if refundable <= 0:
         messages.info(request, "There are no funds to refund on this invoice.")
@@ -2417,11 +2647,17 @@ def invoice_refund(request, pk: int):
     form = RefundForm(request.POST or None, invoice=inv)
 
     if request.method == "POST" and form.is_valid():
-        amt: Decimal = form.cleaned_data["amount"].quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        amt: Decimal = form.cleaned_data["amount"].quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
 
         if amt > refundable:
             messages.error(request, f"Amount exceeds refundable balance (${refundable}).")
-            return render(request, "core/invoice_refund_form.html", {"form": form, "inv": inv, "refundable": refundable})
+            return render(
+                request,
+                "core/invoice_refund_form.html",
+                {"form": form, "inv": inv, "refundable": refundable},
+            )
 
         # Stripe path if available/selected
         did_stripe = False
@@ -2436,7 +2672,11 @@ def invoice_refund(request, pk: int):
             pi_id = form.cleaned_data.get("payment_intent")
             if not pi_id:
                 messages.error(request, "Select a Stripe payment to refund.")
-                return render(request, "core/invoice_refund_form.html", {"form": form, "inv": inv, "refundable": refundable})
+                return render(
+                    request,
+                    "core/invoice_refund_form.html",
+                    {"form": form, "inv": inv, "refundable": refundable},
+                )
 
             try:
                 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -2445,7 +2685,11 @@ def invoice_refund(request, pk: int):
                 did_stripe = True
             except Exception as e:
                 messages.error(request, f"Stripe refund failed: {e}")
-                return render(request, "core/invoice_refund_form.html", {"form": form, "inv": inv, "refundable": refundable})
+                return render(
+                    request,
+                    "core/invoice_refund_form.html",
+                    {"form": form, "inv": inv, "refundable": refundable},
+                )
 
         # Record negative Payment (idempotent for Stripe, unique token for manual)
         external_id = refund_ext_id or f"manual-refund-{uuid4()}"
@@ -2463,23 +2707,31 @@ def invoice_refund(request, pk: int):
         recalc_invoice(inv)
         try:
             notify_company(
-                company, request.user,
+                company,
+                request.user,
                 f"Refund recorded for invoice {inv.number} (${amt}).",
                 url=reverse("core:invoice_detail", args=[inv.pk]),
-                kind=Notification.GENERIC
+                kind=Notification.GENERIC,
             )
         except Exception:
             pass
 
         messages.success(
             request,
-            f"Refund of ${amt} {'issued via Stripe and ' if did_stripe else ''}recorded."
+            f"Refund of ${amt} {'issued via Stripe and ' if did_stripe else ''}recorded.",
         )
         return redirect("core:invoice_detail", pk=pk)
 
-    return render(request, "core/invoice_refund_form.html", {
-        "form": form, "inv": inv, "refundable": refundable
-    })
+    return render(
+        request,
+        "core/invoice_refund_form.html",
+        {"form": form, "inv": inv, "refundable": refundable},
+    )
+
+
+# =============================================================================
+# Company creation
+# =============================================================================
 
 @login_required
 def company_create(request):
@@ -2489,7 +2741,9 @@ def company_create(request):
             obj = form.save(commit=False)
             obj.owner = request.user
             obj.save()
-            CompanyMember.objects.get_or_create(company=obj, user=request.user, defaults={"role": CompanyMember.OWNER})
+            CompanyMember.objects.get_or_create(
+                company=obj, user=request.user, defaults={"role": CompanyMember.OWNER}
+            )
             set_active_company(request, obj)
             messages.success(request, "Company created. Welcome!")
             return redirect("core:company_profile")

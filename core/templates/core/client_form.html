@@ -1,37 +1,65 @@
 {% extends "_app_shell.html" %}
-{% block page_title %}{{ mode == 'create'|yesno:'New Client,Edit Client' }}{% endblock %}
+{% block page_title %}
+  {% if mode == 'create' %}New Client{% else %}Edit Client{% endif %}
+{% endblock %}
+
 {% block app_content %}
 <form method="post" novalidate>
   {% csrf_token %}
+
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger">
+      {% for err in form.non_field_errors %}{{ err }}<br>{% endfor %}
+    </div>
+  {% endif %}
+
   <div class="card shadow-sm">
     <div class="card-body">
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="form-label">First name</label>
+          <label class="form-label" for="{{ form.first_name.id_for_label }}">First name</label>
           {{ form.first_name }}
+          {% if form.first_name.help_text %}<div class="form-text">{{ form.first_name.help_text }}</div>{% endif %}
+          {% if form.first_name.errors %}<div class="text-danger small">{{ form.first_name.errors|join:", " }}</div>{% endif %}
         </div>
+
         <div class="col-md-6">
-          <label class="form-label">Last name</label>
+          <label class="form-label" for="{{ form.last_name.id_for_label }}">Last name</label>
           {{ form.last_name }}
+          {% if form.last_name.help_text %}<div class="form-text">{{ form.last_name.help_text }}</div>{% endif %}
+          {% if form.last_name.errors %}<div class="text-danger small">{{ form.last_name.errors|join:", " }}</div>{% endif %}
         </div>
+
         <div class="col-md-6">
-          <label class="form-label">Company</label>
+          <label class="form-label" for="{{ form.org.id_for_label }}">Company</label>
           {{ form.org }}
+          {% if form.org.help_text %}<div class="form-text">{{ form.org.help_text }}</div>{% endif %}
+          {% if form.org.errors %}<div class="text-danger small">{{ form.org.errors|join:", " }}</div>{% endif %}
         </div>
+
         <div class="col-md-6">
-          <label class="form-label">Email</label>
+          <label class="form-label" for="{{ form.email.id_for_label }}">Email</label>
           {{ form.email }}
+          {% if form.email.help_text %}<div class="form-text">{{ form.email.help_text }}</div>{% endif %}
+          {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors|join:", " }}</div>{% endif %}
         </div>
+
         <div class="col-md-6">
-          <label class="form-label">Phone</label>
+          <label class="form-label" for="{{ form.phone.id_for_label }}">Phone</label>
           {{ form.phone }}
+          {% if form.phone.help_text %}<div class="form-text">{{ form.phone.help_text }}</div>{% endif %}
+          {% if form.phone.errors %}<div class="text-danger small">{{ form.phone.errors|join:", " }}</div>{% endif %}
         </div>
+
         <div class="col-12">
-          <label class="form-label">Address</label>
+          <label class="form-label" for="{{ form.address.id_for_label }}">Address</label>
           {{ form.address }}
+          {% if form.address.help_text %}<div class="form-text">{{ form.address.help_text }}</div>{% endif %}
+          {% if form.address.errors %}<div class="text-danger small">{{ form.address.errors|join:", " }}</div>{% endif %}
         </div>
       </div>
     </div>
+
     <div class="card-footer d-flex justify-content-between">
       <a class="btn btn-outline-secondary" href="{% url 'core:clients' %}">Cancel</a>
       <button class="btn btn-primary" type="submit">Save</button>

@@ -1,0 +1,13 @@
+{% extends "dashboard/help/_article_base.html" %}
+{% block help_title %}Payments{% endblock %}
+{% block help_intro %}Record payments and enable online checkout for faster collection.{% endblock %}
+{% block help_body %}
+<ol class="mb-4">
+  <li><strong>Record a payment:</strong> Open an invoice → <em>Add Payment</em>. Choose method, date, and amount.</li>
+  <li><strong>Online payments:</strong> Connect Stripe in <em>Billing</em> to let clients pay by card or wallet.</li>
+  <li><strong>Reconciliation:</strong> Verify paid invoices and follow up on overdue balances.</li>
+</ol>
+<div class="alert alert-info small">
+  <strong>Tip:</strong> Automated reminders reduce DSO. Configure dunning in invoice settings.
+</div>
+{% endblock %}
