@@ -1,6 +1,6 @@
-{% extends "_app_shell.html" %}
-
-{% block page_title %}Welcome to {{ APP_NAME }}{% endblock %}
+{% extends "base.html" %}
+{% load i18n %}
+{% block page_title %}{% trans "Welcome to" %} {{ APP_NAME }}{% endblock %}
 
 {% block app_content %}
 <div class="row g-3">
@@ -9,34 +9,53 @@
     <div class="card shadow-sm">
       <div class="card-body">
         <h2 class="h4 mb-2">
-          {% if company %}You're almost set up, {{ company.name }}!{% else %}You're almost set up!{% endif %}
+          {% if company %}
+            {% blocktrans with name=company.name %}You're almost set up, {{ name }}!{% endblocktrans %}
+          {% else %}
+            {% trans "You're almost set up!" %}
+          {% endif %}
         </h2>
 
+        {# Subscription status summary #}
         {% if sub %}
           {% if sub.status == "trialing" %}
-            <p class="text-muted mb-3">
-              You’re currently on a trial{% if days_left is not None %} — <strong>{{ days_left }}</strong> day{% if days_left != 1 %}s{% endif %} left{% endif %}.
+            <p class="text-muted mb-2">
+              {% if days_left is not None %}
+                {% blocktrans count dl=days_left %}You’re on a trial — <strong>{{ dl }}</strong> day left.{% plural %}You’re on a trial — <strong>{{ dl }}</strong> days left.{% endblocktrans %}
+              {% else %}
+                {% trans "You’re currently on a trial." %}
+              {% endif %}
             </p>
+            <span class="badge text-bg-info text-uppercase">{% trans "Trial" %}</span>
           {% elif sub.status == "past_due" %}
-            <p class="text-warning mb-3">Your subscription is past due. Update billing to continue using {{ APP_NAME }}.</p>
+            <p class="text-warning mb-2">{% blocktrans %}Your subscription is past due. Update billing to continue using {{ APP_NAME }}.{% endblocktrans %}</p>
+            <span class="badge text-bg-warning text-uppercase">{% trans "Past due" %}</span>
           {% elif sub.status == "active" %}
-            <p class="text-muted mb-3">Your subscription is active. Thanks for being with us!</p>
+            <p class="text-muted mb-2">{% trans "Your subscription is active. Thanks for being with us!" %}</p>
+            <span class="badge text-bg-success text-uppercase">{% trans "Active" %}</span>
           {% else %}
-            <p class="text-muted mb-3">Your subscription isn’t active yet.</p>
+            <p class="text-muted mb-2">{% trans "Your subscription isn’t active yet." %}</p>
+            <span class="badge text-bg-secondary text-uppercase">{{ sub.status|default:_("Unknown") }}</span>
           {% endif %}
         {% else %}
-          <p class="text-muted mb-3">Pick a plan to unlock invoices, estimates, projects, time tracking, and reports.</p>
+          <p class="text-muted mb-2">
+            {% blocktrans %}Pick a plan to unlock invoices, estimates, projects, time tracking, and reports.{% endblocktrans %}
+          </p>
+          <span class="badge text-bg-secondary text-uppercase">{% trans "No plan" %}</span>
         {% endif %}
 
-        <div class="d-flex flex-wrap gap-2">
-          <a class="btn btn-primary" href="{% url 'billing:plans' %}">Choose a plan</a>
+        <div class="mt-3 d-flex flex-wrap gap-2">
+          {# Primary CTA logic: show Choose Plan unless already active #}
+          {% if not sub or sub.status != "active" %}
+            <a class="btn btn-primary" href="{% url 'billing:plans' %}" role="button">{% trans "Choose a plan" %}</a>
+          {% endif %}
 
           {% if company and company.subscription and company.subscription.stripe_customer_id %}
-            <a class="btn btn-outline-secondary" href="{% url 'billing:portal' %}">Manage billing</a>
+            <a class="btn btn-outline-secondary" href="{% url 'billing:portal' %}" role="button">{% trans "Manage billing" %}</a>
           {% endif %}
 
           {% if company %}
-            <a class="btn btn-outline-secondary" href="{% url 'core:company_edit' %}">Company settings</a>
+            <a class="btn btn-outline-secondary" href="{% url 'company:company_edit' %}" role="button">{% trans "Company settings" %}</a>
           {% endif %}
         </div>
       </div>
@@ -45,45 +64,45 @@
     <!-- Features & Next steps -->
     <div class="card shadow-sm mt-3">
       <div class="card-body">
-        <h3 class="h6 mb-3">What you’ll get</h3>
+        <h3 class="h6 mb-3">{% trans "What you’ll get" %}</h3>
         <div class="row g-3">
           <div class="col-12 col-md-6">
             <div class="border rounded p-3 h-100">
-              <strong>Invoices & payments</strong>
-              <p class="text-muted mb-0">Send branded invoices, accept online payments, auto-remind, and track status.</p>
+              <strong>{% trans "Invoices & payments" %}</strong>
+              <p class="text-muted mb-0">{% trans "Send branded invoices, accept online payments, auto-remind, and track status." %}</p>
             </div>
           </div>
           <div class="col-12 col-md-6">
             <div class="border rounded p-3 h-100">
-              <strong>Projects & time</strong>
-              <p class="text-muted mb-0">Track time, approve timesheets, convert to invoices in a click.</p>
+              <strong>{% trans "Projects & time" %}</strong>
+              <p class="text-muted mb-0">{% trans "Track time, approve timesheets, convert to invoices in a click." %}</p>
             </div>
           </div>
           <div class="col-12 col-md-6">
             <div class="border rounded p-3 h-100">
-              <strong>Estimates</strong>
-              <p class="text-muted mb-0">Share estimates for e-signature and convert to projects/invoices.</p>
+              <strong>{% trans "Estimates" %}</strong>
+              <p class="text-muted mb-0">{% trans "Share estimates for e-signature and convert to projects/invoices." %}</p>
             </div>
           </div>
           <div class="col-12 col-md-6">
             <div class="border rounded p-3 h-100">
-              <strong>Reports</strong>
-              <p class="text-muted mb-0">Quick insights on cash flow, profit &amp; loss, and more.</p>
+              <strong>{% trans "Reports" %}</strong>
+              <p class="text-muted mb-0">{% trans "Quick insights on cash flow, profit & loss, and more." %}</p>
             </div>
           </div>
         </div>
 
         <hr class="my-4">
 
-        <h3 class="h6 mb-2">Recommended next steps</h3>
+        <h3 class="h6 mb-2">{% trans "Recommended next steps" %}</h3>
         <ol class="mb-0">
           {% if not company %}
-            <li><a href="{% url 'core:company_edit' %}">Add your company name &amp; logo</a></li>
+            <li><a href="{% url 'company:company_edit' %}">{% trans "Add your company name & logo" %}</a></li>
           {% else %}
-            <li><a href="{% url 'core:company_edit' %}">Check your company settings</a></li>
+            <li><a href="{% url 'company:company_edit' %}">{% trans "Check your company settings" %}</a></li>
           {% endif %}
-          <li><a href="{% url 'billing:plans' %}">Select a subscription plan</a></li>
-          <li>Invite a teammate from <a href="{% url 'core:team_list' %}">Team</a> (optional)</li>
+          <li><a href="{% url 'billing:plans' %}">{% trans "Select a subscription plan" %}</a></li>
+          <li>{% blocktrans %}Invite a teammate from <a href="{% url 'company:team_list' %}">Team</a> (optional){% endblocktrans %}</li>
         </ol>
       </div>
     </div>
@@ -93,14 +112,15 @@
   <div class="col-12 col-lg-4">
     <div class="card shadow-sm">
       <div class="card-body">
-        <h3 class="h6 mb-2">Need help?</h3>
+        <h3 class="h6 mb-2">{% trans "Need help?" %}</h3>
         <ul class="list-unstyled mb-0">
-          <li><a href="{% url 'dashboard:help_article' 'getting-started' %}" class="text-decoration-none">Getting started guide</a></li>
-          <li><a href="{% url 'dashboard:help_article' 'invoices' %}" class="text-decoration-none">How billing works</a></li>
-          <li><a href="{% url 'dashboard:contact' %}" class="text-decoration-none">Contact support</a></li>
+          <li><a href="{% url 'dashboard:help_article' 'getting-started' %}" class="text-decoration-none">{% trans "Getting started guide" %}</a></li>
+          <li><a href="{% url 'dashboard:help_article' 'invoices' %}" class="text-decoration-none">{% trans "How billing works" %}</a></li>
+          <li><a href="{% url 'dashboard:contact' %}" class="text-decoration-none">{% trans "Contact support" %}</a></li>
         </ul>
       </div>
     </div>
   </div>
 </div>
 {% endblock %}
+

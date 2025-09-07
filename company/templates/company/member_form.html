@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block page_title %}Edit Member{% endblock %}
+
+{% block app_content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+
+    {# Header with avatar or initial + identity #}
+    {% firstof member.user.get_full_name member.user.email member.user.get_username as display_name %}
+    <div class="d-flex align-items-center gap-3 mb-3">
+      {% with avatar=member.user.profile.avatar|default:None %}
+        {% if avatar %}
+          <img src="{{ avatar.url }}" alt="" class="rounded-circle"
+               style="width:48px;height:48px;object-fit:cover;">
+        {% else %}
+          <div class="rounded-circle bg-light d-flex align-items-center justify-content-center"
+               style="width:48px;height:48px;" aria-hidden="true">
+            <span class="fw-semibold">{{ display_name|slice:":1"|upper }}</span>
+          </div>
+        {% endif %}
+      {% endwith %}
+      <div>
+        <div class="fw-semibold">{{ display_name }}</div>
+        <div class="text-muted small">
+          {{ member.company.name }} · {{ member.get_role_display|default:member.role|capfirst }}
+          {% if member.job_title %} ({{ member.job_title }}){% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# Notices #}
+    {% if member.role == 'owner' %}
+      <div class="alert alert-warning py-2 mb-3">
+        You’re editing an <strong>Owner</strong>. Some changes may be restricted.
+      </div>
+    {% elif is_self %}
+      <div class="alert alert-info py-2 mb-3">
+        You’re editing your own membership.
+      </div>
+    {% endif %}
+
+    <form method="post" class="row g-3">
+      {% csrf_token %}
+
+      {# Non-field errors #}
+      {% if form.non_field_errors %}
+        <div class="col-12">
+          <div class="alert alert-danger mb-0">
+            {{ form.non_field_errors }}
+          </div>
+        </div>
+      {% endif %}
+
+      {# Role (editable or read-only) #}
+      <div class="col-12 col-md-4">
+        <label class="form-label" for="{{ form.role.id_for_label }}">Role</label>
+
+        {% if can_edit_role %}
+          {{ form.role }}
+          {% if form.role.errors %}
+            <div class="text-danger small mt-1">{{ form.role.errors|join:", " }}</div>
+          {% endif %}
+          <div class="form-text">Controls what this member can access.</div>
+        {% else %}
+          <div class="form-control-plaintext">
+            <span class="badge bg-secondary-subtle text-dark border">
+              {{ member.get_role_display|default:member.role|capfirst }}
+            </span>
+          </div>
+          <input type="hidden" name="{{ form.role.name }}" value="{{ form.role.value }}">
+          <div class="form-text text-muted">You don’t have permission to change roles.</div>
+        {% endif %}
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label" for="{{ form.job_title.id_for_label }}">Job title</label>
+        {{ form.job_title }}
+        {% if form.job_title.errors %}
+          <div class="text-danger small mt-1">{{ form.job_title.errors|join:", " }}</div>
+        {% endif %}
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label" for="{{ form.hourly_rate.id_for_label }}">Hourly rate</label>
+        <div class="input-group">
+          <span class="input-group-text">$</span>
+          {{ form.hourly_rate }}
+        </div>
+        <div class="form-text">Optional. Used for reports/invoicing.</div>
+        {% if form.hourly_rate.errors %}
+          <div class="text-danger small mt-1">{{ form.hourly_rate.errors|join:", " }}</div>
+        {% endif %}
+      </div>
+
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-primary">Save</button>
+        <a class="btn btn-outline-secondary" href="{% url 'company:team_list' %}">Cancel</a>
+      </div>
+    </form>
+
+    <hr class="my-4">
+
+    {# Danger zone: POST (safer than GET) #}
+    <div class="d-flex justify-content-between align-items-center">
+      <div class="text-muted small">Danger zone</div>
+      <div>
+        <form method="post"
+              action="{% url 'company:member_remove' member.id %}"
+              class="d-inline"
+              onsubmit="return confirm('Remove this member from the company? This cannot be undone.');">
+          {% csrf_token %}
+          <button
+            class="btn btn-outline-danger btn-sm"
+            type="submit"
+            {% if is_self or member.role == 'owner' or not can_remove %}disabled title="You can’t remove this member"{% endif %}>
+            Remove from company
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+

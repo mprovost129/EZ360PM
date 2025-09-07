@@ -1,18 +1,18 @@
 {% load static %}
 {% with consent_cookie_name=COOKIE_CONSENT_NAME|default:"cookie_consent" %}
 <style>
-  /* subtle, motion-safe fade */
-  #cookie-banner[hidden] { display: none !important; }
-  @media (prefers-reduced-motion: no-preference) {
-    #cookie-banner.showing { animation: cc-fade .2s ease-out both; }
-    @keyframes cc-fade { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
+  /* Subtle, motion-safe fade */
+  #cookie-banner[hidden]{display:none!important}
+  @media (prefers-reduced-motion:no-preference){
+    #cookie-banner.showing{animation:cc-fade .2s ease-out both}
+    @keyframes cc-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
   }
 </style>
 
 <div id="cookie-banner"
      class="position-fixed bottom-0 start-0 end-0 p-3"
      style="z-index:1080;" hidden
-     role="region" aria-label="Cookie notice">
+     role="region" aria-label="Cookie notice" aria-live="polite" aria-atomic="true">
   <div class="alert alert-dark border shadow-sm d-flex align-items-start gap-3 mb-0">
     <div class="flex-grow-1">
       <strong class="me-1">Cookies:</strong>
@@ -38,19 +38,31 @@
 
 <script>
 (function () {
-  var COOKIE_NAME = "{{ consent_cookie_name }}";
+  var COOKIE_NAME = "{{ consent_cookie_name|escapejs }}";
   var banner = document.getElementById("cookie-banner");
 
   function getCookie(n) {
-    var m = document.cookie.match(new RegExp('(^| )' + n.replace(/([.$?*|{}()[\\]\\/+^])/g,'\\$1') + '=([^;]+)'));
-    return m ? decodeURIComponent(m[2]) : null;
+    // Escape name for regex
+    var esc = n.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+    var m = document.cookie.match(new RegExp("(?:^|;\\s*)" + esc + "=([^;]*)"));
+    return m ? decodeURIComponent(m[1]) : null;
   }
   function hasConsent() { return !!getCookie(COOKIE_NAME); }
 
+  // Parse either JSON format: {"analytics":true,"marketing":false}
+  // or legacy querystring format: "v=1&ana=1&mkt=0"
   function parseConsent(v) {
-    // format: v=1&ana=0|1&mkt=0|1
     var out = { ana:false, mkt:false };
     if (!v) return out;
+    try {
+      var obj = JSON.parse(v);
+      if (obj && typeof obj === "object") {
+        out.ana = !!obj.analytics;
+        out.mkt = !!obj.marketing;
+        return out;
+      }
+    } catch (_){}
+    // Fallback to querystring-ish
     var parts = v.split("&");
     for (var i=0;i<parts.length;i++){
       var kv = parts[i].split("=");
@@ -66,7 +78,6 @@
     if (!banner) return;
     banner.hidden = false;
     banner.classList.add("showing");
-    // move focus for SR/keyboard
     banner.setAttribute("tabindex","-1");
     try { banner.focus({ preventScroll: true }); } catch(e){}
   }
@@ -75,8 +86,10 @@
     banner.hidden = true;
   }
 
-  // Conditional analytics loader (fires only after consent and only if enabled)
+  // Prevent duplicate loaders
+  var _analyticsLoaded = false;
   function loadAnalyticsIfConsented() {
+    if (_analyticsLoaded) return;
     var v = getCookie(COOKIE_NAME);
     var c = parseConsent(v);
 
@@ -85,9 +98,10 @@
     if (c.ana) {
       var s = document.createElement("script");
       s.defer = true;
-      s.setAttribute("data-domain", "{{ PLAUSIBLE_DOMAIN }}");
+      s.setAttribute("data-domain", "{{ PLAUSIBLE_DOMAIN|escapejs }}");
       s.src = "https://plausible.io/js/script.js";
       document.head.appendChild(s);
+      _analyticsLoaded = true;
     }
     {% endif %}
 
@@ -96,13 +110,14 @@
     if (c.ana) {
       var ga = document.createElement("script");
       ga.async = true;
-      ga.src = "https://www.googletagmanager.com/gtag/js?id={{ GA_MEASUREMENT_ID }}";
+      ga.src = "https://www.googletagmanager.com/gtag/js?id={{ GA_MEASUREMENT_ID|escapejs }}";
       document.head.appendChild(ga);
       window.dataLayer = window.dataLayer || [];
       function gtag(){ dataLayer.push(arguments); }
       window.gtag = gtag;
       gtag('js', new Date());
-      gtag('config', '{{ GA_MEASUREMENT_ID }}', { 'anonymize_ip': true });
+      gtag('config', '{{ GA_MEASUREMENT_ID|escapejs }}', { 'anonymize_ip': true });
+      _analyticsLoaded = true;
     }
     {% endif %}
   }
@@ -114,42 +129,40 @@
     loadAnalyticsIfConsented();
   }
 
-  // Progressive enhancement: AJAX-submit the quick actions (no page reload).
+  // CSRF helper (Django default cookie)
   function getCsrfToken() {
-    // Django default cookie name
     var m = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
     return m ? decodeURIComponent(m[1]) : null;
   }
 
-  if (banner) {
+  // AJAX-submit quick actions (no page reload)
+  if (banner && "fetch" in window && "FormData" in window) {
     banner.addEventListener("submit", function (ev) {
       var form = ev.target;
       if (!(form instanceof HTMLFormElement)) return;
       var action = form.getAttribute("data-cc-action");
-      if (!action || !window.fetch) return; // let normal POST happen
+      if (!action) return; // let normal POST happen
 
       ev.preventDefault();
       var fd = new FormData(form);
       var csrf = getCsrfToken();
+
       fetch(form.action, {
         method: "POST",
         headers: csrf ? {"X-CSRFToken": csrf} : {},
         body: fd,
         credentials: "same-origin"
       }).then(function () {
-        // Hide and load analytics on success
         hideBanner();
         loadAnalyticsIfConsented();
-        // Let other scripts know consent changed
         document.dispatchEvent(new CustomEvent("cookieconsent:updated"));
       }).catch(function () {
-        // Fallback: submit normally if fetch fails
-        form.submit();
+        form.submit(); // graceful fallback
       });
     });
   }
 
-  // Listen for consent changes triggered elsewhere (e.g., preferences page)
+  // Respond to consent changes elsewhere (preferences page)
   document.addEventListener("cookieconsent:updated", function () {
     if (hasConsent()) {
       hideBanner();
@@ -157,7 +170,7 @@
     }
   });
 
-  // Gentle fallback polling in case consent is set from another tab
+  // Cross-tab gentle polling (if user changes consent in another tab)
   var lastCookie = document.cookie;
   setInterval(function(){
     if (document.cookie !== lastCookie) {

@@ -1,13 +1,26 @@
-{# Call with: {% include "onboarding/_progress.html" with step="payments" %} #}
-{% with steps="company,client,project,payments,team"|cut:" " as s %}
-  {% firstof step "" as current %}
-  <div class="d-flex align-items-center gap-2 small text-muted mb-3">
-    {% for name in s|split:"," %}
-      {% if forloop.first %}{% endif %}
-      <span class="{% if name == current %}fw-semibold text-body{% endif %}">
-        {{ name|title }}
-      </span>
-      {% if not forloop.last %}<span>›</span>{% endif %}
-    {% endfor %}
-  </div>
+{# templates/onboarding/_progress.html #}
+{# Usage: {% include "onboarding/_progress.html" with step="payments" %} #}
+
+{% with current=step|default:"" %}
+<div class="d-flex align-items-center gap-2 small text-muted mb-3">
+  <span class="{% if current == 'company' %}fw-semibold text-body{% endif %}" {% if current == 'company' %}aria-current="step"{% endif %}>
+    Company
+  </span>
+  <span>›</span>
+  <span class="{% if current == 'client' %}fw-semibold text-body{% endif %}" {% if current == 'client' %}aria-current="step"{% endif %}>
+    Client
+  </span>
+  <span>›</span>
+  <span class="{% if current == 'project' %}fw-semibold text-body{% endif %}" {% if current == 'project' %}aria-current="step"{% endif %}>
+    Project
+  </span>
+  <span>›</span>
+  <span class="{% if current == 'payments' %}fw-semibold text-body{% endif %}" {% if current == 'payments' %}aria-current="step"{% endif %}>
+    Payments
+  </span>
+  <span>›</span>
+  <span class="{% if current == 'team' %}fw-semibold text-body{% endif %}" {% if current == 'team' %}aria-current="step"{% endif %}>
+    Team
+  </span>
+</div>
 {% endwith %}

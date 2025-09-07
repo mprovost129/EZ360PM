@@ -1,13 +1,25 @@
 {% extends "dashboard/help/_article_base.html" %}
-{% block help_title %}Estimates & Proposals{% endblock %}
-{% block help_intro %}Create estimates for client approval and convert them into projects or invoices.{% endblock %}
+
+{% block help_title %}Estimates &amp; Proposals{% endblock %}
+{% block help_intro %}Create professional estimates for client approval and seamlessly convert them into projects or invoices in {{ APP_NAME }}.{% endblock %}
+
 {% block help_body %}
-<ol class="mb-4">
-  <li><strong>Create an estimate:</strong> Go to <em>Estimates</em> → <em>New</em>. Add client, scope, rates, and terms.</li>
-  <li><strong>Send for approval:</strong> Email the share link for e-signature or download a PDF.</li>
-  <li><strong>Convert:</strong> After approval, convert to a <em>Project</em> (to track time) or directly to an <em>Invoice</em>.</li>
+<h2 class="h6 mt-3">Workflow</h2>
+<ol class="mb-4" aria-label="Steps for creating and managing estimates">
+  <li>
+    <strong>Create an estimate:</strong> Go to <em>Estimates</em> → <em>New</em>. Add client details, scope of work,
+    rates, and terms.
+  </li>
+  <li>
+    <strong>Send for approval:</strong> Share the secure link for e-signature or download a PDF to send manually.
+  </li>
+  <li>
+    <strong>Convert:</strong> Once approved, convert the estimate into a <em>Project</em> (to track time and expenses)
+    or directly into an <em>Invoice</em> for billing.
+  </li>
 </ol>
-<div class="alert alert-info small">
-  <strong>Tip:</strong> Save an estimate as a template to reuse structure and terms.
+
+<div class="alert alert-info small" role="note">
+  <strong>Tip:</strong> Save an estimate as a template to quickly reuse its structure, line items, and terms.
 </div>
 {% endblock %}

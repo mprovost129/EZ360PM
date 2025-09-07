@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block page_title %}Edit Company{% endblock %}
+
+{% block app_content %}
+<form method="post" enctype="multipart/form-data" novalidate id="companyForm">
+  {% csrf_token %}
+
+  {# Top-level (non-field) errors #}
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger">
+      {{ form.non_field_errors }}
+    </div>
+  {% endif %}
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="row g-3">
+
+        {# Company name #}
+        <div class="col-md-6">
+          {{ form.name.label_tag }}
+          {{ form.name }}
+          {% if form.name.errors %}
+            <div class="invalid-feedback d-block">{{ form.name.errors|striptags }}</div>
+          {% endif %}
+          <div class="form-text">Your business name (e.g., “Acme LLC”).</div>
+        </div>
+
+        {# Phone #}
+        <div class="col-md-6">
+          {{ form.admin_phone.label_tag }}
+          {{ form.admin_phone }}
+          {% if form.admin_phone.errors %}
+            <div class="invalid-feedback d-block">{{ form.admin_phone.errors|striptags }}</div>
+          {% endif %}
+        </div>
+
+        {# Admin contact #}
+        <div class="col-md-6">
+          {{ form.admin_first_name.label_tag }}
+          {{ form.admin_first_name }}
+          {% if form.admin_first_name.errors %}
+            <div class="invalid-feedback d-block">{{ form.admin_first_name.errors|striptags }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-md-6">
+          {{ form.admin_last_name.label_tag }}
+          {{ form.admin_last_name }}
+          {% if form.admin_last_name.errors %}
+            <div class="invalid-feedback d-block">{{ form.admin_last_name.errors|striptags }}</div>
+          {% endif %}
+        </div>
+
+        {# Address lines #}
+        <div class="col-12">
+          {{ form.address_1.label_tag }}
+          {{ form.address_1 }}
+          {% if form.address_1.errors %}
+            <div class="invalid-feedback d-block">{{ form.address_1.errors|striptags }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-12">
+          {{ form.address_2.label_tag }}
+          {{ form.address_2 }}
+          {% if form.address_2.errors %}
+            <div class="invalid-feedback d-block">{{ form.address_2.errors|striptags }}</div>
+          {% endif %}
+          <div class="form-text">Apartment, suite, unit, etc. (optional)</div>
+        </div>
+
+        {# City / State / ZIP #}
+        <div class="col-md-6">
+          {{ form.city.label_tag }}
+          {{ form.city }}
+          {% if form.city.errors %}
+            <div class="invalid-feedback d-block">{{ form.city.errors|striptags }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-md-3">
+          {{ form.state.label_tag }}
+          {{ form.state }}
+          {% if form.state.errors %}
+            <div class="invalid-feedback d-block">{{ form.state.errors|striptags }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-md-3">
+          {{ form.zip_code.label_tag }}
+          {{ form.zip_code }}
+          {% if form.zip_code.errors %}
+            <div class="invalid-feedback d-block">{{ form.zip_code.errors|striptags }}</div>
+          {% endif %}
+        </div>
+
+        {# Logo + Preview #}
+        <div class="col-12 col-lg-8">
+          {{ form.company_logo.label_tag }}
+          {{ form.company_logo }}
+          {% if form.company_logo.errors %}
+            <div class="invalid-feedback d-block">{{ form.company_logo.errors|striptags }}</div>
+          {% endif %}
+          <div class="form-text">
+            PNG/JPG/WebP. Square is best; ~512×512 looks crisp. Transparent PNG recommended. Max 5 MB.
+          </div>
+          {# ClearableFileInput will render its “Currently / Change / Clear” UI here #}
+        </div>
+
+        <div class="col-12 col-lg-4">
+          <label class="form-label d-block">Preview</label>
+          <div class="border rounded d-flex align-items-center justify-content-center" style="height: 90px;">
+            {% if form.instance.company_logo %}
+              <img id="logoPreview"
+                   src="{{ form.instance.company_logo.url }}"
+                   alt="{{ form.instance.name|default:'Company' }} logo"
+                   style="max-height:80px; width:auto;">
+            {% else %}
+              <img id="logoPreview" alt="Logo preview" style="display:none; max-height:80px; width:auto;">
+              <div id="logoEmpty" class="text-muted small">No logo uploaded.</div>
+            {% endif %}
+          </div>
+          <div id="logoHelp" class="form-text mt-2 d-none"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="card-footer d-flex justify-content-between">
+      <a class="btn btn-outline-secondary" href="{% url 'company:company_profile' %}">Cancel</a>
+      <button class="btn btn-primary" type="submit" id="saveBtn">
+        <span class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
+        Save
+      </button>
+    </div>
+  </div>
+</form>
+
+<script>
+  // Live image preview, clear checkbox handling, basic file validation, and double-submit guard
+  (function () {
+    const input = document.getElementById('{{ form.company_logo.id_for_label }}');
+    const img   = document.getElementById('logoPreview');
+    const empty = document.getElementById('logoEmpty');
+    const msg   = document.getElementById('logoHelp');
+    const form  = document.getElementById('companyForm');
+    const btn   = document.getElementById('saveBtn');
+
+    const MB = 1024 * 1024;
+    const MAX_SIZE = 5 * MB;
+    const OK_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+
+    function showPreviewFromFile(file) {
+      const url = URL.createObjectURL(file);
+      img.src = url;
+      img.style.display = '';
+      if (empty) empty.style.display = 'none';
+    }
+
+    function showEmptyPreview() {
+      if (img) { img.removeAttribute('src'); img.style.display = 'none'; }
+      if (empty) empty.style.display = '';
+    }
+
+    if (input && img) {
+      input.addEventListener('change', function () {
+        const file = this.files && this.files[0];
+        if (!file) { return; }
+
+        // Basic type/size checks
+        let error = '';
+        if (!OK_TYPES.includes(file.type)) {
+          error = 'Please upload a PNG, JPG, or WebP image.';
+        } else if (file.size > MAX_SIZE) {
+          error = 'That file is too large. Max size is 5 MB.';
+        }
+
+        if (error) {
+          if (msg) { msg.textContent = error; msg.classList.remove('d-none'); }
+          this.value = ''; // reset
+          showEmptyPreview();
+          return;
+        }
+
+        if (msg) { msg.textContent = ''; msg.classList.add('d-none'); }
+        showPreviewFromFile(file);
+      });
+    }
+
+    // Handle ClearableFileInput's "clear" checkbox (Django names it like "<name>-clear_id")
+    (function attachClearHandler() {
+      if (!input) return;
+      const clearId = input.name + '-clear_id';
+      const clearEl = document.getElementById(clearId);
+      if (!clearEl) return;
+      clearEl.addEventListener('change', function () {
+        if (this.checked) {
+          showEmptyPreview();
+          if (msg) { msg.textContent = ''; msg.classList.add('d-none'); }
+        } else if (input.files && input.files[0]) {
+          showPreviewFromFile(input.files[0]);
+        }
+      });
+    })();
+
+    // Double-submit guard
+    if (form && btn) {
+      form.addEventListener('submit', function () {
+        const sp = btn.querySelector('.spinner-border');
+        if (sp) sp.classList.remove('d-none');
+        btn.setAttribute('disabled', 'disabled');
+      });
+    }
+  })();
+</script>
+{% endblock %}
+

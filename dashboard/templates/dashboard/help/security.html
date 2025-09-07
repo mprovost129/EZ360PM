@@ -1,12 +1,30 @@
 {% extends "dashboard/help/_article_base.html" %}
+
 {% block help_title %}Privacy & Security{% endblock %}
-{% block help_intro %}Overview of security practices, backups, and data retention.{% endblock %}
+{% block help_intro %}Overview of security practices, backups, and data retention in {{ APP_NAME }}.{% endblock %}
+
 {% block help_body %}
+<h2 class="h6 mt-3">Security Practices</h2>
 <ul class="mb-3">
-  <li><strong>Transport security:</strong> All traffic uses HTTPS/TLS.</li>
-  <li><strong>Data protection:</strong> Role-based access controls; limited staff access.</li>
-  <li><strong>Backups:</strong> Regular backups and tested restores.</li>
-  <li><strong>Privacy:</strong> See our <a href="{% url 'dashboard:privacy' %}">Privacy Policy</a> and <a href="{% url 'dashboard:subprocessors' %}">Subprocessors</a>.</li>
+  <li><strong>Transport security:</strong> All traffic is encrypted with HTTPS/TLS.</li>
+  <li><strong>Data protection:</strong> Role-based access controls with limited staff access.</li>
+  <li><strong>Account safety:</strong> Strong passwords required; optional two-factor authentication if enabled.</li>
 </ul>
-<p class="mb-0">Questions? Contact <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
+
+<h2 class="h6 mt-3">Reliability &amp; Backups</h2>
+<ul class="mb-3">
+  <li><strong>Backups:</strong> Regular encrypted backups with tested restore procedures.</li>
+  <li><strong>Uptime:</strong> Monitored infrastructure with redundant systems.</li>
+</ul>
+
+<h2 class="h6 mt-3">Privacy</h2>
+<p class="mb-3">
+  For details on how we handle your data, see our
+  <a href="{% url 'dashboard:privacy' %}">Privacy Policy</a> and the list of
+  <a href="{% url 'dashboard:subprocessors' %}">Subprocessors</a>.
+</p>
+
+<p class="mb-0">
+  Questions? Contact <a href="mailto:{{ support_email }}">{{ support_email }}</a>.
+</p>
 {% endblock %}

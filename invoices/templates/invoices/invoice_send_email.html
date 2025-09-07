@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load humanize tz %}
+
+{% block page_title %}
+  {% if mode == "reminder" %}Send Reminder — {{ inv.number }}{% else %}Send Invoice — {{ inv.number }}{% endif %}
+{% endblock %}
+
+{% block app_content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+
+    {# Invoice summary header #}
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-md-3">
+        <div class="text-muted small">Invoice #</div>
+        <div class="fw-semibold">{{ inv.number }}</div>
+      </div>
+      <div class="col-12 col-md-3">
+        <div class="text-muted small">Client</div>
+        <div class="fw-semibold">{{ inv.client }}</div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="text-muted small">Issued</div>
+        <div>{{ inv.issue_date|date:'Y-m-d' }}</div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="text-muted small">Due</div>
+        <div>{{ inv.due_date|date:'Y-m-d'|default:"—" }}</div>
+      </div>
+      <div class="col-12 col-md-2 text-md-end">
+        <div class="text-muted small">Balance</div>
+        <div class="fw-semibold">${{ inv.balance|floatformat:2|intcomma }}</div>
+      </div>
+    </div>
+
+    {# Helpful hint + reminder meta #}
+    <div class="text-muted small mb-3">
+      Subject is generated automatically. A PDF and public link will be included.
+      {% if mode == "reminder" and inv.last_reminder_sent_at %}
+      <span class="ms-2">
+        Last reminder: {{ inv.last_reminder_sent_at|localtime|date:"Y-m-d H:i" }}
+      </span>
+      {% endif %}
+    </div>
+
+    {% if not default_to %}
+      <div class="alert alert-warning py-2" role="alert">
+        No default recipient found for this client. Please enter an email address below.
+      </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      <div class="mb-3">
+        <label class="form-label" for="emailTo">To</label>
+        <input id="emailTo"
+          type="email"
+          name="to"
+          class="form-control"
+          required
+          autocomplete="email"
+          inputmode="email"
+          value="{{ request.POST.to|default:default_to }}"
+          placeholder="client@example.com">
+        <div class="form-text">Send to the client’s billing contact.</div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" for="emailNote">
+          {% if mode == "reminder" %}Reminder message{% else %}Message (optional){% endif %}
+        </label>
+        <textarea id="emailNote"
+          name="note"
+          class="form-control"
+          rows="4"
+          placeholder="{% if mode == 'reminder' %}Friendly reminder about your invoice…{% else %}Add a short note to your client…{% endif %}">{{ request.POST.note }}</textarea>
+        {% if mode != "reminder" %}
+          <div class="form-text">Keep it brief—your invoice details and total are already included.</div>
+        {% endif %}
+      </div>
+
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit">
+          {% if mode == "reminder" %}Send reminder{% else %}Send invoice{% endif %}
+        </button>
+        <a class="btn btn-outline-secondary" href="{% url 'invoices:invoice_detail' inv.pk %}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

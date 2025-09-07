@@ -1,0 +1,148 @@
+{% extends "_public.html" %}
+{% load humanize %}
+
+{% block title %}Invoice {{ inv.number }}{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:960px">
+
+  {# --- Header: Company & Invoice Meta --- #}
+  <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3">
+    <div class="d-flex align-items-start gap-3">
+      {% if inv.company.logo %}
+        <img src="{{ inv.company.logo.url }}" alt="{{ inv.company.name }}" style="height:48px;width:auto;">
+      {% endif %}
+      <div>
+        <div class="fw-semibold">{{ inv.company.name }}</div>
+        {% if inv.company.address %}<div class="text-muted small">{{ inv.company.address|linebreaksbr }}</div>{% endif %}
+        {% if inv.company.phone %}<div class="text-muted small">{{ inv.company.phone }}</div>{% endif %}
+      </div>
+    </div>
+    <div class="text-end">
+      <div class="mb-1">
+        <span class="badge {% if inv.status == 'paid' %}bg-success{% elif inv.status == 'sent' %}bg-primary{% elif inv.status == 'void' %}bg-secondary{% else %}bg-warning text-dark{% endif %} text-uppercase">
+          {{ inv.status }}
+        </span>
+      </div>
+      <div class="text-muted small">Invoice #</div>
+      <div class="fw-semibold">{{ inv.number }}</div>
+      <div class="text-muted small mt-2">Currency</div>
+      <div class="fw-semibold">{{ inv.currency|upper }}</div>
+    </div>
+  </div>
+
+  {# --- Bill To / Dates --- #}
+  <div class="row g-3 mb-3">
+    <div class="col-md-7">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted small">Bill To</div>
+          <div class="fw-semibold">{{ inv.client }}</div>
+          {% if inv.client.address %}<div class="text-muted small">{{ inv.client.address|linebreaksbr }}</div>{% endif %}
+          {% if inv.client.email %}<div class="text-muted small">{{ inv.client.email }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-5">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <div class="text-muted small">Issued</div>
+            <div>{{ inv.issue_date|date:'Y-m-d' }}</div>
+          </div>
+          <div class="d-flex justify-content-between">
+            <div class="text-muted small">Due</div>
+            <div>{% if inv.due_date %}{{ inv.due_date|date:'Y-m-d' }}{% else %}—{% endif %}</div>
+          </div>
+          <hr class="my-2">
+          <div class="d-flex justify-content-between">
+            <div class="text-muted small">Balance</div>
+            <div class="fw-semibold">${{ inv.balance|floatformat:2|intcomma }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# --- Line Items --- #}
+  <div class="card shadow-sm mb-3">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <colgroup>
+          <col>
+          <col style="width:120px">
+          <col style="width:140px">
+          <col style="width:160px">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th class="text-end">Qty</th>
+            <th class="text-end">Unit</th>
+            <th class="text-end">Line</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in inv.items.all %}
+            <tr>
+              <td>{{ it.description }}</td>
+              <td class="text-end">{{ it.qty|floatformat:2|intcomma }}</td>
+              <td class="text-end">${{ it.unit_price|floatformat:2|intcomma }}</td>
+              <td class="text-end">${{ it.line_total|floatformat:2|intcomma }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="text-center text-muted py-4">No items.</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <th colspan="3" class="text-end">Subtotal</th>
+            <th class="text-end">${{ inv.subtotal|floatformat:2|intcomma }}</th>
+          </tr>
+          <tr>
+            <th colspan="3" class="text-end">Tax</th>
+            <th class="text-end">${{ inv.tax|floatformat:2|intcomma }}</th>
+          </tr>
+          <tr>
+            <th colspan="3" class="text-end">Total</th>
+            <th class="text-end">${{ inv.total|floatformat:2|intcomma }}</th>
+          </tr>
+          <tr>
+            <th colspan="3" class="text-end">Paid</th>
+            <th class="text-end">${{ inv.amount_paid|floatformat:2|intcomma }}</th>
+          </tr>
+          <tr>
+            <th colspan="3" class="text-end">Balance</th>
+            <th class="text-end">${{ inv.balance|floatformat:2|intcomma }}</th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  {# --- Actions --- #}
+  {% if inv.balance > 0 and inv.status != 'void' %}
+    <div class="d-grid gap-2 d-sm-flex justify-content-sm-between align-items-center mb-3">
+      <a class="btn btn-primary btn-lg" href="{% url 'invoices:invoice_checkout' token=inv.public_token %}">
+        Pay ${{ inv.balance|floatformat:2|intcomma }} securely
+      </a>
+      <button class="btn btn-outline-secondary" onclick="window.print()">Print</button>
+    </div>
+  {% else %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="alert alert-success mb-0">This invoice is paid. Thank you!</div>
+      <button class="btn btn-outline-secondary" onclick="window.print()">Print</button>
+    </div>
+  {% endif %}
+
+  {# --- Notes --- #}
+  {% if inv.notes %}
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-1">Notes</div>
+        <div class="text-muted">{{ inv.notes|linebreaks }}</div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

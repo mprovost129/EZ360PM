@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block page_title %}{% if form.instance.pk %}Edit Recurring Plan{% else %}New Recurring Plan{% endif %}{% endblock %}
+{% block app_content %}
+
+<div class="card shadow-sm">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-3">
+      <strong class="mb-0">{% if form.instance.pk %}Edit Plan{% else %}Create Plan{% endif %}</strong>
+      {% if form.instance.pk %}
+        <span class="badge text-bg-light text-capitalize">{{ form.instance.status|default:"draft" }}</span>
+        {% if form.instance.next_run_date %}
+          <span class="text-muted small">Next: {{ form.instance.next_run_date|date:"Y-m-d" }}</span>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    {% if form.instance.pk %}
+      <div class="d-flex gap-2">
+        <form method="post" action="{% url 'invoices:recurring_run_now' form.instance.pk %}" class="d-inline">
+          {% csrf_token %}
+          <button class="btn btn-sm btn-outline-primary"
+                  {% if form.instance.status != 'active' %}disabled title="Plan is paused"{% endif %}>
+            Run now
+          </button>
+        </form>
+        <form method="post" action="{% url 'invoices:recurring_toggle' form.instance.pk %}" class="d-inline">
+          {% csrf_token %}
+          {% if form.instance.status == 'active' %}
+            <button class="btn btn-sm btn-outline-warning">Pause</button>
+          {% else %}
+            <button class="btn btn-sm btn-outline-success">Activate</button>
+          {% endif %}
+        </form>
+        <form method="post" action="{% url 'invoices:recurring_delete' form.instance.pk %}"
+              class="d-inline"
+              onsubmit="return confirm('Delete this recurring plan? This cannot be undone.');">
+          {% csrf_token %}
+          <button class="btn btn-sm btn-outline-danger">Delete</button>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card-body">
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">
+        <ul class="mb-0">{% for err in form.non_field_errors %}<li>{{ err }}</li>{% endfor %}</ul>
+      </div>
+    {% endif %}
+
+    <form method="post" class="row g-3" novalidate>
+      {% csrf_token %}
+
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.title.id_for_label }}">Title</label>
+        {{ form.title }}
+        {% if form.title.help_text %}<div class="form-text">{{ form.title.help_text }}</div>{% endif %}
+        {% if form.title.errors %}<div class="invalid-feedback d-block">{% for e in form.title.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.client.id_for_label }}">Client</label>
+        {{ form.client }}
+        {% if form.client.errors %}<div class="invalid-feedback d-block">{% for e in form.client.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.project.id_for_label }}">Project (optional)</label>
+        {{ form.project }}
+        {% if form.project.errors %}<div class="invalid-feedback d-block">{% for e in form.project.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.template_invoice.id_for_label }}">Template Invoice (optional)</label>
+        {{ form.template_invoice }}
+        <div class="form-text">Items/notes/tax copied each cycle.</div>
+        {% if form.template_invoice.errors %}<div class="invalid-feedback d-block">{% for e in form.template_invoice.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label" for="{{ form.frequency.id_for_label }}">Frequency</label>
+        {{ form.frequency }}
+        {% if form.frequency.errors %}<div class="invalid-feedback d-block">{% for e in form.frequency.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label" for="{{ form.start_date.id_for_label }}">Start date</label>
+        {{ form.start_date }}
+        {% if form.start_date.errors %}<div class="invalid-feedback d-block">{% for e in form.start_date.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label" for="{{ form.next_run_date.id_for_label }}">Next run date</label>
+        {{ form.next_run_date }}
+        <div class="form-text">First issue date shown below; preview updates as you change fields.</div>
+        {% if form.next_run_date.errors %}<div class="invalid-feedback d-block">{% for e in form.next_run_date.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label" for="{{ form.end_date.id_for_label }}">End date</label>
+        {{ form.end_date }}
+        {% if form.end_date.errors %}<div class="invalid-feedback d-block">{% for e in form.end_date.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label" for="{{ form.due_days.id_for_label }}">Due days</label>
+        {{ form.due_days }}
+        <div class="form-text">Days after issue date for due date.</div>
+        {% if form.due_days.errors %}<div class="invalid-feedback d-block">{% for e in form.due_days.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label" for="{{ form.status.id_for_label }}">Status</label>
+        {{ form.status }}
+        {% if form.status.errors %}<div class="invalid-feedback d-block">{% for e in form.status.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+      </div>
+
+      <div class="col-12 col-md-4">
+        <div class="form-check mt-4">
+          {{ form.auto_email }}
+          <label class="form-check-label" for="{{ form.auto_email.id_for_label }}">Auto email invoice</label>
+          {% if form.auto_email.errors %}<div class="invalid-feedback d-block">{% for e in form.auto_email.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+        </div>
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label" for="{{ form.max_occurrences.id_for_label }}">Max occurrences</label>
+        {{ form.max_occurrences }}
+        <div class="form-text">Stop after N issues (optional).</div>
+        {% if form.max_occurrences.errors %}<div class="invalid-feedback d-block">{% for e in form.max_occurrences.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+      </div>
+
+      <div class="col-12">
+        <div class="text-muted small">
+          Upcoming issues (preview): <span id="schedPreview">—</span>
+        </div>
+      </div>
+
+      <div class="col-12 d-flex gap-2 mt-2">
+        <button class="btn btn-primary" type="submit">Save</button>
+        <a class="btn btn-outline-secondary" href="{% url 'invoices:recurring_list' %}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Format a Date as YYYY-MM-DD in LOCAL time (avoid UTC shift).
+  function fmtLocal(d) {
+    if (!(d instanceof Date) || isNaN(d)) return "";
+    const k = d.getTime() - d.getTimezoneOffset() * 60000;
+    return new Date(k).toISOString().slice(0, 10);
+  }
+
+  function parseYMD(s) {
+    // s = "YYYY-MM-DD" -> Date in local time (midnight)
+    if (!s) return null;
+    const [y, m, d] = s.split("-").map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d);
+  }
+
+  function addDaysStr(ymd, days) {
+    const d = parseYMD(ymd);
+    if (!d) return null;
+    d.setDate(d.getDate() + Number(days || 0));
+    return d;
+  }
+
+  function addMonthsClampStr(ymd, m) {
+    const d = parseYMD(ymd);
+    if (!d) return null;
+    const day = d.getDate();
+    const target = new Date(d);
+    target.setMonth(target.getMonth() + m);
+
+    // If month rolled and day changed, clamp to end-of-month
+    if (target.getDate() !== day) {
+      // set to day 0 of next month => last day of previous month
+      target.setDate(0);
+    }
+    return target;
+  }
+
+  function advanceDates(startYMD, freq, n) {
+    const out = [];
+    let cur = parseYMD(startYMD);
+    if (!cur) return out;
+    for (let i = 0; i < n; i++) {
+      out.push(fmtLocal(cur));
+      if (freq === 'weekly') {
+        cur = addDaysStr(fmtLocal(cur), 7);
+      } else if (freq === 'monthly') {
+        cur = addMonthsClampStr(fmtLocal(cur), 1);
+      } else if (freq === 'quarterly') {
+        cur = addMonthsClampStr(fmtLocal(cur), 3);
+      } else if (freq === 'yearly') {
+        cur = addMonthsClampStr(fmtLocal(cur), 12);
+      } else {
+        break;
+      }
+    }
+    return out;
+  }
+
+  function $(id) { return document.getElementById(id); }
+
+  function refreshPreview() {
+    const freqEl = $('{{ form.frequency.id_for_label }}');
+    const nextEl = $('{{ form.next_run_date.id_for_label }}');
+    const startEl = $('{{ form.start_date.id_for_label }}');
+    const dueDaysEl = $('{{ form.due_days.id_for_label }}');
+
+    const freq = (freqEl && freqEl.value) || 'monthly';
+    const start = (nextEl && nextEl.value) || (startEl && startEl.value) || '';
+    const dueDays = dueDaysEl && dueDaysEl.value ? parseInt(dueDaysEl.value, 10) : 0;
+
+    const span = document.getElementById('schedPreview');
+    if (!start) { span.textContent = '—'; return; }
+
+    const issues = advanceDates(start, freq, 3);
+    const pairs = issues.map(iss => {
+      const due = dueDays ? addDaysStr(iss, dueDays) : null;
+      const dueStr = due ? fmtLocal(due) : '—';
+      return `${iss} → due ${dueStr}`;
+    });
+    span.textContent = pairs.length ? pairs.join(', ') : '—';
+  }
+
+  document.addEventListener('change', refreshPreview, true);
+  document.addEventListener('DOMContentLoaded', function() {
+    const startEl = $('{{ form.start_date.id_for_label }}');
+    const nextEl  = $('{{ form.next_run_date.id_for_label }}');
+    if (startEl && nextEl) {
+      startEl.addEventListener('change', function() {
+        if (!nextEl.value) nextEl.value = startEl.value; // default next_run to start date if empty
+        refreshPreview();
+      });
+    }
+    refreshPreview();
+  });
+})();
+</script>
+
+
+{% endblock %}

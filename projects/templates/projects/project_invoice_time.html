@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block page_title %}Invoice Unbilled Time — {{ project.name }}{% endblock %}
+{% block app_content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {# --- Errors (top) --- #}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
+
+      <!-- TIME -->
+      <fieldset class="mb-3">
+        <legend class="h6 mb-3">Time</legend>
+        <div class="row g-3">
+          <div class="col-6 col-md-3">
+            <label class="form-label" for="{{ form.start.id_for_label }}">Start</label>
+            {{ form.start }}
+            {% if form.start.errors %}<div class="invalid-feedback d-block">{{ form.start.errors }}</div>{% endif %}
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label" for="{{ form.end.id_for_label }}">End</label>
+            {{ form.end }}
+            {% if form.end.errors %}<div class="invalid-feedback d-block">{{ form.end.errors }}</div>{% endif %}
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label" for="{{ form.rounding.id_for_label }}">Rounding</label>
+            {{ form.rounding }}
+            {% if form.rounding.errors %}<div class="invalid-feedback d-block">{{ form.rounding.errors }}</div>{% endif %}
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label" for="{{ form.group_by.id_for_label }}">Group time by</label>
+            {{ form.group_by }}
+            {% if form.group_by.errors %}<div class="invalid-feedback d-block">{{ form.group_by.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="{{ form.override_rate.id_for_label }}">Rate override</label>
+            <div class="input-group">
+              <span class="input-group-text" aria-hidden="true">$</span>
+              {{ form.override_rate }}
+            </div>
+            <div class="form-text">Project rate: ${{ project_rate|floatformat:2|intcomma }}</div>
+            {% if form.override_rate.errors %}<div class="invalid-feedback d-block">{{ form.override_rate.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-12 col-md-8">
+            <label class="form-label" for="{{ form.description.id_for_label }}">Time description (optional)</label>
+            {{ form.description }}
+            {% if form.description.errors %}<div class="invalid-feedback d-block">{{ form.description.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-12">
+            <div class="form-check">
+              {{ form.include_only_approved }}
+              <label class="form-check-label" for="{{ form.include_only_approved.id_for_label }}">
+                Only include approved time
+              </label>
+            </div>
+            {% if form.include_only_approved.errors %}<div class="invalid-feedback d-block">{{ form.include_only_approved.errors }}</div>{% endif %}
+          </div>
+        </div>
+      </fieldset>
+
+      <hr>
+
+      <!-- EXPENSES -->
+      <fieldset>
+        <legend class="h6 mb-3">Expenses (optional)</legend>
+        <div class="row g-3">
+          <div class="col-12">
+            <div class="form-check">
+              {{ form.include_expenses }}
+              <label class="form-check-label" for="{{ form.include_expenses.id_for_label }}">
+                Include billable expenses
+              </label>
+            </div>
+            {% if form.include_expenses.errors %}<div class="invalid-feedback d-block">{{ form.include_expenses.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="{{ form.expense_group_by.id_for_label }}">Group expenses by</label>
+            {{ form.expense_group_by }}
+            {% if form.expense_group_by.errors %}<div class="invalid-feedback d-block">{{ form.expense_group_by.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="{{ form.expense_markup_override.id_for_label }}">% Markup override</label>
+            <div class="input-group">
+              {{ form.expense_markup_override }}
+              <span class="input-group-text" aria-hidden="true">%</span>
+            </div>
+            <div class="form-text">Leave blank to use each expense’s markup.</div>
+            {% if form.expense_markup_override.errors %}<div class="invalid-feedback d-block">{{ form.expense_markup_override.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="{{ form.expense_label_prefix.id_for_label }}">Expense label prefix</label>
+            {{ form.expense_label_prefix }}
+            {% if form.expense_label_prefix.errors %}<div class="invalid-feedback d-block">{{ form.expense_label_prefix.errors }}</div>{% endif %}
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="mt-3 d-flex align-items-center justify-content-between">
+        <div class="text-muted">
+          Unbilled (no rounding): <strong>{{ preview_hours|floatformat:2|intcomma }}</strong> h time
+          {% if preview_expenses %}&middot; Expenses: <strong>${{ preview_expenses|floatformat:2|intcomma }}</strong>{% endif %}
+        </div>
+        <div>
+          <button class="btn btn-primary" type="submit">Create invoice</button>
+          <a class="btn btn-outline-secondary" href="{% url 'projects:project_detail' project.pk %}">Cancel</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# Toggle-disable expense fields when checkbox is off #}
+<script>
+  (function () {
+    const inc    = document.getElementById("{{ form.include_expenses.id_for_label }}") || document.getElementById("id_include_expenses");
+    const group  = document.getElementById("{{ form.expense_group_by.id_for_label }}") || document.getElementById("id_expense_group_by");
+    const markup = document.getElementById("{{ form.expense_markup_override.id_for_label }}") || document.getElementById("id_expense_markup_override");
+    const prefix = document.getElementById("{{ form.expense_label_prefix.id_for_label }}") || document.getElementById("id_expense_label_prefix");
+
+    function setDisabled(on) {
+      [group, markup, prefix].forEach(el => { if (el) el.disabled = on; });
+    }
+    if (inc) {
+      setDisabled(!inc.checked);
+      inc.addEventListener("change", () => setDisabled(!inc.checked));
+    }
+  })();
+</script>
+{% endblock %}

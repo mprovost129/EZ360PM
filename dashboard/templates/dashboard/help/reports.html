@@ -1,14 +1,24 @@
 {% extends "dashboard/help/_article_base.html" %}
+
 {% block help_title %}Reports{% endblock %}
-{% block help_intro %}Quick insights for cash flow, profit & loss, time, and project performance.{% endblock %}
+{% block help_intro %}Quick insights into cash flow, profit &amp; loss, time, and project performance.{% endblock %}
+
 {% block help_body %}
+<h2 class="h6 mt-3">Available report types</h2>
 <ul class="mb-3">
-  <li><strong>P&L (cash basis):</strong> Income (payments) minus expenses over a period.</li>
-  <li><strong>Time:</strong> Hours by project, person, and billable status.</li>
-  <li><strong>Projects:</strong> Budget vs. actuals and profitability.</li>
+  <li><strong>P&amp;L (cash basis):</strong> Shows income (payments received) minus expenses for a chosen period.</li>
+  <li><strong>Time:</strong> Breaks down hours by project, team member, and billable/non-billable status.</li>
+  <li><strong>Projects:</strong> Compares budget vs. actuals, tracks profitability, and highlights overruns.</li>
 </ul>
-<p class="mb-4">Use filters (date range, client, project, team) and export CSV for accounting.</p>
-<div class="alert alert-info small">
-  <strong>Tip:</strong> Save frequently used filters as bookmarks in your browser for one-click access.
+
+<h2 class="h6 mt-3">Filters &amp; exports</h2>
+<p class="mb-4">
+  Narrow results by date range, client, project, or team member. Export data to CSV for your accounting
+  software or further analysis.
+</p>
+
+<div class="alert alert-info small" role="note">
+  <strong>Tip:</strong> Save frequently used filters as browser bookmarks for quick, one-click access to the
+  exact report you need.
 </div>
 {% endblock %}

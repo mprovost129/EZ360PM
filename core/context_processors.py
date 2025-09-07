@@ -6,9 +6,20 @@ from typing import Dict, Any
 from django.conf import settings
 from django.http import HttpRequest
 
-from .utils import get_active_company, user_has_active_subscription
+from company.utils import get_active_company
+from core.models import Notification  # kept for legacy shim compatibility
+from .utils import user_has_active_subscription
 from .services import unread_count
 
+__all__ = [
+    "app_frame",
+    "app_globals",
+    # legacy shims
+    "notifications",
+    "branding",
+    "active_and_notifications",
+    "app_context",
+]
 
 # -------------------------------------------------------------------
 # Internal helpers
@@ -41,7 +52,7 @@ def _compute_app_frame(request: HttpRequest) -> Dict[str, Any]:
             except Exception:
                 is_subscribed = False
 
-            # unread notifications (use service to keep logic in one place)
+            # unread notifications (use service to keep logic centralized)
             try:
                 unread = unread_count(active_company, user)  # type: ignore[arg-type]
             except Exception:
@@ -58,43 +69,31 @@ def _compute_app_frame(request: HttpRequest) -> Dict[str, Any]:
 # Primary, recommended context processors
 # -------------------------------------------------------------------
 
-def active_company(request: HttpRequest) -> Dict[str, Any]:
-    """
-    Lightweight: only inject active_company.
-    Prefer using app_frame() for most pages to avoid duplicate queries elsewhere.
-    """
-    try:
-        return {"active_company": get_active_company(request)}
-    except Exception:
-        return {"active_company": None}
-
-
 def app_frame(request: HttpRequest) -> Dict[str, Any]:
     """
-    Canonical context for most app pages: active company, subscription state, and unread notifications.
+    Canonical context for most app pages: active company, subscription state,
+    and unread notifications.
     """
     return _compute_app_frame(request)
 
 
-def app_globals(_request: HttpRequest) -> Dict[str, Any]:
+def app_globals(request: HttpRequest) -> Dict[str, Any]:
     """
-    Global branding/config values. Keep defaults stable to avoid template breakage.
+    Global constants + the standard app frame context in one dict.
+    Keeps a single code path for membership/subscription/notifications.
     """
+    frame = _compute_app_frame(request)
     return {
         "APP_NAME": getattr(settings, "APP_NAME", "EZ360PM"),
-        "company_name": getattr(settings, "COMPANY_NAME", "EZ360PM, LLC"),
-        "support_email": getattr(settings, "SUPPORT_EMAIL", "support@example.com"),
-        "do_not_sell_url": getattr(settings, "DO_NOT_SELL_URL", ""),
-        # Cookie/analytics helpers
-        "COOKIE_CONSENT_NAME": getattr(settings, "COOKIE_CONSENT_NAME", "cookie_consent"),
-        "PLAUSIBLE_DOMAIN": getattr(settings, "PLAUSIBLE_DOMAIN", ""),
-        "GA_MEASUREMENT_ID": getattr(settings, "GA_MEASUREMENT_ID", ""),
+        "COMPANY_NAME": getattr(settings, "COMPANY_NAME", "EZ360PM"),
+        "SUPPORT_EMAIL": getattr(settings, "SUPPORT_EMAIL", "support@example.com"),
+        **frame,
     }
 
 
 # -------------------------------------------------------------------
 # Legacy / compatibility shims
-# (kept to avoid breaking existing templates; all use the central helper)
+# (kept to avoid breaking existing templates; prefer app_frame/app_globals)
 # -------------------------------------------------------------------
 
 def notifications(request: HttpRequest) -> Dict[str, Any]:
@@ -138,3 +137,4 @@ def app_context(request: HttpRequest) -> Dict[str, Any]:
         "active_company": ctx["active_company"],
         "is_subscribed": ctx["is_subscribed"],
     }
+

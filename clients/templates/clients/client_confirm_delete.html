@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block page_title %}Delete Client{% endblock %}
+
+{% block app_content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h6 class="mb-2">You’re about to delete:</h6>
+    <p class="fs-5 mb-3"><strong>{{ obj }}</strong></p>
+
+    <div class="alert alert-warning" id="deleteHelp">
+      <div class="fw-semibold mb-1">This action can’t be undone.</div>
+
+      {% if projects_count or invoices_count or estimates_count or expenses_count %}
+        <div class="mb-1">This client is referenced by:</div>
+        <ul class="mb-0">
+          {% if projects_count %}
+            <li><strong>{{ projects_count }}</strong> project{{ projects_count|pluralize }}</li>
+          {% endif %}
+          {% if invoices_count %}
+            <li><strong>{{ invoices_count }}</strong> invoice{{ invoices_count|pluralize }}</li>
+          {% endif %}
+          {% if estimates_count %}
+            <li><strong>{{ estimates_count }}</strong> estimate{{ estimates_count|pluralize }}</li>
+          {% endif %}
+          {% if expenses_count %}
+            <li><strong>{{ expenses_count }}</strong> expense{{ expenses_count|pluralize }}</li>
+          {% endif %}
+        </ul>
+      {% else %}
+        <div class="mb-0">Please confirm you really want to remove this client.</div>
+      {% endif %}
+    </div>
+
+    <form method="post" class="d-flex align-items-center gap-2">
+      {% csrf_token %}
+      <div class="form-check me-auto">
+        <input class="form-check-input" type="checkbox" id="confirmDelete"
+               onchange="document.getElementById('deleteBtn').disabled = !this.checked;">
+        <label class="form-check-label" for="confirmDelete">
+          I understand and want to delete this client
+        </label>
+      </div>
+
+      <a class="btn btn-outline-secondary" href="{% url 'clients:clients' %}">Cancel</a>
+      <button id="deleteBtn" class="btn btn-danger" type="submit" disabled aria-describedby="deleteHelp" aria-disabled="true">
+        Delete
+      </button>
+      <noscript>
+        <button class="btn btn-danger" type="submit">Delete (no JS)</button>
+      </noscript>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,7 +1,9 @@
 {% extends "base.html" %}
+
+{% block page_title %}Help Center{% endblock %}
+
 {% block content %}
-<div class="container py-5" style="max-width: 900px">
-  <h1 class="h4 mb-3">Help Center</h1>
+<div class="container py-4" style="max-width:900px">
   <p class="text-muted mb-4">Browse quick guides to get the most out of {{ APP_NAME }}.</p>
 
   <div class="row g-3">
@@ -18,7 +20,9 @@
       </div>
     {% empty %}
       <div class="col-12">
-        <div class="alert alert-info mb-0">No help articles are available yet. Please check back soon.</div>
+        <div class="alert alert-info mb-0">
+          No help articles are available yet. Please check back soon.
+        </div>
       </div>
     {% endfor %}
   </div>

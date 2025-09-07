@@ -22,15 +22,19 @@ from django.utils.http import (
 )
 from django.views.decorators.http import require_POST
 
-from core.models import Company, CompanyMember
-from core.utils import get_user_profile, set_active_company
-from .forms import LoginForm, RegisterForm
+from .utils import get_user_profile
+from company.models import Company, CompanyMember
+from company.utils import get_active_company, get_user_companies, set_active_company
+from core.utils import get_user_membership
+from .forms import LoginForm, RegisterForm, UserProfileForm
 from .tokens import email_verification_token
 
 User = get_user_model()
 
 
-# ---------- Helpers ----------
+# ----------------------------------------------------------------------
+# Helpers
+# ----------------------------------------------------------------------
 def _safe_next(request: HttpRequest, default_name: str = "dashboard:home") -> str:
     """
     Return a safe redirect target, preferring ?next= when it points to our host.
@@ -65,7 +69,25 @@ def _send_verification_email(request: HttpRequest, user: User) -> None:  # type:
     ).send(fail_silently=False)
 
 
-# ---------- Auth: Login / Logout / Register ----------
+def _compose_name_from_form(first: Optional[str], last: Optional[str], fallback: str) -> str:
+    """
+    Combine first/last into a single display name when present.
+    Falls back to given fallback (e.g., existing user.name or email).
+    """
+    f = (first or "").strip()
+    l = (last or "").strip()
+    if f and l:
+        return f"{f} {l}"
+    if f:
+        return f
+    if l:
+        return l
+    return fallback
+
+
+# ----------------------------------------------------------------------
+# Auth: Login / Logout / Register
+# ----------------------------------------------------------------------
 def login_view(request: HttpRequest) -> HttpResponse:
     if request.user.is_authenticated:
         return redirect(_safe_next(request))
@@ -73,16 +95,16 @@ def login_view(request: HttpRequest) -> HttpResponse:
     next_url = _safe_next(request)
 
     if request.method == "POST":
-        form = LoginForm(request.POST)
+        form = LoginForm(request.POST, request=request)  # <-- pass request
         if form.is_valid():
             user = form.cleaned_data.get("user")
             if user is not None:
-                login(request, user)  # rotates session
+                login(request, user)  # backend is set by authenticate()
                 messages.success(request, "Welcome back!")
                 return redirect(next_url)
             form.add_error(None, "Authentication failed. Please try again.")
     else:
-        form = LoginForm()
+        form = LoginForm(request=request)
 
     return render(request, "accounts/login.html", {"form": form, "next": next_url})
 
@@ -102,7 +124,9 @@ def register_view(request: HttpRequest) -> HttpResponse:
         form = RegisterForm(request.POST)
         if form.is_valid():
             user: User = form.save()  # type: ignore[assignment]
-            login(request, user)
+
+            # IMPORTANT: specify which auth backend to use
+            login(request, user, backend="accounts.backends.EmailBackend")
 
             # Starter company + membership
             display = (getattr(user, "name", "") or user.email).strip()
@@ -125,7 +149,9 @@ def register_view(request: HttpRequest) -> HttpResponse:
     return render(request, "accounts/register.html", {"form": form})
 
 
-# ---------- Password change / reset (Django CBVs) ----------
+# ----------------------------------------------------------------------
+# Password change / reset (Django CBVs)
+# ----------------------------------------------------------------------
 class CaseInsensitivePasswordResetForm(PasswordResetForm):
     """
     Allow password reset by email ignoring case for custom User.
@@ -179,7 +205,9 @@ password_reset_complete = auth_views.PasswordResetCompleteView.as_view(
 )
 
 
-# ---------- Email verification ----------
+# ----------------------------------------------------------------------
+# Email verification
+# ----------------------------------------------------------------------
 def verify_needed(request: HttpRequest) -> HttpResponse:
     if request.user.is_authenticated and getattr(request.user, "is_verified", False):
         return redirect("dashboard:home")
@@ -203,11 +231,102 @@ def verify_email(request: HttpRequest, uidb64: str, token: str) -> HttpResponse:
 
     if user and email_verification_token.check_token(user, token):
         if not getattr(user, "is_verified", False):
-            setattr(user, "is_verified", True)  # custom field on your User
+            setattr(user, "is_verified", True)
             user.save(update_fields=["is_verified"])
         messages.success(request, "Email verified! You’re all set.")
-        # Adjust this route to your onboarding destination as needed
-        return redirect("dashboard:welcome")
+        # Route to your primary app landing
+        return redirect("dashboard:home")
 
     messages.error(request, "That verification link is invalid or expired.")
     return redirect("accounts:verify_needed")
+
+
+# ----------------------------------------------------------------------
+# User Profile
+# ----------------------------------------------------------------------
+@login_required
+def my_profile(request: HttpRequest) -> HttpResponse:
+    user = request.user
+    company = get_active_company(request)
+    profile = get_user_profile(user)
+
+    if request.method == "POST":
+        form = UserProfileForm(request.POST, request.FILES, instance=profile)
+        if form.is_valid():
+            profile = form.save()
+
+            # Accept either (first_name/last_name) or a single "name" field from the form.
+            first = (form.cleaned_data.get("first_name") or "").strip()
+            last = (form.cleaned_data.get("last_name") or "").strip()
+            explicit_name = (form.cleaned_data.get("name") or "").strip()
+            new_name = explicit_name or _compose_name_from_form(first, last, getattr(user, "name", "") or user.email) # type: ignore
+
+            if hasattr(user, "name") and new_name and new_name != (user.name or ""): # type: ignore
+                user.name = new_name # type: ignore
+                user.save(update_fields=["name"]) # type: ignore
+
+            messages.success(request, "Profile updated.")
+            return redirect("accounts:my_profile")
+    else:
+        # Prefill initial name fields if your form supports them
+        # (safe to include both: form may ignore unused initial keys)
+        initial = {
+            "name": getattr(request.user, "name", "") or "",
+            "first_name": (getattr(request.user, "name", "") or "").split(" ", 1)[0] if getattr(request.user, "name", "") else "",
+            "last_name": (getattr(request.user, "name", "") or "").split(" ", 1)[1] if " " in (getattr(request.user, "name", "") or "") else "",
+        }
+        form = UserProfileForm(instance=profile, initial=initial)
+
+    membership = get_user_membership(user, company) if company else None
+    companies = get_user_companies(user)
+
+    return render(
+        request,
+        "accounts/profile.html",
+        {
+            "form": form,
+            "profile": profile,
+            "company": company,
+            "membership": membership,
+            "companies": companies,
+        },
+    )
+
+
+@login_required
+def my_profile_edit(request: HttpRequest) -> HttpResponse:
+    """
+    If you keep a separate edit page, this mirrors my_profile's POST handling.
+    """
+    company = get_active_company(request)
+    profile = get_user_profile(request.user)
+
+    if request.method == "POST":
+        form = UserProfileForm(request.POST, request.FILES, instance=profile)
+        if form.is_valid():
+            form.save()
+
+            first = (form.cleaned_data.get("first_name") or "").strip()
+            last = (form.cleaned_data.get("last_name") or "").strip()
+            explicit_name = (form.cleaned_data.get("name") or "").strip()
+            new_name = explicit_name or _compose_name_from_form(first, last, getattr(request.user, "name", "") or request.user.email) # type: ignore
+
+            if hasattr(request.user, "name") and new_name and new_name != (getattr(request.user, "name", "") or ""):
+                request.user.name = new_name # type: ignore
+                request.user.save(update_fields=["name"]) # type: ignore
+
+            messages.success(request, "Profile updated.")
+            return redirect("accounts:my_profile")
+    else:
+        initial = {
+            "name": getattr(request.user, "name", "") or "",
+            "first_name": (getattr(request.user, "name", "") or "").split(" ", 1)[0] if getattr(request.user, "name", "") else "",
+            "last_name": (getattr(request.user, "name", "") or "").split(" ", 1)[1] if " " in (getattr(request.user, "name", "") or "") else "",
+        }
+        form = UserProfileForm(instance=profile, initial=initial)
+
+    return render(
+        request,
+        "accounts/profile_form.html",
+        {"form": form, "company": company, "profile": profile},
+    )

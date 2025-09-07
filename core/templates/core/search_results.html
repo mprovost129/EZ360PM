@@ -1,4 +1,5 @@
-{% extends "_app_shell.html" %}
+{% extends "base.html" %}
+{% load humanize %}
 {% block page_title %}Search{% endblock %}
 {% block app_content %}
 
@@ -6,8 +7,9 @@
   <label for="search-q" class="visually-hidden">Search</label>
   <input id="search-q" class="form-control" type="search" name="q"
          value="{{ q|default_if_none:'' }}"
-         placeholder="Search clients, projects, invoices… (try inv:1234)">
-  <button class="btn btn-primary ms-2">Search</button>
+         placeholder="Search clients, projects, invoices… (try inv:1234)"
+         autocomplete="off">
+  <button class="btn btn-primary ms-2" type="submit">Search</button>
 </form>
 
 <div class="card shadow-sm">
@@ -15,33 +17,52 @@
     <table class="table align-middle mb-0">
       <thead>
         <tr>
-          <th style="width:140px">Type</th>
-          <th>Title</th>
-          <th>Details</th>
-          <th style="width:140px">Date</th>
-          <th style="width:100px"></th>
+          <th scope="col" style="width:140px">Type</th>
+          <th scope="col">Title</th>
+          <th scope="col">Details</th>
+          <th scope="col" style="width:140px">Date</th>
+          <th scope="col" style="width:100px" class="text-end">
+            {% if results_total is not None %}
+              <span class="text-muted small">{{ results_total|intcomma }} found</span>
+            {% endif %}
+          </th>
         </tr>
       </thead>
       <tbody>
-        {% for r in results %}
-        <tr>
-          <td><span class="badge bg-secondary text-capitalize">{{ r.kind }}</span></td>
-          <td class="fw-semibold text-truncate" style="max-width:420px">{{ r.title }}</td>
-          <td class="text-muted text-truncate" style="max-width:520px">{{ r.subtitle }}</td>
-          <td>
-            {% if r.date %}{{ r.date|date:"Y-m-d" }}{% else %}—{% endif %}
-          </td>
-          <td class="text-end">
-            {% if r.url %}
-              <a class="btn btn-sm btn-outline-primary" href="{{ r.url }}">Open</a>
-            {% else %}
-              <span class="text-muted small">—</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="5" class="text-center text-muted py-4">No results.</td></tr>
-        {% endfor %}
+        {% if q and results %}
+          {% for r in results %}
+          <tr>
+            <td><span class="badge bg-secondary text-capitalize">{{ r.kind }}</span></td>
+            <td class="fw-semibold text-truncate" style="max-width:420px" title="{{ r.title }}">
+              {{ r.title }}
+            </td>
+            <td class="text-muted text-truncate" style="max-width:520px" title="{{ r.subtitle }}">
+              {{ r.subtitle }}
+            </td>
+            <td class="text-nowrap">
+              {% if r.date %}{{ r.date|date:"Y-m-d" }}{% else %}—{% endif %}
+            </td>
+            <td class="text-end">
+              {% if r.url %}
+                <a class="btn btn-sm btn-outline-primary" href="{{ r.url }}">Open</a>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        {% elif q %}
+          <tr>
+            <td colspan="5" class="text-center text-muted py-4">No results.</td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="5" class="text-muted py-3">
+              Type a query above to search your workspace. Try shortcuts like
+              <code>inv:1234</code> for an invoice number.
+            </td>
+          </tr>
+        {% endif %}
       </tbody>
     </table>
   </div>

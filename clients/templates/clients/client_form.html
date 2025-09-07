@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block page_title %}
+  {% if mode == 'create' %}New Client{% else %}Edit Client{% endif %}
+{% endblock %}
+
+{% block app_content %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+
+  {# Top-level (non-field) errors #}
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger" role="alert">
+      {{ form.non_field_errors }}
+    </div>
+  {% endif %}
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+
+      {# ---- Identity ---- #}
+      <fieldset class="mb-4">
+        <legend class="h6 mb-3">Identity</legend>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.first_name.id_for_label }}">First name</label>
+            {{ form.first_name }}
+            {% if form.first_name.help_text %}<div class="form-text">{{ form.first_name.help_text }}</div>{% endif %}
+            {% if form.first_name.errors %}<div class="invalid-feedback d-block" aria-live="polite">{{ form.first_name.errors }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.last_name.id_for_label }}">Last name</label>
+            {{ form.last_name }}
+            {% if form.last_name.help_text %}<div class="form-text">{{ form.last_name.help_text }}</div>{% endif %}
+            {% if form.last_name.errors %}<div class="invalid-feedback d-block" aria-live="polite">{{ form.last_name.errors }}</div>{% endif %}
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="{{ form.org.id_for_label }}">Company</label>
+            {{ form.org }}
+            {% if form.org.help_text %}<div class="form-text">{{ form.org.help_text }}</div>{% endif %}
+            {% if form.org.errors %}<div class="invalid-feedback d-block" aria-live="polite">{{ form.org.errors }}</div>{% endif %}
+          </div>
+        </div>
+      </fieldset>
+
+      {# ---- Contact ---- #}
+      <fieldset class="mb-4">
+        <legend class="h6 mb-3">Contact</legend>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.email.id_for_label }}">Email</label>
+            {{ form.email }}
+            {% if form.email.help_text %}<div class="form-text">{{ form.email.help_text }}</div>{% endif %}
+            {% if form.email.errors %}<div class="invalid-feedback d-block" aria-live="polite">{{ form.email.errors }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.phone.id_for_label }}">Phone</label>
+            {{ form.phone }}
+            {% if form.phone.help_text %}<div class="form-text">{{ form.phone.help_text }}</div>{% endif %}
+            {% if form.phone.errors %}<div class="invalid-feedback d-block" aria-live="polite">{{ form.phone.errors }}</div>{% endif %}
+          </div>
+        </div>
+      </fieldset>
+
+      {# ---- Address ---- #}
+      <fieldset>
+        <legend class="h6 mb-3">Address</legend>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label" for="{{ form.address_1.id_for_label }}">Address 1</label>
+            {{ form.address_1 }}
+            {% if form.address_1.errors %}<div class="invalid-feedback d-block" aria-live="polite">{{ form.address_1.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-12">
+            <label class="form-label" for="{{ form.address_2.id_for_label }}">Address 2</label>
+            {{ form.address_2 }}
+            {% if form.address_2.errors %}<div class="invalid-feedback d-block" aria-live="polite">{{ form.address_2.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.city.id_for_label }}">City</label>
+            {{ form.city }}
+            {% if form.city.errors %}<div class="invalid-feedback d-block" aria-live="polite">{{ form.city.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label" for "{{ form.state.id_for_label }}">State</label>
+            {{ form.state }}
+            {% if form.state.errors %}<div class="invalid-feedback d-block" aria-live="polite">{{ form.state.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label" for="{{ form.zip_code.id_for_label }}">Zip code</label>
+            {{ form.zip_code }}
+            {% if form.zip_code.errors %}<div class="invalid-feedback d-block" aria-live="polite">{{ form.zip_code.errors }}</div>{% endif %}
+          </div>
+        </div>
+      </fieldset>
+
+    </div>
+
+    <div class="card-footer d-flex justify-content-between">
+      <a class="btn btn-outline-secondary" href="{% url 'clients:clients' %}">Cancel</a>
+      <div class="d-flex gap-2">
+        {% if form.instance.pk %}
+          <a class="btn btn-outline-danger" href="{% url 'clients:delete' form.instance.pk %}">Delete</a>
+        {% endif %}
+        <button class="btn btn-primary" type="submit">Save</button>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

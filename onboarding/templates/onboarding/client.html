@@ -1,13 +1,25 @@
 {% extends "base.html" %}
+{% block page_title %}Add Your First Client{% endblock %}
 
 {% block content %}
 <div class="container py-5" style="max-width: 640px">
-    {# Onboarding progress indicator #}
+  {# Onboarding progress indicator #}
   {% include "onboarding/_progress.html" with step="client" %}
   <h1 class="h4 mb-3">Add Your First Client</h1>
   <p class="text-muted mb-4">
     Clients are who you bill. Add a client now or skip and create one later.
   </p>
+
+  {# Top-level non-field errors #}
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger" role="alert">
+      <ul class="mb-0">
+        {% for err in form.non_field_errors %}
+          <li>{{ err }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
 
   <form method="post" novalidate>
     {% csrf_token %}

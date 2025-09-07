@@ -1,4 +1,5 @@
-{% extends "_app_shell.html" %}
+{% extends "base.html" %}
+{% load humanize %}
 {% block page_title %}Search{% endblock %}
 
 {% block app_content %}
@@ -6,10 +7,14 @@
   <div class="card-body">
     <form class="row g-2 mb-3" method="get" action="{% url 'core:search' %}">
       <div class="col-12 col-md-8">
-        <input class="form-control" type="search" name="q" value="{{ q|default_if_none:'' }}" placeholder="Search clients, projects, invoices, estimates, expenses…">
+        <label for="search-q" class="visually-hidden">Search</label>
+        <input id="search-q" class="form-control" type="search" name="q"
+               value="{{ q|default_if_none:'' }}"
+               placeholder="Search clients, projects, invoices, estimates, expenses…"
+               autocomplete="off">
       </div>
       <div class="col-12 col-md-auto">
-        <button class="btn btn-primary">Search</button>
+        <button class="btn btn-primary" type="submit">Search</button>
       </div>
     </form>
 
@@ -20,9 +25,12 @@
       {# Clients #}
       <div class="mb-4">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <h2 class="h6 mb-0">Clients</h2>
+          <h2 class="h6 mb-0">
+            Clients
+            <span class="text-muted">({{ clients_total|intcomma }})</span>
+          </h2>
           {% if clients_total > limit %}
-            <a class="small" href="{% url 'core:clients' %}?q={{ q|urlencode }}">View all {{ clients_total }}</a>
+            <a class="small" href="{% url 'clients:clients' %}?q={{ q|urlencode }}">View all {{ clients_total|intcomma }}</a>
           {% endif %}
         </div>
         {% if clients %}
@@ -30,9 +38,9 @@
             {% for c in clients %}
               <li class="list-group-item d-flex justify-content-between align-items-center">
                 <span>
-                  {{ c.org|default:"-" }}{% if c.first_name or c.last_name %} — {{ c.first_name }} {{ c.last_name }}{% endif %}
+                  {{ c.org|default:"—" }}{% if c.first_name or c.last_name %} — {{ c.first_name }} {{ c.last_name }}{% endif %}
                 </span>
-                <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:client_update' c.pk %}">Open</a>
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'clients:client_update' c.pk %}">Open</a>
               </li>
             {% endfor %}
           </ul>
@@ -44,24 +52,35 @@
       {# Projects #}
       <div class="mb-4">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <h2 class="h6 mb-0">Projects</h2>
+          <h2 class="h6 mb-0">
+            Projects
+            <span class="text-muted">({{ projects_total|intcomma }})</span>
+          </h2>
           {% if projects_total > limit %}
-            <a class="small" href="{% url 'core:projects' %}?q={{ q|urlencode }}">View all {{ projects_total }}</a>
+            <a class="small" href="{% url 'projects:projects' %}?q={{ q|urlencode }}">View all {{ projects_total|intcomma }}</a>
           {% endif %}
         </div>
         {% if projects %}
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
-              <thead><tr><th>#</th><th>Name</th><th>Client</th><th>Created</th><th></th></tr></thead>
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Name</th>
+                  <th scope="col">Client</th>
+                  <th scope="col">Created</th>
+                  <th scope="col" class="text-end"></th>
+                </tr>
+              </thead>
               <tbody>
                 {% for p in projects %}
                   <tr>
-                    <td>{{ p.number }}</td>
-                    <td><a href="{% url 'core:project_detail' p.pk %}">{{ p.name }}</a></td>
-                    <td>{{ p.client }}</td>
-                    <td>{{ p.created_at|date:'Y-m-d' }}</td>
+                    <td class="text-nowrap">{{ p.number|default:"—" }}</td>
+                    <td><a href="{% url 'projects:project_detail' p.pk %}">{{ p.name }}</a></td>
+                    <td>{{ p.client|default:"—" }}</td>
+                    <td class="text-nowrap">{{ p.created_at|date:'Y-m-d' }}</td>
                     <td class="text-end">
-                      <a class="btn btn-sm btn-outline-primary" href="{% url 'core:project_detail' p.pk %}">Open</a>
+                      <a class="btn btn-sm btn-outline-primary" href="{% url 'projects:project_detail' p.pk %}">Open</a>
                     </td>
                   </tr>
                 {% endfor %}
@@ -76,25 +95,37 @@
       {# Invoices #}
       <div class="mb-4">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <h2 class="h6 mb-0">Invoices</h2>
+          <h2 class="h6 mb-0">
+            Invoices
+            <span class="text-muted">({{ invoices_total|intcomma }})</span>
+          </h2>
           {% if invoices_total > limit %}
-            <a class="small" href="{% url 'core:invoices' %}?q={{ q|urlencode }}">View all {{ invoices_total }}</a>
+            <a class="small" href="{% url 'invoices:invoices' %}?q={{ q|urlencode }}">View all {{ invoices_total|intcomma }}</a>
           {% endif %}
         </div>
         {% if invoices %}
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
-              <thead><tr><th>#</th><th>Client</th><th>Project</th><th>Issued</th><th>Status</th><th></th></tr></thead>
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Client</th>
+                  <th scope="col">Project</th>
+                  <th scope="col">Issued</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" class="text-end"></th>
+                </tr>
+              </thead>
               <tbody>
                 {% for inv in invoices %}
                   <tr>
-                    <td><a href="{% url 'core:invoice_detail' inv.pk %}">{{ inv.number }}</a></td>
-                    <td>{{ inv.client }}</td>
+                    <td class="text-nowrap"><a href="{% url 'invoices:invoice_detail' inv.pk %}">{{ inv.number }}</a></td>
+                    <td>{{ inv.client|default:"—" }}</td>
                     <td>{{ inv.project|default:"—" }}</td>
-                    <td>{{ inv.issue_date|date:'Y-m-d' }}</td>
+                    <td class="text-nowrap">{{ inv.issue_date|date:'Y-m-d' }}</td>
                     <td><span class="badge text-bg-secondary text-capitalize">{{ inv.status }}</span></td>
                     <td class="text-end">
-                      <a class="btn btn-sm btn-outline-primary" href="{% url 'core:invoice_detail' inv.pk %}">Open</a>
+                      <a class="btn btn-sm btn-outline-primary" href="{% url 'invoices:invoice_detail' inv.pk %}">Open</a>
                     </td>
                   </tr>
                 {% endfor %}
@@ -109,25 +140,37 @@
       {# Estimates #}
       <div class="mb-4">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <h2 class="h6 mb-0">Estimates</h2>
+          <h2 class="h6 mb-0">
+            Estimates
+            <span class="text-muted">({{ estimates_total|intcomma }})</span>
+          </h2>
           {% if estimates_total > limit %}
-            <a class="small" href="{% url 'core:estimates' %}?q={{ q|urlencode }}">View all {{ estimates_total }}</a>
+            <a class="small" href="{% url 'estimates:estimates' %}?q={{ q|urlencode }}">View all {{ estimates_total|intcomma }}</a>
           {% endif %}
         </div>
         {% if estimates %}
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
-              <thead><tr><th>#</th><th>Client</th><th>Project</th><th>Issued</th><th>Status</th><th></th></tr></thead>
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Client</th>
+                  <th scope="col">Project</th>
+                  <th scope="col">Issued</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" class="text-end"></th>
+                </tr>
+              </thead>
               <tbody>
                 {% for est in estimates %}
                   <tr>
-                    <td><a href="{% url 'core:estimate_detail' est.pk %}">{{ est.number }}</a></td>
-                    <td>{{ est.client }}</td>
+                    <td class="text-nowrap"><a href="{% url 'estimates:estimate_detail' est.pk %}">{{ est.number }}</a></td>
+                    <td>{{ est.client|default:"—" }}</td>
                     <td>{{ est.project|default:"—" }}</td>
-                    <td>{{ est.issue_date|date:'Y-m-d' }}</td>
+                    <td class="text-nowrap">{{ est.issue_date|date:'Y-m-d' }}</td>
                     <td><span class="badge text-bg-secondary text-capitalize">{{ est.status }}</span></td>
                     <td class="text-end">
-                      <a class="btn btn-sm btn-outline-primary" href="{% url 'core:estimate_detail' est.pk %}">Open</a>
+                      <a class="btn btn-sm btn-outline-primary" href="{% url 'estimates:estimate_detail' est.pk %}">Open</a>
                     </td>
                   </tr>
                 {% endfor %}
@@ -142,23 +185,34 @@
       {# Expenses #}
       <div>
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <h2 class="h6 mb-0">Expenses</h2>
+          <h2 class="h6 mb-0">
+            Expenses
+            <span class="text-muted">({{ expenses_total|intcomma }})</span>
+          </h2>
           {% if expenses_total > limit %}
-            <a class="small" href="{% url 'core:expenses' %}?q={{ q|urlencode }}">View all {{ expenses_total }}</a>
+            <a class="small" href="{% url 'expenses:expenses' %}?q={{ q|urlencode }}">View all {{ expenses_total|intcomma }}</a>
           {% endif %}
         </div>
         {% if expenses %}
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
-              <thead><tr><th>Date</th><th>Description</th><th>Project</th><th>Vendor</th><th class="text-end">Amount</th></tr></thead>
+              <thead>
+                <tr>
+                  <th scope="col">Date</th>
+                  <th scope="col">Description</th>
+                  <th scope="col">Project</th>
+                  <th scope="col">Vendor</th>
+                  <th scope="col" class="text-end">Amount</th>
+                </tr>
+              </thead>
               <tbody>
                 {% for ex in expenses %}
                   <tr>
-                    <td>{{ ex.date|date:'Y-m-d' }}</td>
-                    <td>{{ ex.description }}</td>
+                    <td class="text-nowrap">{{ ex.date|date:'Y-m-d' }}</td>
+                    <td>{{ ex.description|default:"—" }}</td>
                     <td>{{ ex.project|default:"—" }}</td>
                     <td>{{ ex.vendor|default:"—" }}</td>
-                    <td class="text-end">${{ ex.amount|floatformat:2 }}</td>
+                    <td class="text-end">${{ ex.amount|floatformat:2|intcomma }}</td>
                   </tr>
                 {% endfor %}
               </tbody>
@@ -169,7 +223,13 @@
         {% endif %}
       </div>
 
+      {# If literally everything is empty, give a friendly hint #}
+      {% if not clients and not projects and not invoices and not estimates and not expenses %}
+        <p class="text-muted mt-3 mb-0">No results yet. Try a broader term or check your spelling.</p>
+      {% endif %}
+
     {% endif %}
   </div>
 </div>
 {% endblock %}
+

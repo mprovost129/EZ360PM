@@ -6,14 +6,20 @@ from . import views
 app_name = "billing"
 
 urlpatterns = [
+    # -----------------------------
     # Customer-facing
+    # -----------------------------
     path("plans/", views.plans, name="plans"),
     path("subscribe/<slug:slug>/", views.subscribe, name="subscribe"),
     path("portal/", views.portal, name="portal"),
 
-    # Stripe webhook
+    # -----------------------------
+    # Stripe webhooks
+    # -----------------------------
     path("webhook/stripe/", views.webhook_stripe, name="stripe_webhook"),
 
-    # Admin/staff
-    path("webhooks/logs/", views.webhook_logs, name="webhook_logs"),
+    # -----------------------------
+    # Admin / staff utilities
+    # -----------------------------
+    path("webhook/logs/", views.webhook_logs, name="webhook_logs"),
 ]

@@ -1,13 +1,78 @@
 {% extends "dashboard/help/_article_base.html" %}
+
 {% block help_title %}Team & Roles{% endblock %}
 {% block help_intro %}Invite teammates, assign roles, and configure approvals.{% endblock %}
+
 {% block help_body %}
-<ol class="mb-4">
-  <li><strong>Invite:</strong> Go to <em>Team</em> and send an invite via email.</li>
-  <li><strong>Roles:</strong> Admin (all access), Manager (projects/time), Member (own work). Adjust as needed.</li>
-  <li><strong>Approvals:</strong> Enable timesheet approvals if your workflow requires it.</li>
+<ol class="mb-4" aria-label="Getting started with team management">
+  <li><strong>Invite:</strong> Go to <em>Company → Team</em> and send an invite via email
+      {% if perms %}({{ request.user.email }} will appear as inviter){% endif %}.
+      Invited users receive a link to create their account and join your company.</li>
+  <li><strong>Roles:</strong> Choose the minimum access needed. You can update roles any time.</li>
+  <li><strong>Approvals:</strong> Enable timesheet approvals in <em>Company → Settings</em> if your workflow requires manager sign-off.</li>
 </ol>
-<div class="alert alert-info small">
-  <strong>Tip:</strong> Limit financial access to Admins; Managers can still run projects effectively.
+
+<h2 class="h6 mt-4">Role matrix</h2>
+<div class="table-responsive">
+  <table class="table table-sm align-middle">
+    <thead>
+      <tr>
+        <th scope="col">Area</th>
+        <th scope="col">Admin</th>
+        <th scope="col">Manager</th>
+        <th scope="col">Member</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Company &amp; billing</td>
+        <td>Full access</td>
+        <td class="text-muted">No</td>
+        <td class="text-muted">No</td>
+      </tr>
+      <tr>
+        <td>Clients &amp; projects</td>
+        <td>Full access</td>
+        <td>Create/edit all</td>
+        <td>Assigned projects only</td>
+      </tr>
+      <tr>
+        <td>Time tracking</td>
+        <td>View/edit all</td>
+        <td>Approve/view team</td>
+        <td>Log own time</td>
+      </tr>
+      <tr>
+        <td>Invoices &amp; payments</td>
+        <td>Full access</td>
+        <td>View/create project invoices</td>
+        <td class="text-muted">No</td>
+      </tr>
+      <tr>
+        <td>Expenses</td>
+        <td>Full access</td>
+        <td>Create/edit for projects</td>
+        <td class="text-muted">No</td>
+      </tr>
+      <tr>
+        <td>Reports</td>
+        <td>All reports</td>
+        <td>Project/time reports</td>
+        <td class="text-muted">No</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<h2 class="h6 mt-4">Common tasks</h2>
+<ul class="mb-4">
+  <li><strong>Invite a teammate:</strong> <a href="{% url 'company:team_invite' %}">Company → Team → Invite</a></li>
+  <li><strong>Change a role:</strong> <a href="{% url 'company:team' %}">Company → Team</a> → edit member</li>
+  <li><strong>Enable timesheet approvals:</strong> <a href="{% url 'company:settings' %}">Company → Settings</a> → Time</li>
+  <li><strong>Remove a member:</strong> <a href="{% url 'company:team' %}">Company → Team</a> → Remove (keeps their historical records)</li>
+</ul>
+
+<div class="alert alert-info small" role="note">
+  <strong>Tip:</strong> Limit financial access to <em>Admins</em>. <em>Managers</em> can run projects and approve time without seeing company billing.
 </div>
 {% endblock %}

@@ -1,83 +1,168 @@
-{# core/templates/core/email_send_form.html #}
-{% extends "_app_shell.html" %}
-{% load widget_tweaks %}
+{% extends "base.html" %}
 
 {% block page_title %}Send {{ kind|title }} Email{% endblock %}
 
 {% block app_content %}
-<div class="card shadow-sm">
-  <div class="card-body">
-    {% if form.non_field_errors %}
-      <div class="alert alert-danger mb-3">
-        {{ form.non_field_errors }}
-      </div>
-    {% endif %}
+<form method="post" novalidate id="emailForm">
+  {% csrf_token %}
+  <div class="card shadow-sm">
+    <div class="card-body">
+      {# Error summary #}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger mb-3" role="alert">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
 
-    <form method="post" class="row g-3" novalidate>
-      {% csrf_token %}
+      <div class="row g-3">
+        {# To #}
+        <div class="col-12 col-md-6">
+          <label class="form-label" for="{{ form.to.id_for_label }}">To</label>
+          {% if form.to.errors %}
+            {{ form.to.as_widget(attrs={
+              "class":"form-control is-invalid",
+              "inputmode":"email",
+              "autocomplete":"email",
+              "placeholder":"name@company.com"
+            }) }}
+            <div class="invalid-feedback d-block">{{ form.to.errors|striptags }}</div>
+          {% else %}
+            {{ form.to.as_widget(attrs={
+              "class":"form-control",
+              "inputmode":"email",
+              "autocomplete":"email",
+              "placeholder":"name@company.com"
+            }) }}
+          {% endif %}
+        </div>
 
-      {# To #}
-      <div class="col-12 col-md-6">
-        <label class="form-label" for="{{ form.to.id_for_label }}">To</label>
-        {% if form.to.errors %}
-          {% render_field form.to class+="form-control is-invalid" %}
-          <div class="invalid-feedback">{{ form.to.errors|striptags }}</div>
-        {% else %}
-          {% render_field form.to class+="form-control" %}
-        {% endif %}
-      </div>
+        {# CC #}
+        <div class="col-12 col-md-6">
+          <label class="form-label" for="{{ form.cc.id_for_label }}">CC</label>
+          {% if form.cc.errors %}
+            {{ form.cc.as_widget(attrs={
+              "class":"form-control is-invalid",
+              "placeholder":"alice@example.com, bob@example.com",
+              "inputmode":"email",
+              "autocomplete":"email"
+            }) }}
+            <div class="invalid-feedback d-block">{{ form.cc.errors|striptags }}</div>
+          {% else %}
+            {{ form.cc.as_widget(attrs={
+              "class":"form-control",
+              "placeholder":"alice@example.com, bob@example.com",
+              "inputmode":"email",
+              "autocomplete":"email"
+            }) }}
+          {% endif %}
+          <div class="form-text">Comma or semicolon separated</div>
+        </div>
 
-      {# CC #}
-      <div class="col-12 col-md-6">
-        <label class="form-label" for="{{ form.cc.id_for_label }}">CC</label>
-        {% if form.cc.errors %}
-          {% render_field form.cc class+="form-control is-invalid" placeholder="alice@example.com, bob@example.com" %}
-          <div class="invalid-feedback">{{ form.cc.errors|striptags }}</div>
-        {% else %}
-          {% render_field form.cc class+="form-control" placeholder="alice@example.com, bob@example.com" %}
-        {% endif %}
-        <div class="form-text">Comma-separated</div>
-      </div>
+        {# Subject #}
+        <div class="col-12">
+          <label class="form-label d-flex justify-content-between align-items-center" for="{{ form.subject.id_for_label }}">
+            <span>Subject</span>
+            <span class="small text-muted"><span id="subCount">0</span> chars</span>
+          </label>
+          {% if form.subject.errors %}
+            {{ form.subject.as_widget(attrs={"class":"form-control is-invalid", "autocomplete":"off", "maxlength":"200"}) }}
+            <div class="invalid-feedback d-block">{{ form.subject.errors|striptags }}</div>
+          {% else %}
+            {{ form.subject.as_widget(attrs={"class":"form-control", "autocomplete":"off", "maxlength":"200"}) }}
+          {% endif %}
+        </div>
 
-      {# Subject #}
-      <div class="col-12">
-        <label class="form-label" for="{{ form.subject.id_for_label }}">Subject</label>
-        {% if form.subject.errors %}
-          {% render_field form.subject class+="form-control is-invalid" %}
-          <div class="invalid-feedback">{{ form.subject.errors|striptags }}</div>
-        {% else %}
-          {% render_field form.subject class+="form-control" %}
-        {% endif %}
-      </div>
+        {# Message #}
+        <div class="col-12">
+          <div class="d-flex justify-content-between align-items-center">
+            <label class="form-label mb-0" for="{{ form.message.id_for_label }}">Message (optional)</label>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="useDefaultMsg">
+              <label class="form-check-label small text-muted" for="useDefaultMsg">Use default message</label>
+            </div>
+          </div>
 
-      {# Message #}
-      <div class="col-12">
-        <label class="form-label" for="{{ form.message.id_for_label }}">Message (optional)</label>
-        {% if form.message.errors %}
-          {% render_field form.message class+="form-control is-invalid" rows="6" %}
-          <div class="invalid-feedback">{{ form.message.errors|striptags }}</div>
-        {% else %}
-          {% render_field form.message class+="form-control" rows="6" %}
-        {% endif %}
-        <div class="form-text">Leave blank to use the default message.</div>
-      </div>
+          {% if form.message.errors %}
+            {{ form.message.as_widget(attrs={"class":"form-control is-invalid", "rows":"6"}) }}
+            <div class="invalid-feedback d-block">{{ form.message.errors|striptags }}</div>
+          {% else %}
+            {{ form.message.as_widget(attrs={"class":"form-control", "rows":"6"}) }}
+          {% endif %}
+          <div class="form-text">Leave blank to use the default message. You can also press <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Enter</kbd> to send.</div>
+        </div>
 
-      {# Helpful note about attachments #}
-      <div class="col-12">
-        <div class="small text-muted">
-          {% if kind == 'invoice' %}A PDF copy of the invoice will be attached.{% endif %}
-          {% if kind == 'estimate' %}A PDF copy of the estimate will be attached.{% endif %}
+        <div class="col-12">
+          <div class="small text-muted">
+            {% if kind == 'invoice' %}A PDF copy of the invoice will be attached.{% endif %}
+            {% if kind == 'estimate' %}A PDF copy of the estimate will be attached.{% endif %}
+          </div>
         </div>
       </div>
+    </div>
 
-      <div class="col-12 d-flex gap-2">
-        <button class="btn btn-primary">Send</button>
-        <a class="btn btn-outline-secondary"
-           href="{% if kind == 'invoice' %}{% url 'core:invoice_detail' obj.pk %}{% else %}{% url 'core:estimate_detail' obj.pk %}{% endif %}">
-          Cancel
-        </a>
-      </div>
-    </form>
+    <div class="card-footer d-flex justify-content-between">
+      <a class="btn btn-outline-secondary"
+         href="{% if kind == 'invoice' %}{% url 'invoices:invoice_detail' obj.pk %}{% else %}{% url 'estimates:estimate_detail' obj.pk %}{% endif %}">
+        Cancel
+      </a>
+      <button id="sendBtn" class="btn btn-primary" type="submit">
+        <span class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
+        Send
+      </button>
+    </div>
   </div>
-</div>
+</form>
+
+<script>
+  (function () {
+    const form = document.getElementById('emailForm');
+    const btn  = document.getElementById('sendBtn');
+    const subj = document.getElementById('{{ form.subject.id_for_label }}');
+    const msg  = document.getElementById('{{ form.message.id_for_label }}');
+    const subCount = document.getElementById('subCount');
+    const useDefault = document.getElementById('useDefaultMsg');
+
+    // Subject counter
+    if (subj && subCount) {
+      const upd = () => { subCount.textContent = subj.value.length; };
+      upd();
+      subj.addEventListener('input', upd);
+    }
+
+    // Default message toggle (disables textarea and clears value)
+    if (useDefault && msg) {
+      const toggle = () => {
+        if (useDefault.checked) {
+          msg.dataset.prevValue = msg.value || '';
+          msg.value = '';
+          msg.setAttribute('disabled', 'disabled');
+        } else {
+          if (msg.dataset.prevValue) msg.value = msg.dataset.prevValue;
+          msg.removeAttribute('disabled');
+        }
+      };
+      useDefault.addEventListener('change', toggle);
+    }
+
+    // Keyboard shortcut: Ctrl/Cmd + Enter to submit
+    document.addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        if (form && !btn.disabled) form.requestSubmit ? form.requestSubmit() : form.submit();
+      }
+    });
+
+    // Prevent double-submit + show spinner
+    if (form && btn) {
+      form.addEventListener('submit', function () {
+        const sp = btn.querySelector('.spinner-border');
+        if (sp) sp.classList.remove('d-none');
+        btn.setAttribute('disabled', 'disabled');
+      });
+    }
+
+    // If server marked fields invalid, focus the first one
+    const firstInvalid = document.querySelector('.is-invalid');
+    if (firstInvalid) firstInvalid.focus();
+  })();
+</script>
 {% endblock %}

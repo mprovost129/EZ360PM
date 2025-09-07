@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block page_title %}Delete Recurring Plan{% endblock %}
+{% block app_content %}
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    {% if form and form.non_field_errors %}
+      <div class="alert alert-danger">
+        <ul class="mb-0">{% for err in form.non_field_errors %}<li>{{ err }}</li>{% endfor %}</ul>
+      </div>
+    {% endif %}
+
+    <div id="danger-note" class="alert alert-danger d-flex align-items-start" role="alert" aria-live="polite">
+      <div>
+        <div class="fw-semibold">This action cannot be undone.</div>
+        <div class="small">Deleting a recurring plan won’t remove invoices already created.</div>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <div class="text-muted small mb-1">Plan</div>
+      <div class="fw-semibold">{{ plan.title }}</div>
+      <div class="text-muted small">
+        Client: {{ plan.client }} ·
+        Frequency: {{ plan.get_frequency_display }} ·
+        Next run: {{ plan.next_run_date|date:"Y-m-d"|default:"—" }} ·
+        Status: {{ plan.status|capfirst }}
+      </div>
+    </div>
+
+    <p class="mb-3">Are you sure you want to delete this recurring plan?</p>
+
+    <form method="post" action="" aria-describedby="danger-note"
+          onsubmit="return confirm('Delete this recurring plan? This cannot be undone.');">
+      {% csrf_token %}
+      <button class="btn btn-danger" type="submit">Delete plan</button>
+      <a class="btn btn-outline-secondary" href="{% url 'invoices:recurring_list' %}">Cancel</a>
+
+      {# Use POST for status toggle (don’t mutate state via GET) #}
+      <form method="post" action="{% url 'invoices:recurring_toggle' plan.pk %}" class="d-inline">
+        {% csrf_token %}
+        {% if plan.status == 'active' %}
+          <button class="btn btn-outline-warning ms-2" type="submit">Pause instead</button>
+        {% else %}
+          <button class="btn btn-outline-success ms-2" type="submit">Activate instead</button>
+        {% endif %}
+      </form>
+
+      <a class="btn btn-outline-primary ms-2" href="{% url 'invoices:recurring_update' plan.pk %}">Edit instead</a>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

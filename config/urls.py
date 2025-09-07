@@ -17,6 +17,13 @@ urlpatterns = [
     path("", include("dashboard.urls")),                # dashboard + landing
     path("app/", include("core.urls")),                 # clients, projects, invoices, etc.
     path("billing/", include("billing.urls")),          # subscriptions, portal
+    path("timetracking/", include("timetracking.urls")),
+    path("projects/", include("projects.urls")),
+    path("invoices/", include("invoices.urls")),
+    path("company/", include("company.urls")),
+    path("payments/", include("payments.urls")),
+    path("expenses/", include("expenses.urls")),
+    path("clients/", include("clients.urls")),
 
     # Optional sub-apps
     path("help/", include(("helpcenter.urls", "help"), namespace="help")),

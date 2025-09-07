@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block page_title %}Delete Invoice{% endblock %}
+
+{% block app_content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="mb-3">
+      <div class="fw-semibold">Invoice {{ inv.number }}</div>
+      <div class="text-muted small">
+        Client: {{ inv.client }} · Status: {{ inv.status|capfirst }}
+        · Total: ${{ inv.total|floatformat:2 }} · Balance: ${{ inv.balance|floatformat:2 }}
+      </div>
+    </div>
+
+    <div class="alert alert-warning">
+      <strong>Heads up:</strong> This will permanently delete the invoice and its line items.
+      The public link will stop working. This action cannot be undone.
+    </div>
+
+    {% with has_payments=inv.amount_paid|floatformat:2 != "0.00" %}
+      {% if has_payments %}
+        <div class="alert alert-danger">
+          Payments exist on this invoice, so it cannot be deleted (payments are protected).
+          You can <a href="{% url 'invoices:invoice_refund' inv.pk %}">issue a refund</a> or
+          <a href="{% url 'invoices:invoice_update' inv.pk %}">edit the invoice</a> and set its status to <em>Void</em> instead.
+        </div>
+      {% elif inv.status != inv.DRAFT %}
+        <div class="alert alert-secondary">
+          Consider <a href="{% url 'invoices:invoice_update' inv.pk %}">voiding it</a> (set status to <em>Void</em>) instead.
+          Deleting removes the record entirely.
+        </div>
+      {% endif %}
+
+      <form method="post" class="d-flex gap-2 align-items-center">
+        {% csrf_token %}
+        <a class="btn btn-outline-secondary" href="{% url 'invoices:invoice_detail' inv.pk %}">Cancel</a>
+        <button class="btn btn-danger" type="submit"
+                {% if has_payments %}disabled aria-disabled="true" title="Invoices with payments cannot be deleted."{% endif %}>
+          Delete invoice
+        </button>
+      </form>
+    {% endwith %}
+  </div>
+</div>
+{% endblock %}

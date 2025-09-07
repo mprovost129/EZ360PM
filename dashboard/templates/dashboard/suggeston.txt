@@ -1,19 +1,23 @@
+{# dashboard/email/suggestion.txt #}
 New suggestion submitted
+========================
 
 ID: {{ s.pk }}
 Subject: {{ s.subject|default_if_none:""|default:"(none)" }}
 
-From (public fields)
-- Name: {{ s.name|default_if_none:""|default:"(none)" }}
-- Email: {{ s.email|default_if_none:""|default:"(none)" }}
+Public fields
+-------------
+- Name:    {{ s.name|default_if_none:""|default:"(none)" }}
+- Email:   {{ s.email|default_if_none:""|default:"(none)" }}
 - Company: {{ s.company|default_if_none:""|default:"(none)" }}
-- From URL: {{ s.page_url|default_if_none:""|default:"(n/a)" }}
+- From URL: {{ s.page_url|default_if_none:""|default:"(none)" }}
 
-Authenticated user (if any)
+Authenticated user
+------------------
 {% if s.user %}
 - User: {{ s.user }}{% if s.user.email %} <{{ s.user.email }}>{% endif %}
 {% else %}
-- User: (anon)
+- User: (anonymous)
 {% endif %}
 
 Message

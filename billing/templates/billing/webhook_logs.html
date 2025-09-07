@@ -1,17 +1,30 @@
-{% extends "_app_shell.html" %}
+{% extends "base.html" %}
+{% load static %}
 {% load humanize %}
+
 {% block content %}
 <div class="container py-4">
   <div class="d-flex align-items-center justify-content-between mb-3">
     <h1 class="h4 mb-0">Stripe Webhook Deliveries</h1>
-    <a class="btn btn-sm btn-outline-secondary" href="" title="Refresh">Refresh</a>
+    <div class="d-flex gap-2">
+      <form method="get" class="d-flex align-items-center">
+        <input type="hidden" name="errors" value="" />
+        <div class="form-check me-2">
+          <input class="form-check-input" type="checkbox" name="errors" id="errorsOnly" value="1"
+                 {% if request.GET.errors %}checked{% endif %}>
+          <label class="form-check-label small" for="errorsOnly">Errors only</label>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" type="submit" title="Apply filter">Apply</button>
+      </form>
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'billing:webhook_logs' %}" title="Refresh">Refresh</a>
+    </div>
   </div>
 
   <div class="table-responsive">
     <table class="table table-sm align-middle">
       <thead class="table-light">
         <tr>
-          <th style="width: 140px;">When</th>
+          <th style="width: 200px;">When</th>
           <th>Type</th>
           <th>Status</th>
           <th>Invoice</th>
@@ -25,21 +38,22 @@
           <tr class="{% if not log.processed_ok %}table-warning{% endif %}">
             <td>
               <div>{{ log.created_at|date:"Y-m-d H:i" }}</div>
+              <small class="text-muted">{{ log.created_at|naturaltime }}</small>
               {% if log.processed_at %}
-                <small class="text-muted">proc {{ log.processed_at|date:"H:i:s" }}</small>
+                <div class="small text-muted">proc {{ log.processed_at|date:"H:i:s" }}</div>
               {% endif %}
             </td>
             <td><code class="small">{{ log.type }}</code></td>
             <td>
               {% if log.processed_ok %}
-                <span class="badge bg-success">processed</span>
+                <span class="badge text-bg-success">processed</span>
               {% else %}
-                <span class="badge bg-danger">error</span>
+                <span class="badge text-bg-danger">error</span>
               {% endif %}
             </td>
             <td>
               {% if log.invoice %}
-                <a href="{% url 'core:invoice_detail' log.invoice.pk %}">{{ log.invoice.number }}</a>
+                <a href="{% url 'invoices:invoice_detail' log.invoice.pk %}">{{ log.invoice.number }}</a>
               {% else %}
                 <span class="text-muted">—</span>
               {% endif %}
@@ -48,7 +62,13 @@
               {% if log.amount %}${{ log.amount|floatformat:2|intcomma }}{% else %}<span class="text-muted">—</span>{% endif %}
             </td>
             <td><small class="text-muted">{{ log.payment_external_id|default:"—" }}</small></td>
-            <td><small class="text-break">{{ log.stripe_event_id }}</small></td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <small class="text-break">{{ log.stripe_event_id }}</small>
+                <button class="btn btn-xs btn-outline-secondary py-0 px-1 copy-btn"
+                        data-copy="{{ log.stripe_event_id }}" title="Copy ID">Copy</button>
+              </div>
+            </td>
           </tr>
           {% if log.message %}
             <tr class="{% if not log.processed_ok %}table-warning{% endif %}">
@@ -65,14 +85,20 @@
       </tbody>
     </table>
   </div>
-
-  {# Optional: simple pager if you add pagination later #}
-  {# 
-  <nav aria-label="Webhook logs pagination">
-    <ul class="pagination pagination-sm justify-content-center">
-      ...
-    </ul>
-  </nav>
-  #}
 </div>
+
+<script>
+  // Simple copy-to-clipboard for Event IDs
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.copy-btn');
+    if (!btn) return;
+    const text = btn.getAttribute('data-copy') || '';
+    navigator.clipboard.writeText(text).then(() => {
+      const prev = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(() => (btn.textContent = prev), 1200);
+    }).catch(() => {});
+  });
+</script>
 {% endblock %}
+

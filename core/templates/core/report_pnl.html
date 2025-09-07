@@ -1,9 +1,9 @@
-{% extends "_app_shell.html" %}
+{% extends "base.html" %}
 {% load humanize %}
 {% block page_title %}Profit &amp; Loss{% endblock %}
 
 {% block app_content %}
-<form class="row g-2 align-items-end mb-3" method="get">
+<form class="row g-2 align-items-end mb-3" method="get" action="">
   <div class="col-auto">
     <label class="form-label" for="pnl-start">Start</label>
     <input id="pnl-start" class="form-control" type="date" name="start" value="{{ start|date:'Y-m-d' }}">
@@ -27,6 +27,9 @@
        href="{% url 'core:report_pnl_csv' %}?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}&basis={{ basis }}">
       Export CSV
     </a>
+  </div>
+  <div class="col-auto">
+    <a class="btn btn-light" href="{% url 'core:report_pnl' %}">Reset</a>
   </div>
 
   <!-- Quick ranges -->
@@ -72,7 +75,7 @@
         <hr>
         <div class="d-flex justify-content-between">
           <div class="fw-semibold">Profit</div>
-          <div class="fw-bold {% if profit < 0 %}text-danger{% endif %}">
+          <div class="fw-bold {% if profit > 0 %}text-success{% elif profit < 0 %}text-danger{% endif %}">
             ${{ profit|floatformat:2|intcomma }}
           </div>
         </div>
@@ -92,8 +95,8 @@
           <table class="table mb-0 align-middle">
             <thead>
               <tr>
-                <th>Category</th>
-                <th class="text-end">Total</th>
+                <th scope="col">Category</th>
+                <th scope="col" class="text-end">Total</th>
               </tr>
             </thead>
             <tbody>

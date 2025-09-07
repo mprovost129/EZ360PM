@@ -1,25 +1,24 @@
-{% extends "base.html" %}
+{% extends "dashboard/help/_article_base.html" %}
 
-{% block content %}
-<div class="container py-5" style="max-width: 720px">
-  <h1 class="h4 mb-3">Getting Started</h1>
-  <p class="text-muted mb-4">
-    Set up {{ APP_NAME }} in just a few steps. Once your company, clients, and first project are ready,
-    you can begin tracking time and sending invoices.
-  </p>
+{% block help_title %}Getting Started{% endblock %}
+{% block help_intro %}Set up {{ APP_NAME }} in just a few steps. Once your company, clients, and first project are ready, you can begin tracking time and sending invoices.{% endblock %}
 
-  <ol class="mb-4">
-    <li><strong>Create your company:</strong> Add your company name, contact details, and upload a logo.</li>
-    <li><strong>Add a client and project:</strong> Enter client details, then create a project (hourly or flat rate).</li>
-    <li><strong>Track and invoice:</strong> Start a timer or log time manually. Unbilled hours can be added
-        to invoices and sent to your client.</li>
-  </ol>
+{% block help_body %}
+<ol class="mb-4" aria-label="Steps to get started">
+  <li>
+    <strong>Create your company:</strong> Add your company name, contact details, and upload a logo.
+  </li>
+  <li>
+    <strong>Add a client and project:</strong> Enter client details, then create a project (hourly or flat rate).
+  </li>
+  <li>
+    <strong>Track and invoice:</strong> Start a timer or log time manually. Unbilled hours can be added
+    to invoices and sent to your client.
+  </li>
+</ol>
 
-  <div class="alert alert-info small mb-4">
-    <strong>Tip:</strong> You can revisit onboarding anytime from the dashboard. It shows your setup progress
-    and quick links for next steps.
-  </div>
-
-  <a class="btn btn-outline-secondary" href="{% url 'dashboard:help_index' %}">Back to Help</a>
+<div class="alert alert-info small" role="note">
+  <strong>Tip:</strong> You can revisit onboarding anytime from the dashboard. It shows your setup progress
+  and quick links for next steps.
 </div>
 {% endblock %}

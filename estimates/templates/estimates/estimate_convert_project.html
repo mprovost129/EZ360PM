@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block page_title %}Convert to Project — Estimate {{ est.number }}{% endblock %}
+
+{% block app_content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {# Global form errors #}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger mb-3" role="alert">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
+
+      <div class="mb-3">
+        <label class="form-label d-block">Conversion mode</label>
+        {{ form.mode }}
+        {% if form.mode.errors %}
+          <div class="text-danger small">{{ form.mode.errors|join:", " }}</div>
+        {% endif %}
+      </div>
+
+      {# Attach to existing project #}
+      <div id="attach-fields" class="mb-3">
+        <label class="form-label" for="{{ form.existing_project.id_for_label }}">Existing project</label>
+        {{ form.existing_project }}
+        {% if form.existing_project.errors %}
+          <div class="text-danger small">{{ form.existing_project.errors|join:", " }}</div>
+        {% endif %}
+        <div class="form-text">
+          Projects are filtered to your company{% if est.client %} and client ({{ est.client }}){% endif %}.
+        </div>
+      </div>
+
+      {# Create a new project #}
+      <div id="new-fields">
+        <div class="row g-3">
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="{{ form.new_number.id_for_label }}">Project #</label>
+            {{ form.new_number }}
+            {% if form.new_number.errors %}<div class="text-danger small">{{ form.new_number.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div class="col-12 col-md-8">
+            <label class="form-label" for="{{ form.new_name.id_for_label }}">Project name</label>
+            {{ form.new_name }}
+            {% if form.new_name.errors %}<div class="text-danger small">{{ form.new_name.errors|join:", " }}</div>{% endif %}
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="{{ form.new_billing_type.id_for_label }}">Billing type</label>
+            {{ form.new_billing_type }}
+            {% if form.new_billing_type.errors %}<div class="text-danger small">{{ form.new_billing_type.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label" for="{{ form.new_estimated_hours.id_for_label }}">Estimated hours</label>
+            {{ form.new_estimated_hours }}
+            {% if form.new_estimated_hours.errors %}<div class="text-danger small">{{ form.new_estimated_hours.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label" for="{{ form.new_budget.id_for_label }}">Budget</label>
+            {{ form.new_budget }}
+            {% if form.new_budget.errors %}<div class="text-danger small">{{ form.new_budget.errors|join:", " }}</div>{% endif %}
+          </div>
+
+          <div class="col-6 col-md-4">
+            <label class="form-label" for="{{ form.new_start_date.id_for_label }}">Start date</label>
+            {{ form.new_start_date }}
+            {% if form.new_start_date.errors %}<div class="text-danger small">{{ form.new_start_date.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label" for="{{ form.new_due_date.id_for_label }}">Due date</label>
+            {{ form.new_due_date }}
+            {% if form.new_due_date.errors %}<div class="text-danger small">{{ form.new_due_date.errors|join:", " }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-3 d-flex gap-2">
+        <button class="btn btn-primary" type="submit">Convert</button>
+        <a class="btn btn-outline-secondary" href="{% url 'estimates:estimate_detail' est.pk %}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  const attachFields = document.getElementById('attach-fields');
+  const newFields = document.getElementById('new-fields');
+  const radios = document.querySelectorAll('input[name="mode"]');
+
+  // Enable/disable inputs inside a container
+  function setEnabled(container, enabled) {
+    container.querySelectorAll('input, select, textarea, button').forEach(el => {
+      // Keep hidden inputs enabled
+      el.disabled = (el.type !== 'hidden') ? !enabled : false;
+    });
+  }
+
+  function sync() {
+    const value = document.querySelector('input[name="mode"]:checked')?.value || 'new';
+    const isAttach = (value === 'attach');
+
+    attachFields.style.display = isAttach ? '' : 'none';
+    newFields.style.display = isAttach ? 'none' : '';
+
+    setEnabled(attachFields, isAttach);
+    setEnabled(newFields, !isAttach);
+  }
+
+  radios.forEach(r => r.addEventListener('change', sync));
+  sync(); // initial
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,147 @@
+{# templates/core/time_edit.html #}
+{% extends "base.html" %}
+{% block page_title %}Edit Time{% endblock %}
+
+{% block app_content %}
+<form method="post" novalidate>
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger small mb-3">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.project.id_for_label }}">Project</label>
+          {{ form.project }}
+          {% if form.project.errors %}
+            <div class="text-danger small mt-1">{{ form.project.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-md-6">
+          <div class="d-flex justify-content-between align-items-center">
+            <label class="form-label mb-0" for="{{ form.is_billable.id_for_label }}">Billable</label>
+          </div>
+          <div class="form-check">
+            {{ form.is_billable }}
+            <label class="form-check-label" for="{{ form.is_billable.id_for_label }}">This time is billable</label>
+          </div>
+          {% if form.is_billable.errors %}
+            <div class="text-danger small mt-1">{{ form.is_billable.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.start_time.id_for_label }}">Started at</label>
+          {{ form.start_time }}
+          {% if form.start_time.errors %}
+            <div class="text-danger small mt-1">{{ form.start_time.errors }}</div>
+          {% endif %}
+          <div id="tz-help" class="form-text">
+            Use your local time ({{ request.user.profile.timezone|default:"local" }}).
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="d-flex justify-content-between align-items-center">
+            <label class="form-label mb-0" for="{{ form.end_time.id_for_label }}">Ended at</label>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="set-end-now">Now</button>
+          </div>
+          {{ form.end_time }}
+          {% if form.end_time.errors %}
+            <div class="text-danger small mt-1">{{ form.end_time.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.hours.id_for_label }}">Hours</label>
+          <div class="input-group">
+            {{ form.hours }}
+            <span class="input-group-text">h</span>
+          </div>
+          {% if form.hours.errors %}
+            <div class="text-danger small mt-1">{{ form.hours.errors }}</div>
+          {% endif %}
+          <div id="hours-help" class="form-text">
+            Leave blank and we’ll compute from start/end. You can override.
+          </div>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label" for="{{ form.notes.id_for_label }}">Notes</label>
+          {{ form.notes }}
+          {% if form.notes.errors %}
+            <div class="text-danger small mt-1">{{ form.notes.errors }}</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card-footer d-flex justify-content-between">
+      <a class="btn btn-outline-secondary" href="{% url 'timetracking:time_list' %}">Cancel</a>
+      <button class="btn btn-primary" type="submit">Save</button>
+    </div>
+  </div>
+</form>
+
+{# Lightweight JS: auto-calc hours and quick "Now" #}
+<script>
+(function() {
+  const start = document.getElementById('{{ form.start_time.id_for_label }}');
+  const end   = document.getElementById('{{ form.end_time.id_for_label }}');
+  const hours = document.getElementById('{{ form.hours.id_for_label }}');
+  const setNowBtn = document.getElementById('set-end-now');
+
+  function toLocalInput(dt) {
+    const pad = n => String(n).padStart(2, '0');
+    const y = dt.getFullYear();
+    const m = pad(dt.getMonth() + 1);
+    const d = pad(dt.getDate());
+    const hh = pad(dt.getHours());
+    const mm = pad(dt.getMinutes());
+    return `${y}-${m}-${d}T${hh}:${mm}`;
+  }
+
+  function parseLocal(value) {
+    if (!value) return null;
+    const dt = new Date(value);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+
+  function compute() {
+    if (!start || !end || !hours) return;
+    const userTyped = hours.dataset.userTyped === '1';
+    if (userTyped) return;
+
+    const s = parseLocal(start.value);
+    const e = parseLocal(end.value);
+    if (!s || !e) return;
+    const diffMs = e - s;
+    if (diffMs <= 0) return;
+
+    const h = diffMs / 36e5; // ms -> hours
+    const rounded = Math.round(h * 100) / 100;
+    hours.value = rounded.toFixed(2);
+  }
+
+  if (setNowBtn && end) {
+    setNowBtn.addEventListener('click', function() {
+      end.value = toLocalInput(new Date());
+      compute();
+    });
+  }
+
+  if (hours) {
+    hours.addEventListener('input', function() {
+      hours.dataset.userTyped = hours.value ? '1' : '';
+    });
+  }
+
+  if (start) start.addEventListener('change', compute);
+  if (end)   end.addEventListener('change', compute);
+})();
+</script>
+{% endblock %}

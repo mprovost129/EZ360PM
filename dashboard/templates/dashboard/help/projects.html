@@ -1,13 +1,26 @@
 {% extends "dashboard/help/_article_base.html" %}
+
 {% block help_title %}Projects{% endblock %}
-{% block help_intro %}Organize work as hourly or flat-rate projects with budgets and due dates.{% endblock %}
+{% block help_intro %}Organize work as hourly or flat-rate projects with budgets, due dates, and team assignments.{% endblock %}
+
 {% block help_body %}
-<ol class="mb-4">
-  <li><strong>Create a project:</strong> Choose <em>Hourly</em> or <em>Flat rate</em>, set budget, start/due dates, and team.</li>
-  <li><strong>Track progress:</strong> Use timers or weekly logs; monitor budget vs. actuals on the project page.</li>
-  <li><strong>Bill work:</strong> Add unbilled time/expenses to invoices with one click.</li>
+<h2 class="h6 mt-3">Getting started</h2>
+<ol class="mb-4" aria-label="Steps for managing projects">
+  <li>
+    <strong>Create a project:</strong> Choose <em>Hourly</em> or <em>Flat rate</em>, set a budget, define start/due dates,
+    and assign team members.
+  </li>
+  <li>
+    <strong>Track progress:</strong> Use timers or weekly logs to record hours. Monitor budget vs. actuals on the project
+    overview page.
+  </li>
+  <li>
+    <strong>Bill work:</strong> Add unbilled time and expenses to invoices with one click, keeping billing in sync with your projects.
+  </li>
 </ol>
-<div class="alert alert-info small">
-  <strong>Tip:</strong> Use project numbers and statuses (Active/On hold/Done) to keep lists tidy.
+
+<h2 class="h6 mt-3">Tips for organization</h2>
+<div class="alert alert-info small" role="note">
+  <strong>Tip:</strong> Use project numbers and statuses (<em>Active</em>, <em>On hold</em>, <em>Done</em>) to keep your project list tidy and searchable.
 </div>
 {% endblock %}

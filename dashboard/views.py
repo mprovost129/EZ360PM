@@ -1,40 +1,42 @@
 # dashboard/views.py
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
+import json
 from typing import Dict, List, Tuple
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
 from django.core.mail import EmailMessage, mail_admins
-from django.db.models import Sum
+from django.db.models import F, Sum, Value
+from django.db.models.functions import Coalesce
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
-from django.contrib.auth.decorators import login_required
 
+from clients.models import Client
+from company.utils import get_active_company, get_onboarding_status
 from core.forms import SuggestionForm
-from core.models import (
-    Client,
-    Expense,
-    Invoice,
-    Notification,
-    Payment,
-    Project,
-    Suggestion,
-    TimeEntry,
-)
-from core.services import recalc_invoice
-from core.utils import default_range_last_30, get_active_company, get_onboarding_status
+from core.models import Notification, Suggestion
+from core.utils import default_range_last_30, parse_date
+from expenses.models import Expense
+from invoices.models import Invoice
+from payments.models import Payment
+from projects.models import Project
+from timetracking.models import TimeEntry
+from .utils import get_cookie_consent, set_consent_cookie
 
 # Optional import; fall back gracefully if the helper isn't present.
 try:
     from core.utils import user_has_active_subscription  # type: ignore
-except Exception:
+except Exception:  # pragma: no cover
     def user_has_active_subscription(company) -> bool:  # type: ignore
         return False
 
@@ -75,45 +77,62 @@ def home(request: HttpRequest) -> HttpResponse:
         .aggregate(s=Sum("amount"))
         .get("s") or Decimal("0")
     )
-    profit_30 = income_30 - expenses_30
+    profit_30 = Decimal(income_30) - Decimal(expenses_30)
 
-    # --- Invoices & balances (exclude void) and keep totals fresh
+    # --- Invoices & balances (exclude void)
     inv_qs = Invoice.objects.filter(company=company).exclude(status=Invoice.VOID)
-    # Ensure derived totals are fresh (cheap field-only load)
-    for inv in inv_qs.only("id", "total", "amount_paid", "status"):
-        recalc_invoice(inv)
 
-    outstanding_total = sum(
-        (inv.total or Decimal("0")) - (inv.amount_paid or Decimal("0")) for inv in inv_qs
+    # NOTE: If you need to *force* recompute totals (e.g., after rate changes),
+    # do it outside the request path (signal/management command), or gate it:
+    # if settings.DEBUG:
+    #     from invoices.services import recalc_invoice
+    #     for inv in inv_qs.only("id", "total", "amount_paid", "status"):
+    #         recalc_invoice(inv)
+
+    # Outstanding = SUM( COALESCE(total,0) - COALESCE(amount_paid,0) ) where still > 0
+    # We compute the sum of positive balances directly in SQL for speed.
+    balances = (
+        inv_qs.annotate(
+            bal=Coalesce(F("total"), Value(Decimal("0"))) - Coalesce(F("amount_paid"), Value(Decimal("0")))
+        )
+        .filter(bal__gt=0)
+        .aggregate(s=Sum("bal"))
+        .get("s") or Decimal("0")
     )
+    outstanding_total = Decimal(balances)
 
-    # Overdue list
+    # Overdue list (top 10)
     overdue: List[Tuple[Invoice, Decimal]] = []
     overdue_qs = (
         inv_qs.exclude(due_date__isnull=True)
         .filter(due_date__lt=today)
         .select_related("client")
+        .annotate(
+            bal=Coalesce(F("total"), Value(Decimal("0"))) - Coalesce(F("amount_paid"), Value(Decimal("0")))
+        )
+        .filter(bal__gt=0)
         .order_by("due_date")[:10]
     )
     for inv in overdue_qs:
-        bal = (inv.total or Decimal("0")) - (inv.amount_paid or Decimal("0"))
-        if bal > 0:
-            overdue.append((inv, bal))
+        overdue.append((inv, inv.bal))  # type: ignore[attr-defined]
 
     # --- This week time (Mon–Sun)
     now = timezone.localtime()
     start_week = now.date() - timedelta(days=now.weekday())
     end_week = start_week + timedelta(days=6)
 
-    hours_week = (
+    hours_week_val = (
         TimeEntry.objects.filter(
-            project__company=company, started_at__date__range=(start_week, end_week)
+            project__company=company, start_time__date__range=(start_week, end_week)
         )
         .aggregate(s=Sum("hours"))
-        .get("s") or 0
+        .get("s")
     )
+    # Ensure Decimal for template consistency
+    hours_week: Decimal = Decimal(str(hours_week_val or "0"))
+
     active_timers = TimeEntry.objects.filter(
-        project__company=company, ended_at__isnull=True
+        project__company=company, end_time__isnull=True
     ).count()
 
     # --- Activity & quick lists
@@ -126,10 +145,11 @@ def home(request: HttpRequest) -> HttpResponse:
         .select_related("client")
         .order_by("-created_at")[:5]
     )
+    # Sum of payments per client; Coalesce to keep ordering stable when nulls
     top_clients = (
         Client.objects.filter(company=company)
-        .annotate(total_paid=Sum("invoices__payments__amount"))
-        .order_by("-total_paid")[:5]
+        .annotate(total_paid=Coalesce(Sum("invoices__payments__amount"), Value(Decimal("0"))))
+        .order_by("-total_paid", "org", "last_name")[:5]
     )
 
     context: Dict = {
@@ -251,9 +271,8 @@ HELP_ARTICLES = {
     "security": "dashboard/help/security.html",
 }
 
-def help_index(request):
+def help_index(request: HttpRequest) -> HttpResponse:
     articles = [
-        # slug, title, description
         {"slug": "getting-started", "title": "Getting Started", "desc": "Set up your company, clients, and first project."},
         {"slug": "invoices", "title": "Invoices", "desc": "Create, send, and track invoices; use templates and reminders."},
         {"slug": "time-tracking", "title": "Time Tracking", "desc": "Use timers and manual logs; convert time to invoices."},
@@ -299,14 +318,21 @@ def _legal_ctx() -> Dict[str, object]:
     }
 
 
-def subprocessors(request: HttpRequest) -> HttpResponse:
-    ctx = _legal_ctx() | {"items": getattr(settings, "SUBPROCESSORS", [])}
-    return render(request, "dashboard/legal/subprocessors.html", ctx)
+def subprocessors(request):
+    items = getattr(settings, "SUBPROCESSORS", [])
+    effective_str = getattr(settings, "LEGAL_EFFECTIVE_DATE", "")
+    effective_date = parse_date(effective_str) if effective_str else None
 
-
-def cookies(request: HttpRequest) -> HttpResponse:
-    ctx = _legal_ctx()
-    return render(request, "dashboard/legal/cookies.html", ctx)
+    return render(
+        request,
+        "dashboard/legal/subprocessors.html",
+        {
+            "items": items,
+            "effective_date": effective_date,
+            "company_name": getattr(settings, "COMPANY_NAME", "EZ360PM"),
+            "site_url": getattr(settings, "SITE_URL", ""),
+        },
+    )
 
 
 def _consent_cookie_value(analytics: bool, marketing: bool) -> str:
@@ -314,47 +340,23 @@ def _consent_cookie_value(analytics: bool, marketing: bool) -> str:
     return f"v=1&ana={'1' if analytics else '0'}&mkt={'1' if marketing else '0'}"
 
 
-def cookie_preferences(request: HttpRequest) -> HttpResponse:
-    # pre-fill toggles from existing cookie (if any)
-    raw = request.COOKIES.get(COOKIE_NAME, "")
-    defaults = {"analytics": False, "marketing": False}
-    try:
-        parts = dict(p.split("=", 1) for p in raw.split("&") if "=" in p)
-        defaults["analytics"] = parts.get("ana") == "1"
-        defaults["marketing"] = parts.get("mkt") == "1"
-    except Exception:
-        pass
-    ctx = _legal_ctx() | defaults
-    return render(request, "dashboard/legal/cookie_preferences.html", ctx)
+def _safe_next(request: HttpRequest, fallback: str = "/") -> str:
+    """Prevent open redirects by verifying the host/scheme."""
+    candidate = request.POST.get("next") or request.META.get("HTTP_REFERER") or fallback
+    return candidate if url_has_allowed_host_and_scheme(candidate, allowed_hosts={request.get_host()}) else fallback
 
 
-@require_POST
-def cookie_consent_set(request: HttpRequest) -> HttpResponse:
-    choice = (request.POST.get("choice") or "").lower()
-    ref = request.POST.get("next") or request.META.get("HTTP_REFERER") or "/"
-
-    if choice == "accept_all":
-        value = _consent_cookie_value(analytics=True, marketing=True)
-    elif choice == "reject_all":
-        value = _consent_cookie_value(analytics=False, marketing=False)
-    else:
-        # custom
-        analytics = request.POST.get("analytics") == "on"
-        marketing = request.POST.get("marketing") == "on"
-        value = _consent_cookie_value(analytics=analytics, marketing=marketing)
-
-    resp = redirect(ref)
-    # non-HttpOnly so JS can check before loading analytics
-    resp.set_cookie(
-        COOKIE_NAME,
-        value,
-        max_age=COOKIE_MAX_AGE,
-        secure=request.is_secure(),
-        samesite="Lax",
-        httponly=False,
-    )
-    messages.success(request, "Your cookie preferences have been saved.")
-    return resp
+def cookies(request):
+    """
+    Public Cookie Policy page.
+    """
+    ctx = {
+        "effective_date": getattr(settings, "LEGAL_EFFECTIVE_DATE", ""),
+        "governing_law": getattr(settings, "GOVERNING_LAW", ""),
+        "company_name": getattr(settings, "COMPANY_NAME", getattr(settings, "APP_NAME", "EZ360PM")),
+        "support_email": getattr(settings, "SUPPORT_EMAIL", "support@example.com"),
+    }
+    return render(request, "dashboard/legal/cookies.html", ctx)
 
 
 def terms(request: HttpRequest) -> HttpResponse:
@@ -372,7 +374,7 @@ def onboarding(request: HttpRequest) -> HttpResponse:
     status = get_onboarding_status(request.user, company)
     return render(
         request,
-        "dashboard/onboarding.html",
+        "onboarding/onboarding.html",
         {
             "status": status,
             "company": company,
@@ -386,3 +388,86 @@ def onboarding_dismiss(request: HttpRequest) -> HttpResponse:
     request.session["onboarding_dismissed"] = True
     messages.info(request, "Onboarding hidden. You can return to it anytime from the Help menu.")
     return redirect("dashboard:home")
+
+
+@login_required
+def refer(request: HttpRequest) -> HttpResponse:
+    company = get_active_company(request)
+    code = f"{request.user.pk}-{(company.pk if company else '0')}"
+    link = f"{getattr(settings,'SITE_URL','').rstrip('/')}/?ref={code}"
+    return render(request, "dashboard/refer.html", {"link": link})
+
+
+def _read_consent(request) -> Dict[str, bool]:
+    """Best-effort parse of the consent cookie into flags."""
+    name = getattr(settings, "COOKIE_CONSENT_NAME", "cookie_consent")
+    raw = request.COOKIES.get(name, "")
+    default = {"analytics": False, "marketing": False}
+    if not raw:
+        return default
+    try:
+        if raw in ("all", "accept"):
+            return {"analytics": True, "marketing": True}
+        if raw in ("essential", "reject"):
+            return default
+        if raw.startswith("custom:"):
+            body = raw.split("custom:", 1)[1]
+            parts = dict(p.split("=", 1) for p in body.split(",") if "=" in p)
+            return {
+                "analytics": parts.get("analytics") in ("1", "true", "True"),
+                "marketing": parts.get("marketing") in ("1", "true", "True"),
+            }
+        # Allow JSON format too
+        data = json.loads(raw)
+        return {"analytics": bool(data.get("analytics")), "marketing": bool(data.get("marketing"))}
+    except Exception:
+        return default
+
+def _effective_date():
+    eff = getattr(settings, "LEGAL_EFFECTIVE_DATE", "")
+    try:
+        return date.fromisoformat(eff) if eff else None
+    except Exception:
+        return None
+
+def cookie_preferences(request):
+    flags = _read_consent(request)
+    ctx = {
+        "analytics": flags["analytics"],
+        "marketing": flags["marketing"],
+        "effective_date": _effective_date(),
+    }
+    return render(request, "dashboard/legal/cookie_preferences.html", ctx)
+
+@require_POST
+def cookie_consent_set(request):
+    """
+    Persist cookie consent.
+      - choice=accept|all       → full consent
+      - choice=reject|essential → essentials only
+      - choice=custom           → use checkboxes 'analytics' and/or 'marketing'
+    """
+    choice = (request.POST.get("choice") or "").lower()
+    analytics = bool(request.POST.get("analytics"))
+    marketing = bool(request.POST.get("marketing"))
+
+    name = getattr(settings, "COOKIE_CONSENT_NAME", "cookie_consent")
+    max_age = int(getattr(settings, "COOKIE_CONSENT_MAX_AGE", 60 * 60 * 24 * 365))
+
+    if choice in ("accept", "all"):
+        value = "all"
+    elif choice in ("reject", "essential"):
+        value = "essential"
+    else:
+        value = f"custom:analytics={'1' if analytics else '0'},marketing={'1' if marketing else '0'}"
+
+    resp = redirect(request.META.get("HTTP_REFERER") or reverse("dashboard:cookie_preferences"))
+    resp.set_cookie(
+        name,
+        value,
+        max_age=max_age,
+        samesite="Lax",
+        secure=not settings.DEBUG,
+        httponly=False,  # front-end JS can read to hide the banner
+    )
+    return resp

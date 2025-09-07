@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block head_title %}{{ title|default:"Unlock more" }} — {{ APP_NAME }}{% endblock %}
+{% load i18n %}
+{% block head_title %}{{ title|default:_("Unlock more") }} — {{ APP_NAME }}{% endblock %}
 
 {% block content %}
 <div class="container py-5" style="max-width:960px">
@@ -8,25 +9,25 @@
       <span class="d-inline-block mb-2" aria-hidden="true" style="font-size:2rem;">
         <i class="bi bi-{{ icon|default:'stars' }}"></i>
       </span>
-      <span class="visually-hidden">{{ title|default:"Feature" }}</span>
+      <span class="visually-hidden">{{ title|default:_("Feature") }}</span>
     {% endif %}
-    <h1 class="h3 mb-2">{{ title|default:"Unlock more with a plan" }}</h1>
+    <h1 class="h3 mb-2">{{ title|default:_("Unlock more with a plan") }}</h1>
     {% if lead %}<p class="text-muted mb-0">{{ lead }}</p>{% endif %}
   </header>
 
   <div class="row g-4 align-items-stretch mt-2">
     <section class="col-md-6">
       <div class="p-4 bg-light border rounded-3 h-100">
-        <h2 class="h5 mb-3">What you’ll get</h2>
+        <h2 class="h5 mb-3">{% trans "What you’ll get" %}</h2>
         {% if features %}
           <ul class="mb-0">
             {% for f in features %}<li>{{ f }}</li>{% endfor %}
           </ul>
         {% else %}
           <ul class="mb-0">
-            <li>Clean, focused UI for {{ title|default:"your work"|lower }}</li>
-            <li>Exports you can take anywhere (CSV / PDF)</li>
-            <li>Fast support if you need a hand</li>
+            <li>{% blocktrans %}Clean, focused UI for {{ title|default:"your work"|lower }}{% endblocktrans %}</li>
+            <li>{% trans "Exports you can take anywhere (CSV / PDF)" %}</li>
+            <li>{% trans "Fast support if you need a hand" %}</li>
           </ul>
         {% endif %}
       </div>
@@ -34,24 +35,31 @@
 
     <section class="col-md-6">
       <div class="p-4 border rounded-3 h-100 d-flex flex-column">
-        <h2 class="h5">Ready to unlock {{ title|default:"this feature"|lower }}?</h2>
-        <p class="text-muted">Pick a plan that fits — or start free to kick the tires.</p>
+        <h2 class="h5">{% blocktrans %}Ready to unlock {{ title|default:"this feature"|lower }}?{% endblocktrans %}</h2>
+        <p class="text-muted">{% trans "Pick a plan that fits — or start free to kick the tires." %}</p>
 
         {% if illustration_url %}
-          <img src="{{ illustration_url }}" alt="" class="img-fluid rounded mb-3">
+          <img src="{{ illustration_url }}"
+               alt="{{ illustration_alt|default:_('Illustration') }}"
+               class="img-fluid rounded mb-3">
         {% endif %}
 
         <div class="mt-auto d-flex flex-wrap gap-2">
           {% if ctas %}
-            {# ctas = [{'label':'See plans','url':..., 'style':'primary|outline-primary|success', ...}, ...] #}
+            {# ctas = [{'label':'See plans','url':..., 'style':'primary|outline-primary|success', 'target':'_blank', 'rel':'noopener', ...}, ...] #}
             {% for c in ctas %}
-              <a class="btn {% if c.style %}btn-{{ c.style }}{% else %}btn-primary{% endif %}" href="{{ c.url }}">{{ c.label }}</a>
+              <a class="btn {% if c.style %}btn-{{ c.style }}{% else %}btn-primary{% endif %}"
+                 href="{{ c.url }}"
+                 {% if c.target %}target="{{ c.target }}"{% endif %}
+                 {% if c.rel or c.target == '_blank' %}rel="{{ c.rel|default:'noopener noreferrer' }}"{% endif %}>
+                {{ c.label }}
+              </a>
             {% endfor %}
           {% else %}
             {% if cta_primary_url and cta_primary_label %}
               <a class="btn btn-primary" href="{{ cta_primary_url }}">{{ cta_primary_label }}</a>
             {% else %}
-              <a class="btn btn-primary" href="{% url 'billing:plans' %}">See plans</a>
+              <a class="btn btn-primary" href="{% url 'billing:plans' %}">{% trans "See plans" %}</a>
             {% endif %}
             {% if cta_secondary_url and cta_secondary_label %}
               <a class="btn btn-outline-primary" href="{{ cta_secondary_url }}">{{ cta_secondary_label }}</a>
@@ -67,7 +75,7 @@
   {% endif %}
 
   <div class="text-center mt-4">
-    <a class="small text-decoration-none" href="{% url 'dashboard:home' %}">Back to Home</a>
+    <a class="small text-decoration-none" href="{% url 'dashboard:home' %}">{% trans "Back to Home" %}</a>
   </div>
 </div>
 {% endblock %}

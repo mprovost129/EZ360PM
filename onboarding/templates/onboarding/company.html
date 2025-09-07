@@ -1,13 +1,26 @@
 {% extends "base.html" %}
+{% block page_title %}Create Your Company{% endblock %}
 
 {% block content %}
 <div class="container py-5" style="max-width: 640px">
   {# Onboarding progress indicator #}
   {% include "onboarding/_progress.html" with step="company" %}
+
   <h1 class="h4 mb-3">Create Your Company</h1>
   <p class="text-muted mb-4">
     Add your company name, logo, and contact details. You can update these settings later from your profile.
   </p>
+
+  {# Top-level non-field errors #}
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger" role="alert">
+      <ul class="mb-0">
+        {% for err in form.non_field_errors %}
+          <li>{{ err }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
 
   <form method="post" enctype="multipart/form-data" novalidate>
     {% csrf_token %}

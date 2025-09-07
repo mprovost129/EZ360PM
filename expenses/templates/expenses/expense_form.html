@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block page_title %}
+  {% if mode == 'create' %}New Expense{% else %}Edit Expense{% endif %}
+{% endblock %}
+
+{% block app_content %}
+<form method="post" novalidate>
+  {% csrf_token %}
+
+  {% with exp=expense|default:form.instance %}
+
+  {# Top-level errors #}
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger" role="alert">
+      {{ form.non_field_errors }}
+    </div>
+  {% endif %}
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+
+      {# Linked invoice notice (if any) #}
+      {% if exp and exp.invoice %}
+        <div class="alert alert-info d-flex justify-content-between align-items-center mb-4" role="alert">
+          <div>
+            This expense has been added to
+            <strong>
+              <a class="alert-link" href="{% url 'invoices:invoice_detail' exp.invoice.pk %}">{{ exp.invoice.number }}</a>
+            </strong>.
+            Edits here won’t change the sent invoice.
+          </div>
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'invoices:invoice_detail' exp.invoice.pk %}">View invoice</a>
+        </div>
+      {% endif %}
+
+      {# ===== Basics ===== #}
+      <fieldset class="mb-4">
+        <legend class="h6 mb-3">Basics</legend>
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label" for="{{ form.date.id_for_label }}">Date</label>
+            {{ form.date }}
+            {% if form.date.errors %}<div class="invalid-feedback d-block">{{ form.date.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label" for="{{ form.vendor.id_for_label }}">Vendor</label>
+            {{ form.vendor }}
+            {% if form.vendor.errors %}<div class="invalid-feedback d-block">{{ form.vendor.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-md-5">
+            <label class="form-label" for="{{ form.category.id_for_label }}">Category</label>
+            {{ form.category }}
+            {% if form.category.errors %}<div class="invalid-feedback d-block">{{ form.category.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-12">
+            <label class="form-label" for="{{ form.description.id_for_label }}">Description</label>
+            {{ form.description }}
+            {% if form.description.errors %}<div class="invalid-feedback d-block">{{ form.description.errors }}</div>{% endif %}
+          </div>
+        </div>
+      </fieldset>
+
+      {# ===== Billing & Allocation ===== #}
+      <fieldset class="mb-4">
+        <legend class="h6 mb-3">Billing &amp; Allocation</legend>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.project.id_for_label }}">Project</label>
+            {{ form.project }}
+            {% if form.project.errors %}<div class="invalid-feedback d-block">{{ form.project.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.amount.id_for_label }}">Amount</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              {{ form.amount }}
+            </div>
+            {% if form.amount.errors %}<div class="invalid-feedback d-block">{{ form.amount.errors }}</div>{% endif %}
+          </div>
+        </div>
+      </fieldset>
+
+      {# ===== Rebilling (conditional) ===== #}
+      <fieldset class="mb-0">
+        <legend class="h6 mb-3">Rebilling</legend>
+
+        <div class="row g-3 align-items-center">
+          <div class="col-12">
+            <div class="form-check">
+              {{ form.is_billable }}
+              <label class="form-check-label" for="{{ form.is_billable.id_for_label }}">Billable to client</label>
+            </div>
+            {% if form.is_billable.errors %}<div class="invalid-feedback d-block">{{ form.is_billable.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-md-4 billable-fields">
+            <label class="form-label" for="{{ form.billable_markup_pct.id_for_label }}">% Markup</label>
+            <div class="input-group">
+              {{ form.billable_markup_pct }}
+              <span class="input-group-text">%</span>
+            </div>
+            <div class="form-text" id="markupHelp">Optional markup to add when rebilling (e.g., 10.00).</div>
+            {% if form.billable_markup_pct.errors %}<div class="invalid-feedback d-block">{{ form.billable_markup_pct.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-md-8 billable-fields">
+            <label class="form-label" for="{{ form.billable_note.id_for_label }}">Billable note</label>
+            {{ form.billable_note }}
+            <div class="form-text">Shown on the invoice line item (e.g., “Reimbursable expense”).</div>
+            {% if form.billable_note.errors %}<div class="invalid-feedback d-block">{{ form.billable_note.errors }}</div>{% endif %}
+          </div>
+        </div>
+      </fieldset>
+
+    </div>
+
+    <div class="card-footer d-flex justify-content-between">
+      <a class="btn btn-outline-secondary" href="{% url 'expenses:expenses' %}">Cancel</a>
+      <div class="d-flex gap-2">
+        {% if form.instance.pk %}
+          <form method="post" action="{% url 'expenses:expense_delete' form.instance.pk %}" class="d-inline" onsubmit="return confirm('Delete this expense?');">
+            {% csrf_token %}
+            <button class="btn btn-outline-danger" type="submit">Delete</button>
+          </form>
+        {% endif %}
+        <button class="btn btn-primary" type="submit">Save</button>
+      </div>
+    </div>
+  </div>
+
+  {% endwith %}
+</form>
+
+<script>
+  // Show/hide & enable/disable rebilling fields based on the billable checkbox
+  (function () {
+    const billable = document.getElementById('{{ form.is_billable.id_for_label }}');
+    const groups = document.querySelectorAll('.billable-fields');
+
+    function setEnabled(container, enabled) {
+      container.querySelectorAll('input, select, textarea').forEach(el => {
+        // keep hidden fields (if any) enabled
+        el.disabled = (el.type !== 'hidden') ? !enabled : false;
+      });
+    }
+
+    function toggle() {
+      const on = !!(billable && billable.checked);
+      groups.forEach(g => {
+        g.style.display = on ? '' : 'none';
+        setEnabled(g, on);
+      });
+    }
+
+    if (billable) {
+      billable.addEventListener('change', toggle);
+      toggle(); // initial state
+    }
+  })();
+</script>
+{% endblock %}

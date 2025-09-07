@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% load humanize tz %}
+{% block page_title %}Payments{% endblock %}
+{% block app_content %}
+
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+  <form class="d-flex align-items-center" method="get" role="search" style="max-width:520px; width:100%">
+    <label for="paymentsSearch" class="visually-hidden">Search payments</label>
+    <input id="paymentsSearch" class="form-control" type="search" name="q" value="{{ q }}" placeholder="Search by invoice #, client, method…">
+    <button class="btn btn-outline-secondary ms-2" type="submit">Search</button>
+    {% if q %}
+      <a class="btn btn-outline-secondary ms-2" href="{% url 'payments:list' %}">Clear</a>
+    {% endif %}
+  </form>
+  <a class="btn btn-outline-primary" href="{% url 'invoices:invoices' %}">Go to Invoices</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr>
+          <th style="width:160px">Received</th>
+          <th>Invoice</th>
+          <th>Client</th>
+          <th style="width:160px">Method</th>
+          <th class="text-end" style="width:160px">Amount</th>
+          <th class="text-end" style="width:160px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in payments %}
+        <tr>
+          <td class="text-nowrap">{{ p.received_at|localtime|date:"Y-m-d H:i" }}</td>
+
+          <td class="fw-semibold">
+            {% if p.invoice %}
+              <a class="text-decoration-none" href="{% url 'invoices:invoice_detail' p.invoice.pk %}">
+                {{ p.invoice.number|default:p.invoice.pk }}
+              </a>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+
+          <td class="text-truncate">
+            {% if p.invoice and p.invoice.client %}
+              {{ p.invoice.client.org|default:p.invoice.client }}
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+
+          <td class="text-nowrap">
+            {% if p.method %}{{ p.method }}{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+
+          <td class="text-end text-nowrap">
+            ${{ p.amount|floatformat:2|intcomma }}
+          </td>
+
+          <td class="text-end">
+            {% if p.invoice %}
+              <a class="btn btn-sm btn-outline-primary" href="{% url 'invoices:invoice_detail' p.invoice.pk %}">View invoice</a>
+            {% else %}
+              <button class="btn btn-sm btn-outline-secondary" disabled>View invoice</button>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-center text-muted py-4">No payments found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj %}
+    <div class="card-footer d-flex justify-content-between align-items-center">
+      <div class="text-muted small">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+      </div>
+      <div class="btn-group">
+        {% if page_obj.has_previous %}
+          <a class="btn btn-sm btn-outline-secondary" href="?{% if q %}q={{ q|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+        {% else %}
+          <button class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+        {% endif %}
+        {% if page_obj.has_next %}
+          <a class="btn btn-sm btn-outline-secondary" href="?{% if q %}q={{ q|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+        {% else %}
+          <button class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+{% endblock %}

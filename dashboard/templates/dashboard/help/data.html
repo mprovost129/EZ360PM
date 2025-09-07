@@ -1,13 +1,26 @@
 {% extends "dashboard/help/_article_base.html" %}
-{% block help_title %}Data Export & Import{% endblock %}
-{% block help_intro %}Export your data anytime; import clients and projects from CSV.{% endblock %}
+
+{% block help_title %}Data Export &amp; Import{% endblock %}
+{% block help_intro %}Export your data anytime, or import clients and projects from CSV templates in {{ APP_NAME }}.{% endblock %}
+
 {% block help_body %}
-<ol class="mb-4">
-  <li><strong>Export:</strong> From <em>Reports</em> or list pages, use <em>Export CSV</em> to back up or migrate.</li>
-  <li><strong>Import clients/projects:</strong> Download the CSV template, fill required fields, and upload.</li>
-  <li><strong>Data safety:</strong> Keep exports secure—they may contain sensitive client data.</li>
+<h2 class="h6 mt-3">How it works</h2>
+<ol class="mb-4" aria-label="Steps for exporting and importing data">
+  <li>
+    <strong>Export:</strong> From <em>Reports</em> or list pages, click <em>Export CSV</em> to download records
+    for backup, analysis, or migration.
+  </li>
+  <li>
+    <strong>Import clients/projects:</strong> Download the provided CSV template, complete the required fields,
+    and upload it to bulk-create clients or projects.
+  </li>
+  <li>
+    <strong>Data safety:</strong> Exports may include sensitive client or financial data. Store files securely
+    and share them only with trusted recipients.
+  </li>
 </ol>
-<div class="alert alert-info small">
-  <strong>Tip:</strong> Test imports with a few rows first to validate your headers and formats.
+
+<div class="alert alert-info small" role="note">
+  <strong>Tip:</strong> Test imports with a few rows first to confirm your headers and formats before uploading a full dataset.
 </div>
 {% endblock %}

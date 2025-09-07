@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block page_title %}Invite Member{% endblock %}
+
+{% block app_content %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="card shadow-sm">
+    <div class="card-body">
+      {# Error summary #}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger mb-3">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
+
+      <div class="row g-3 align-items-start">
+        {# Email #}
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.email.id_for_label }}">Email</label>
+          {{ form.email.as_widget|safe }}
+          {% if form.email.errors %}
+            <div class="invalid-feedback d-block">{{ form.email.errors|striptags }}</div>
+          {% else %}
+            <div class="form-text" id="emailHelp">Invite will be sent to this address.</div>
+          {% endif %}
+        </div>
+
+        {# Role #}
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.role.id_for_label }}">Role</label>
+          {{ form.role.as_widget|safe }}
+          {% if form.role.errors %}
+            <div class="invalid-feedback d-block">{{ form.role.errors|striptags }}</div>
+          {% else %}
+            <div class="form-text" id="roleHelp">
+              Owners/Admins can manage billing &amp; team. Members have project-level access.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="form-text mt-3">
+        In development, the invite link may also appear below.
+      </div>
+    </div>
+
+    <div class="card-footer d-flex justify-content-between">
+      <a class="btn btn-outline-secondary" href="{% url 'company:team_list' %}">Cancel</a>
+      <button id="sendBtn" class="btn btn-primary" type="submit">
+        <span class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
+        Send invite
+      </button>
+    </div>
+  </div>
+</form>
+
+{# Dev helper: show/copy invite URL when provided by the view #}
+{% if invite_url %}
+  <div class="alert alert-success mt-3" role="region" aria-live="polite">
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <strong>Invite link created</strong>
+      <span class="badge text-bg-light">DEV</span>
+    </div>
+    <div class="input-group">
+      <input id="inviteLink" type="text" class="form-control" value="{{ invite_url }}" readonly>
+      <button id="copyBtn" class="btn btn-outline-secondary" type="button">Copy</button>
+    </div>
+    <div id="copyMsg" class="small text-success mt-2 d-none">Copied!</div>
+  </div>
+{% endif %}
+
+<script>
+  // Prevent double submits + show spinner
+  (function () {
+    const btn = document.getElementById('sendBtn');
+    if (!btn) return;
+    const form = btn.closest('form');
+    if (!form) return;
+    form.addEventListener('submit', function () {
+      const spinner = btn.querySelector('.spinner-border');
+      if (spinner) spinner.classList.remove('d-none');
+      btn.setAttribute('disabled', 'disabled');
+    });
+  })();
+
+  // Copy invite link (dev helper)
+  (function () {
+    const btn = document.getElementById('copyBtn');
+    const inp = document.getElementById('inviteLink');
+    const msg = document.getElementById('copyMsg');
+    if (!btn || !inp) return;
+    btn.addEventListener('click', async function () {
+      try {
+        await navigator.clipboard.writeText(inp.value);
+        if (msg) { msg.classList.remove('d-none'); setTimeout(() => msg.classList.add('d-none'), 1500); }
+      } catch (_) {
+        inp.select(); document.execCommand('copy');
+        if (msg) { msg.classList.remove('d-none'); setTimeout(() => msg.classList.add('d-none'), 1500); }
+      }
+    });
+  })();
+</script>
+{% endblock %}
+

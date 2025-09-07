@@ -2,85 +2,79 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, TypeVar, cast
+from typing import Callable, Optional, Dict, Any, TypeVar
 
+from django.conf import settings
 from django.contrib import messages
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
-from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
-from .utils import get_active_company
+# Prefer the lightweight helper from core.utils; provide a safe fallback.
+try:
+    from core.utils import user_has_active_subscription  # type: ignore
+except Exception:  # pragma: no cover
+    def user_has_active_subscription(company) -> bool:  # fallback
+        return False
 
-ViewFunc = TypeVar("ViewFunc", bound=Callable[..., HttpResponse])
+# Feature flag to allow turning off gating in dev/tests.
+ENFORCE_SUBSCRIPTION: bool = bool(getattr(settings, "ENFORCE_SUBSCRIPTION", True))
+
+VF = TypeVar("VF", bound=Callable[..., HttpResponse])
+
+__all__ = [
+    "require_subscription",
+    "subscription_or_landing",
+]
 
 
-def _safe_redirect_to_onboarding_or_home() -> HttpResponse:
+def require_subscription(view_func: VF) -> VF:
     """
-    Redirect to onboarding if available, otherwise fallback to dashboard home,
-    and finally to root as a last resort.
+    Guard views behind an active subscription.
+    - If settings.ENFORCE_SUBSCRIPTION is False, always allow.
+    - If the user’s active company has an active/trialing subscription, allow.
+    - Otherwise, redirect to billing plans with a friendly message.
     """
-    try:
-        return redirect("core:onboarding_company")
-    except NoReverseMatch:
-        try:
-            return redirect("dashboard:home")
-        except NoReverseMatch:
-            return redirect("/")
+    @wraps(view_func)
+    def _wrapped(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        # Lazy imports to avoid circular import with company.utils
+        from django.conf import settings
+        from company.utils import get_active_company
+
+        enforce = getattr(settings, "ENFORCE_SUBSCRIPTION", True)
+        if not enforce:
+            return view_func(request, *args, **kwargs)
+
+        company = get_active_company(request)
+        # user_has_active_subscription is defined in this module; no import needed
+        if company and user_has_active_subscription(company):
+            return view_func(request, *args, **kwargs)
+
+        messages.warning(request, "Please choose a plan to use this feature.")
+        return redirect("billing:plans")
+
+    return _wrapped  # type: ignore[return-value]
 
 
 def _has_active_subscription(company) -> bool:
     """
-    Safe checker that avoids hard failures when billing is absent or partially configured.
-
-    Rules:
-      - Subscription must exist.
-      - status in {"active", "trialing"} is treated as valid.
-      - If cancel_at_period_end is True, the subscription is valid until current_period_end.
+    Safe checker that doesn't hard-crash if billing isn't installed and
+    tolerates partially-populated subscription objects.
     """
     try:
         sub = getattr(company, "subscription", None)
         if not sub:
             return False
-
-        status = (getattr(sub, "status", "") or "").lower()
-        if status not in {"active", "trialing"}:
+        status_ok = str(getattr(sub, "status", "")).lower() in {"active", "trialing"}
+        if not status_ok:
             return False
-
-        # If cancellation at period end, still valid until then.
+        # If set to cancel at period end, still valid until the end timestamp.
         if getattr(sub, "cancel_at_period_end", False):
-            cpe = getattr(sub, "current_period_end", None)
-            return bool(cpe and cpe > timezone.now())
-
+            end = getattr(sub, "current_period_end", None)
+            return bool(end and end > timezone.now())
         return True
     except Exception:
-        # If anything unexpected happens, err on the safe side and treat as not active.
         return False
-
-
-def require_subscription(view: ViewFunc) -> ViewFunc:
-    """
-    Guard a view so it's accessible only when the active company has an active subscription.
-    If no active company is set, the user is redirected to onboarding (or dashboard/home).
-    """
-    @wraps(view)
-    def _wrapped(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
-        company = get_active_company(request)
-        if not company:
-            messages.info(request, "Create your company profile to continue.")
-            return _safe_redirect_to_onboarding_or_home()
-
-        if not _has_active_subscription(company):
-            messages.warning(request, "Your subscription is inactive. Choose a plan to continue.")
-            try:
-                # Include a 'next' parameter when possible so users can return after checkout.
-                return redirect(f"{reverse('billing:plans')}?next={request.path}")
-            except NoReverseMatch:
-                return _safe_redirect_to_onboarding_or_home()
-
-        return view(request, *args, **kwargs)
-
-    return cast(ViewFunc, _wrapped)
 
 
 def subscription_or_landing(
@@ -88,34 +82,45 @@ def subscription_or_landing(
     *,
     context: Optional[Dict[str, Any]] = None,
     context_cb: Optional[Callable[[HttpRequest], Dict[str, Any]]] = None,
-) -> Callable[[ViewFunc], ViewFunc]:
+):
     """
-    Decorator that:
-      - Executes the view if the active company has an active subscription.
-      - Otherwise renders a friendly landing page (HTTP 200), optionally enriched via `context_cb`.
+    Decorator factory:
+      If the active company has a subscription → run the view.
+      Otherwise → render a friendly landing page (HTTP 200, not 403).
 
-    Useful for top-level pages where you want to showcase the product and prompt for upgrade
-    rather than hard-blocking with a redirect.
+    Args:
+        template_name: Path to the landing template.
+        context: Static context dict merged into the landing render.
+        context_cb: Optional callback(request) → dict for dynamic context.
     """
-    base_context: Dict[str, Any] = context or {}
+    base_ctx = dict(context or {})
 
-    def _decorator(view_func: ViewFunc) -> ViewFunc:
+    def _decorator(view_func: VF) -> VF:
         @wraps(view_func)
         def _wrapped(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
-            company = get_active_company(request)
-            if company and _has_active_subscription(company):
+            # Lazy imports to prevent circular import with company.utils
+            from django.conf import settings
+            from company.utils import get_active_company
+            # user_has_active_subscription is defined in this module
+
+            # If enforcement is disabled, always allow
+            if not getattr(settings, "ENFORCE_SUBSCRIPTION", True):
                 return view_func(request, *args, **kwargs)
 
-            landing_ctx = dict(base_context)
+            company = get_active_company(request)
+            if company and user_has_active_subscription(company):
+                return view_func(request, *args, **kwargs)
+
+            landing_ctx = dict(base_ctx)
             if context_cb:
                 try:
                     landing_ctx.update(context_cb(request) or {})
                 except Exception:
-                    # If your callback throws, don’t break the page—just show base context.
+                    # Don’t block landing if the callback fails.
                     pass
 
             return render(request, template_name, landing_ctx, status=200)
 
-        return cast(ViewFunc, _wrapped)
+        return _wrapped  # type: ignore[return-value]
 
     return _decorator

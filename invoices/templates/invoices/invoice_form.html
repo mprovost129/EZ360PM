@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block page_title %}
+  {% if mode == "create" %}New Invoice{% else %}Edit Invoice{% endif %}
+{% endblock %}
+
+{% block app_content %}
+<form method="post" novalidate>
+  {% csrf_token %}
+
+  {# ——— Top-level errors ——— #}
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger" role="alert">
+      {{ form.non_field_errors }}
+    </div>
+  {% endif %}
+
+  {# ========== Header / Basics ========== #}
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <fieldset class="mb-3">
+        <legend class="h6 mb-3">Basics</legend>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label" for="{{ form.number.id_for_label }}">Invoice #</label>
+            {{ form.number }}
+            {% if form.number.errors %}<div class="invalid-feedback d-block">{{ form.number.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label" for="{{ form.client.id_for_label }}">Client</label>
+            {{ form.client }}
+            {% if form.client.errors %}<div class="invalid-feedback d-block">{{ form.client.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label" for="{{ form.project.id_for_label }}">Project</label>
+            {{ form.project }}
+            {% if form.project.errors %}<div class="invalid-feedback d-block">{{ form.project.errors }}</div>{% endif %}
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="mb-3">
+        <legend class="h6 mb-3">Dates & Tax</legend>
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label" for="{{ form.status.id_for_label }}">Status</label>
+            {{ form.status }}
+            {% if form.status.errors %}<div class="invalid-feedback d-block">{{ form.status.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label" for="{{ form.issue_date.id_for_label }}">Issue date</label>
+            {{ form.issue_date }}
+            {% if form.issue_date.errors %}<div class="invalid-feedback d-block">{{ form.issue_date.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label" for="{{ form.due_date.id_for_label }}">Due date</label>
+            {{ form.due_date }}
+            {% if form.due_date.errors %}<div class="invalid-feedback d-block">{{ form.due_date.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label" for="{{ form.tax.id_for_label }}">Tax (amount)</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              {{ form.tax }}
+            </div>
+            {% if form.tax.errors %}<div class="invalid-feedback d-block">{{ form.tax.errors }}</div>{% endif %}
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="mb-0">
+        <legend class="h6 mb-3">Notes</legend>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label" for="{{ form.notes.id_for_label }}">Notes</label>
+            {{ form.notes }}
+            {% if form.notes.errors %}<div class="invalid-feedback d-block">{{ form.notes.errors }}</div>{% endif %}
+          </div>
+        </div>
+      </fieldset>
+    </div>
+  </div>
+
+  {# ========== Line items ========== #}
+  <div class="card shadow-sm">
+    <div class="card-body">
+
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <strong>Line Items</strong>
+        <button class="btn btn-sm btn-outline-secondary" type="button" id="add-row-btn">Add row</button>
+      </div>
+
+      {% if formset.non_form_errors %}
+        <div class="alert alert-danger py-2 mb-3">
+          {{ formset.non_form_errors }}
+        </div>
+      {% endif %}
+
+      {{ formset.management_form }}
+
+      <div id="items" data-prefix="{{ formset.prefix }}">
+        {% for f in formset %}
+          <div class="row g-2 align-items-end border-bottom pb-2 mb-2 item-row">
+            <div class="col-md-7">
+              <label class="form-label" for="{{ f.description.id_for_label }}">Description</label>
+              {{ f.description }}
+              {% if f.description.errors %}<div class="invalid-feedback d-block">{{ f.description.errors }}</div>{% endif %}
+            </div>
+
+            <div class="col-md-2">
+              <label class="form-label" for="{{ f.qty.id_for_label }}">Qty</label>
+              {{ f.qty }}
+              {% if f.qty.errors %}<div class="invalid-feedback d-block">{{ f.qty.errors }}</div>{% endif %}
+            </div>
+
+            <div class="col-md-2">
+              <label class="form-label" for="{{ f.unit_price.id_for_label }}">Unit price</label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                {{ f.unit_price }}
+              </div>
+              {% if f.unit_price.errors %}<div class="invalid-feedback d-block">{{ f.unit_price.errors }}</div>{% endif %}
+            </div>
+
+            <div class="col-md-1">
+              <label class="form-label d-block">Delete</label>
+              {{ f.DELETE }}
+              {{ f.id }}
+              <button class="btn btn-sm btn-outline-danger ms-1 remove-row-btn" type="button" title="Remove row">&times;</button>
+            </div>
+          </div>
+        {% empty %}
+          {# Fallback: show one blank row if formset has no initial forms #}
+          <div class="row g-2 align-items-end border-bottom pb-2 mb-2 item-row">
+            <div class="col-md-7">
+              <label class="form-label" for="{{ formset.empty_form.description.id_for_label|default:'' }}">Description</label>
+              {{ formset.empty_form.description }}
+            </div>
+            <div class="col-md-2">
+              <label class="form-label" for="{{ formset.empty_form.qty.id_for_label|default:'' }}">Qty</label>
+              {{ formset.empty_form.qty }}
+            </div>
+            <div class="col-md-2">
+              <label class="form-label" for="{{ formset.empty_form.unit_price.id_for_label|default:'' }}">Unit price</label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                {{ formset.empty_form.unit_price }}
+              </div>
+            </div>
+            <div class="col-md-1">
+              <label class="form-label d-block">Delete</label>
+              {{ formset.empty_form.DELETE }}
+              {{ formset.empty_form.id }}
+              <button class="btn btn-sm btn-outline-danger ms-1 remove-row-btn" type="button" title="Remove row">&times;</button>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      {# Hidden prototype for new rows — uses __prefix__ #}
+      <template id="item-empty-template">
+        <div class="row g-2 align-items-end border-bottom pb-2 mb-2 item-row">
+          <div class="col-md-7">
+            <label class="form-label" for="{{ formset.empty_form.description.id_for_label|default:'' }}">Description</label>
+            {{ formset.empty_form.description }}
+          </div>
+          <div class="col-md-2">
+            <label class="form-label" for="{{ formset.empty_form.qty.id_for_label|default:'' }}">Qty</label>
+            {{ formset.empty_form.qty }}
+          </div>
+          <div class="col-md-2">
+            <label class="form-label" for="{{ formset.empty_form.unit_price.id_for_label|default:'' }}">Unit price</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              {{ formset.empty_form.unit_price }}
+            </div>
+          </div>
+          <div class="col-md-1">
+            <label class="form-label d-block">Delete</label>
+            {{ formset.empty_form.DELETE }}
+            {{ formset.empty_form.id }}
+            <button class="btn btn-sm btn-outline-danger ms-1 remove-row-btn" type="button" title="Remove row">&times;</button>
+          </div>
+        </div>
+      </template>
+
+    </div>
+
+    <div class="card-footer d-flex justify-content-between">
+      {% if form.instance.pk %}
+        <a class="btn btn-outline-secondary" href="{% url 'invoices:invoice_detail' form.instance.pk %}">Cancel</a>
+      {% else %}
+        <a class="btn btn-outline-secondary" href="{% url 'invoices:invoices' %}">Cancel</a>
+      {% endif %}
+      <div class="d-flex gap-2">
+        {% if form.instance.pk %}
+          <a class="btn btn-outline-danger" href="{% url 'invoices:invoice_delete' form.instance.pk %}">Delete</a>
+        {% endif %}
+        <button class="btn btn-primary" type="submit">Save</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<script>
+(function() {
+  const items = document.getElementById('items');
+  if (!items) return;
+
+  const prefix = items.dataset.prefix || 'items';
+  const totalInput = document.querySelector(`[name="${prefix}-TOTAL_FORMS"]`);
+  const addBtn = document.getElementById('add-row-btn');
+  const tmpl = document.getElementById('item-empty-template');
+
+  function addFormsetRow() {
+    const idx = parseInt(totalInput.value || '0', 10);
+    const html = tmpl.innerHTML.replace(/__prefix__/g, idx);
+    const frag = document.createRange().createContextualFragment(html);
+
+    // Reset any values that might sneak in
+    frag.querySelectorAll('input, textarea, select').forEach(el => {
+      if (el.type === 'checkbox' || el.type === 'radio') {
+        el.checked = false;
+      } else if (el.tagName === 'SELECT') {
+        el.selectedIndex = -1;
+      } else if (el.type !== 'hidden') {
+        el.value = '';
+      }
+    });
+
+    items.appendChild(frag);
+    totalInput.value = idx + 1;
+  }
+
+  function handleRemoveClick(e) {
+    const btn = e.target.closest('.remove-row-btn');
+    if (!btn) return;
+    const row = btn.closest('.item-row');
+    if (!row) return;
+
+    const del = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
+    if (del) {
+      del.checked = true;
+      row.style.display = 'none';
+    } else {
+      row.remove();
+      // Keep TOTAL_FORMS stable; server-side formset handles gaps by ids.
+    }
+  }
+
+  if (addBtn) addBtn.addEventListener('click', addFormsetRow);
+  items.addEventListener('click', handleRemoveClick);
+})();
+</script>
+{% endblock %}

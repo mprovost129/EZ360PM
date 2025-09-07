@@ -1,0 +1,24 @@
+{# estimates/templates/email/estimate_email.txt #}
+Hi {{ est.client.first_name|default:est.client.org|default:"there" }},
+
+{% if mode == "reminder" -%}
+This is a friendly reminder about estimate {{ est.number }} from {{ est.company.name }}.
+{%- else -%}
+Here’s estimate {{ est.number }} from {{ est.company.name }}.
+{%- endif %}
+
+Issued: {{ est.issue_date|date:"Y-m-d" }}
+{% if est.valid_until %}Valid until: {{ est.valid_until|date:"Y-m-d" }}{% endif %}
+Total: ${{ est.total|default:0|floatformat:2 }}
+
+View online:
+{{ public_url }}
+
+{% if note %}
+Message:
+{{ note }}
+{% endif %}
+
+Thanks,  
+{{ est.company.name }}  
+Sent via {{ APP_NAME }}

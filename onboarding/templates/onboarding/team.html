@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block page_title %}Invite Your Team{% endblock %}
 
 {% block content %}
 <div class="container py-5" style="max-width:640px">
@@ -13,7 +14,7 @@
   <div class="border rounded p-3 mb-4">
     <p class="mb-2"><strong>How to invite</strong></p>
     <ol class="mb-0">
-      <li>Go to <a href="{% url 'core:team_list' %}">Team</a>.</li>
+      <li>Go to <a href="{% url 'company:team_list' %}">Team</a>.</li>
       <li>Click <em>Invite</em> and enter their email address.</li>
       <li>Choose a role (Admin, Manager, or Member).</li>
     </ol>
@@ -21,7 +22,7 @@
 
   <form method="post" class="d-flex gap-2">
     {% csrf_token %}
-    <a class="btn btn-primary" href="{% url 'core:team_list' %}">Open Team</a>
+    <a class="btn btn-primary" href="{% url 'company:team_list' %}">Open Team</a>
     <button type="submit" class="btn btn-outline-secondary" name="skip" value="1">Skip</button>
   </form>
 </div>

@@ -1,0 +1,18 @@
+{# templates/email/invoice_reminder_email.txt #}
+{% load humanize %}
+Hi {{ inv.client.first_name|default:inv.client.org|default:"there" }},
+
+This is a friendly reminder about Invoice {{ inv.number }} from {{ inv.company.name }}.
+
+Amount due: ${{ inv.balance|default_if_none:inv.total|floatformat:2|intcomma }}
+Issued: {{ inv.issue_date|date:"Y-m-d" }}{% if inv.due_date %} · Due: {{ inv.due_date|date:"Y-m-d" }}{% if days or days == 0 %}{% if days > 0 %} ({{ days }} day{{ days|pluralize }} overdue){% elif days == 0 %} (due today){% endif %}{% endif %}{% endif %}
+
+You can view and pay online here:
+{{ site_url }}{% url 'invoices:invoice_public' token=inv.public_token %}
+
+A PDF copy is attached for your records.
+If you’ve already paid, please ignore this message.
+
+Thanks!
+{{ inv.company.name }}
+

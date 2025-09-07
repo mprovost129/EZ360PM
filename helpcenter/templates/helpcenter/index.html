@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% block page_title %}Help Center{% endblock %}
+
 {% block content %}
 <div class="container py-5" style="max-width: 900px">
   <h1 class="h4 mb-4">Help Center</h1>
@@ -9,13 +11,16 @@
     {% for section in sections %}
       <div class="mb-4">
         <h2 class="h5 mb-3">{{ section.title }}</h2>
-        <div class="accordion" id="faq-{{ section.slug }}">
+        <div class="accordion" id="faq-{{ section.slug }}" aria-label="{{ section.title }}">
           {% for item in section.items %}
             <div class="accordion-item">
               <h2 class="accordion-header" id="heading-{{ section.slug }}-{{ forloop.counter }}">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                <button class="accordion-button collapsed fw-semibold"
+                        type="button"
+                        data-bs-toggle="collapse"
                         data-bs-target="#collapse-{{ section.slug }}-{{ forloop.counter }}"
-                        aria-expanded="false" aria-controls="collapse-{{ section.slug }}-{{ forloop.counter }}">
+                        aria-expanded="false"
+                        aria-controls="collapse-{{ section.slug }}-{{ forloop.counter }}">
                   {{ item.q }}
                 </button>
               </h2>

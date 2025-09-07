@@ -27,11 +27,15 @@ ALLOWED_HOSTS = tuple(
 # Site URL (use full origin incl. scheme in prod, e.g. "https://app.EZ360PM.com")
 SITE_URL = os.getenv("SITE_URL", "http://127.0.0.1:8000").rstrip("/")
 
-# Derive CSRF_TRUSTED_ORIGINS from SITE_URL automatically
+# Derive CSRF_TRUSTED_ORIGINS and ensure SITE_URL host is allowed
 _parsed = urlparse(SITE_URL if "://" in SITE_URL else f"https://{SITE_URL}")
 CSRF_TRUSTED_ORIGINS = [f"{_parsed.scheme}://{_parsed.hostname}"]
 if _parsed.port:
     CSRF_TRUSTED_ORIGINS.append(f"{_parsed.scheme}://{_parsed.hostname}:{_parsed.port}")
+
+if _parsed.hostname and _parsed.hostname not in ALLOWED_HOSTS:
+    # Keep your explicit ALLOWED_HOSTS, but also allow the SITE_URL host
+    ALLOWED_HOSTS = (*ALLOWED_HOSTS, _parsed.hostname)
 
 # -----------------------------------------------------------------------------
 # Apps
@@ -46,12 +50,23 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.humanize",
     "django.contrib.postgres",
+    "widget_tweaks",
 
     # Local apps
     "accounts",
     "core.apps.CoreConfig",
     "billing",
     "dashboard",
+    "timetracking",
+    "clients.apps.ClientsConfig",
+    "projects",
+    "invoices",
+    "company",
+    "payments",
+    "estimates",
+    "expenses",
+    "onboarding",
+    "helpcenter",
 ]
 
 MIDDLEWARE = [
@@ -78,11 +93,12 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                "core.context_processors.active_company",
+                "company.context_processors.active_company",
                 "core.context_processors.notifications",
                 "core.context_processors.branding",
                 "core.context_processors.app_context",
                 "core.context_processors.app_globals",
+                "dashboard.context_processors.cookie_consent",
             ],
         },
     },
@@ -112,6 +128,23 @@ else:
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / os.getenv("DB_NAME", "db.sqlite3"),
+        }
+    }
+
+# Optional caching (safe local-memory default; override via env if desired)
+if os.getenv("CACHE_BACKEND", "").lower() == "redis":
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": os.getenv("REDIS_URL", "redis://127.0.0.1:6379/1"),
+            "TIMEOUT": int(os.getenv("CACHE_TIMEOUT", "300")),
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "TIMEOUT": int(os.getenv("CACHE_TIMEOUT", "300")),
         }
     }
 
@@ -163,6 +196,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "EZ360PM <no-reply@localhost>")
 EMAIL_SUBJECT_PREFIX = os.getenv("EMAIL_SUBJECT_PREFIX", "[EZ360PM] ")
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 
 # (Optional) Production SMTP example (uncomment + set env vars)
 # EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
@@ -236,18 +270,58 @@ SUBPROCESSORS = [
 ]
 
 # -----------------------------------------------------------------------------
+# Sessions & Cookies (good defaults; override via env as needed)
+# -----------------------------------------------------------------------------
+SESSION_COOKIE_AGE = int(os.getenv("SESSION_COOKIE_AGE", str(60 * 60 * 24 * 14)))  # 2 weeks
+SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
+CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", "Lax")
+
+# -----------------------------------------------------------------------------
+# Logging (compact, production-friendly)
+# -----------------------------------------------------------------------------
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+DJANGO_LOG_LEVEL = os.getenv("DJANGO_LOG_LEVEL", "INFO")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "simple": {"format": "%(levelname)s %(name)s: %(message)s"},
+        "verbose": {"format": "%(asctime)s %(levelname)s %(name)s [%(module)s:%(lineno)d] %(message)s"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "simple"},
+    },
+    "root": {"handlers": ["console"], "level": LOG_LEVEL},
+    "loggers": {
+        "django": {"handlers": ["console"], "level": DJANGO_LOG_LEVEL, "propagate": False},
+        "django.security.DisallowedHost": {  # avoid noisy tracebacks for healthchecks, etc.
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
+
+# -----------------------------------------------------------------------------
 # Security (recommended for production)
 # -----------------------------------------------------------------------------
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    # If behind a proxy/ELB that sets X-Forwarded-Proto:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
     # HSTS (enable once you're sure HTTPS is fully working)
     SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
-    # Content Security Policy can be added via middleware or web server
-    # X_FRAME_OPTIONS, etc., may also be enforced at the proxy
+    # Additional safe headers
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = "DENY"
+    SECURE_REFERRER_POLICY = os.getenv("SECURE_REFERRER_POLICY", "strict-origin-when-cross-origin")
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = os.getenv("SECURE_CROSS_ORIGIN_OPENER_POLICY", "same-origin")
+
+# Optional: append slashes for nicer URLs
+APPEND_SLASH = os.getenv("APPEND_SLASH", "1") == "1"

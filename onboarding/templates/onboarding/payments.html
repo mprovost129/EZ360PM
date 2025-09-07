@@ -22,6 +22,18 @@
 
   <form method="post" class="d-flex gap-2">
     {% csrf_token %}
+
+    {# Optional non-field errors (safe even if no form is bound) #}
+    {% if form and form.non_field_errors %}
+      <div class="alert alert-danger" role="alert">
+        <ul class="mb-0">
+          {% for err in form.non_field_errors %}
+            <li>{{ err }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
     <a class="btn btn-primary" href="{% url 'billing:plans' %}">Go to Plans</a>
     {% if company and company.subscription and company.subscription.stripe_customer_id %}
       <a class="btn btn-outline-secondary" href="{% url 'billing:portal' %}">Billing Portal</a>
@@ -30,3 +42,4 @@
   </form>
 </div>
 {% endblock %}
+

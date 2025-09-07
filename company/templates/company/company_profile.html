@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block page_title %}Company Profile{% endblock %}
+
+{% block app_content %}
+<div class="row g-3">
+  <!-- Overview -->
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+
+        <div class="d-flex align-items-center gap-3 mb-3">
+          {% if company.company_logo %}
+            <img src="{{ company.company_logo.url }}" alt="{{ company.name }} logo"
+                 style="height:40px;width:auto;" />
+          {% else %}
+            <div class="rounded bg-light d-inline-flex align-items-center justify-content-center"
+                 style="width:40px;height:40px;">
+              <span class="fw-bold">{{ company.name|default:"Company"|slice:":1"|upper }}</span>
+            </div>
+          {% endif %}
+
+          <div class="flex-grow-1">
+            <div class="h5 mb-1 d-flex align-items-center gap-2">
+              <span>{{ company.name|default:"Your Company" }}</span>
+              {% if is_subscribed is not None %}
+                {% if is_subscribed %}
+                  <span class="badge text-bg-success">Subscribed</span>
+                {% else %}
+                  <span class="badge text-bg-warning">Free / Inactive</span>
+                {% endif %}
+              {% endif %}
+            </div>
+            {% if company.admin_phone %}
+              <div class="text-muted small">{{ company.admin_phone }}</div>
+            {% endif %}
+            {% if company.owner %}
+              <div class="text-muted small">
+                Owner:
+                {% firstof company.owner.get_full_name company.owner.email company.owner.username %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <hr>
+
+        <div class="row g-3">
+          <div class="col-md-12">
+            <div class="text-muted small">Address</div>
+            <div class="mb-2">
+              {{ company.address_1|default:"—" }}{% if company.address_2 %}<br>{{ company.address_2 }}{% endif %}
+              {% if company.city or company.state or company.zip_code %}
+                <br>
+                {{ company.city|default:"" }}{% if company.city %}{% if company.state or company.zip_code %},{% endif %}{% endif %}
+                {% if company.state %} {{ company.state }}{% endif %}
+                {% if company.zip_code %} {{ company.zip_code }}{% endif %}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-2">
+          <a class="btn btn-outline-primary" href="{% url 'company:company_edit' %}">Edit Company</a>
+          <a class="btn btn-outline-secondary" href="{% url 'company:team_list' %}">Manage Team</a>
+          <a class="btn btn-outline-secondary" href="{% url 'company:company_create' %}">Create Another Company</a>
+          <a class="btn btn-primary" href="{% url 'billing:plans' %}">Plans &amp; Billing</a>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Links / Meta -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Quick Links</div>
+        <div class="d-grid gap-2">
+          <a class="btn btn-outline-secondary" href="{% url 'projects:projects' %}">Projects</a>
+          <a class="btn btn-outline-secondary" href="{% url 'clients:clients' %}">Clients</a>
+          <a class="btn btn-outline-secondary" href="{% url 'invoices:invoices' %}">Invoices</a>
+          <a class="btn btn-outline-secondary" href="{% url 'expenses:expenses' %}">Expenses</a>
+          <a class="btn btn-outline-secondary" href="{% url 'core:reports' %}">Reports</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

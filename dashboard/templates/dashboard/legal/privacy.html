@@ -116,7 +116,11 @@
   <p>
     We do not “sell” personal information as defined by the California Consumer Privacy Act (CCPA/CPRA). If we engage in
     sharing for cross-context behavioral advertising, you may opt out using available controls or by visiting:
-    {% if do_not_sell_url %}<a href="{{ do_not_sell_url }}">{{ do_not_sell_url }}</a>{% else %}<em>(link to your Do-Not-Sell/Share page)</em>{% endif %}.
+    {% if do_not_sell_url %}
+      <a href="{{ do_not_sell_url }}" rel="noopener">{{ do_not_sell_url }}</a>
+    {% else %}
+      <em>(link to your Do-Not-Sell/Share page)</em>
+    {% endif %}.
   </p>
 
   <h2 id="children" class="h5">11) Children’s Privacy</h2>
@@ -129,7 +133,11 @@
   <p>
     We use trusted subprocessors to provide the Service (e.g., cloud hosting, email delivery, payment processing). For transparency,
     we may publish a list here:
-    {% if subprocessors_url %}<a href="{{ subprocessors_url }}">{{ subprocessors_url }}</a>{% else %}<em>(add your subprocessors page)</em>{% endif %}.
+    {% if subprocessors_url %}
+      <a href="{{ subprocessors_url }}" rel="noopener">{{ subprocessors_url }}</a>
+    {% else %}
+      <em>(add your subprocessors page)</em>
+    {% endif %}.
   </p>
 
   <h2 id="changes" class="h5">13) Changes to This Policy</h2>
@@ -139,7 +147,7 @@
   </p>
 
   <h2 id="contact" class="h5">14) Contact</h2>
-  <p>
+  <p class="mb-0">
     {{ company_name }}<br>
     {{ company_address }}<br>
     <a href="mailto:{{ support_email }}">{{ support_email }}</a>

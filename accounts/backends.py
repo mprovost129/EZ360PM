@@ -1,18 +1,21 @@
 # accounts/backends.py
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from django.contrib.auth.backends import ModelBackend
+from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth import get_user_model
 from django.http import HttpRequest
-
-User = get_user_model()
 
 
 class EmailBackend(ModelBackend):
     """
     Authenticate against the custom User model using email instead of username.
+
+    - Accepts both `username` and `email` keyword arguments.
+    - Normalizes email to lowercase before lookup.
+    - Respects `is_active` via `user_can_authenticate`.
     """
 
     def authenticate(
@@ -21,21 +24,29 @@ class EmailBackend(ModelBackend):
         username: str | None = None,
         password: str | None = None,
         email: str | None = None,
-        **kwargs,
-    ) -> Optional[User]: # type: ignore
-        if email is None:
-            # Some auth flows pass `username` instead of `email`
-            email = username
-        if email is None or password is None:
-            return None
+        **kwargs: Any,
+    ) -> Optional[AbstractBaseUser]:
+        UserModel = get_user_model()
 
-        # Normalize email
-        email = email.strip().lower()
+        ident = (email or username or "").strip().lower()
+        if not ident or password is None:
+            return None
 
         try:
-            user = User.objects.get(email__iexact=email)
-        except User.DoesNotExist:
+            user = UserModel.objects.get(email__iexact=ident)
+        except UserModel.DoesNotExist:
+            # Dummy hash to mitigate timing attacks (same pattern Django uses)
+            UserModel().set_password(password)
             return None
+        except UserModel.MultipleObjectsReturned:
+            # If duplicates ever exist, pick a deterministic one
+            user = (
+                UserModel.objects.filter(email__iexact=ident)
+                .order_by("id")
+                .first()
+            )
+            if not user:
+                return None
 
         if user.check_password(password) and self.user_can_authenticate(user):
             return user

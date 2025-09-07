@@ -1,0 +1,125 @@
+{# dashboard/email/suggestion.html #}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>New suggestion submitted</title>
+  <meta name="viewport" content="width=device-width">
+  <style>
+    /* Basic email-safe styles */
+    body { margin:0; padding:0; background:#f6f7f9; font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+    .wrapper { width:100%; background:#f6f7f9; padding:24px 0; }
+    .container { max-width:640px; margin:0 auto; background:#ffffff; border:1px solid #e6e8ec; border-radius:8px; overflow:hidden; }
+    .header { padding:16px 20px; background:#0d6efd; color:#fff; }
+    .h1 { margin:0; font-size:18px; line-height:1.3; }
+    .section { padding:16px 20px; }
+    .muted { color:#6c757d; font-size:13px; }
+    .hr { height:1px; background:#eceff3; border:0; margin:0; }
+    .kv { width:100%; border-collapse:collapse; margin-top:8px; }
+    .kv th, .kv td { text-align:left; vertical-align:top; padding:6px 0; font-size:14px; line-height:1.4; }
+    .kv th { width:120px; color:#6c757d; font-weight:600; padding-right:12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .message { white-space:pre-wrap; word-break:break-word; }
+    a { color:#0d6efd; text-decoration:none; }
+    @media (prefers-color-scheme: dark) {
+      body { background:#0b0d10; }
+      .container { background:#14181d; border-color:#263040; }
+      .header { background:#0d6efd; }
+      .h1 { color:#fff; }
+      .muted { color:#99a3ad; }
+      .hr { background:#263040; }
+      .kv th { color:#aab4bf; }
+      .kv td { color:#e6edf3; }
+      a { color:#6ea8fe; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container" role="article" aria-roledescription="email">
+      <div class="header">
+        <h1 class="h1">New suggestion submitted</h1>
+        <div class="muted">ID <span class="mono">#{{ s.pk }}</span></div>
+      </div>
+
+      <div class="section">
+        <table class="kv" role="presentation">
+          <tr>
+            <th>Subject</th>
+            <td>{{ s.subject|default_if_none:""|default:"(none)" }}</td>
+          </tr>
+        </table>
+      </div>
+
+      <hr class="hr">
+
+      <div class="section">
+        <div class="muted" style="margin-bottom:6px;">Public fields</div>
+        <table class="kv" role="presentation">
+          <tr>
+            <th>Name</th>
+            <td>{{ s.name|default_if_none:""|default:"(none)" }}</td>
+          </tr>
+          <tr>
+            <th>Email</th>
+            <td>
+              {% with em=s.email|default_if_none:""|default:"" %}
+                {% if em %}<a href="mailto:{{ em }}">{{ em }}</a>{% else %}(none){% endif %}
+              {% endwith %}
+            </td>
+          </tr>
+          <tr>
+            <th>Company</th>
+            <td>{{ s.company|default_if_none:""|default:"(none)" }}</td>
+          </tr>
+          <tr>
+            <th>From URL</th>
+            <td>
+              {% with u=s.page_url|default_if_none:""|default:"" %}
+                {% if u %}<a href="{{ u }}">{{ u }}</a>{% else %}(none){% endif %}
+              {% endwith %}
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <hr class="hr">
+
+      <div class="section">
+        <div class="muted" style="margin-bottom:6px;">Authenticated user</div>
+        <table class="kv" role="presentation">
+          {% if s.user %}
+            <tr>
+              <th>User</th>
+              <td>
+                {{ s.user }}
+                {% if s.user.email %} &lt;<a href="mailto:{{ s.user.email }}">{{ s.user.email }}</a>&gt;{% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <th>User</th>
+              <td>(anonymous)</td>
+            </tr>
+          {% endif %}
+        </table>
+      </div>
+
+      <hr class="hr">
+
+      <div class="section">
+        <div class="muted" style="margin-bottom:6px;">Message</div>
+        <div class="message">
+          {{ s.message|default_if_none:""|default:"(no message provided)" }}
+        </div>
+      </div>
+
+      <hr class="hr">
+
+      <div class="section">
+        <div class="muted">This notification was generated automatically.</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

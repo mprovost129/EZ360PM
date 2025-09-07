@@ -1,13 +1,24 @@
 {% extends "dashboard/help/_article_base.html" %}
-{% block help_title %}Billing & Subscription{% endblock %}
-{% block help_intro %}Choose a plan, manage payment methods, and view invoices/receipts.{% endblock %}
+
+{% block help_title %}Billing &amp; Subscription{% endblock %}
+{% block help_intro %}Choose a plan, manage payment methods, and view invoices/receipts for your {{ APP_NAME }} subscription.{% endblock %}
+
 {% block help_body %}
-<ol class="mb-4">
-  <li><strong>Pick a plan:</strong> Go to <em>Billing → Plans</em> and select a tier.</li>
-  <li><strong>Manage billing:</strong> Use the <em>Billing Portal</em> to update cards, download receipts, or cancel.</li>
-  <li><strong>Trials & past-due:</strong> The dashboard shows trial days left and past-due notices.</li>
+<h2 class="h6 mt-3">Managing your subscription</h2>
+<ol class="mb-4" aria-label="Steps for managing billing and subscription">
+  <li>
+    <strong>Pick a plan:</strong> Go to <em>Billing → Plans</em> and select the tier that fits your needs.
+  </li>
+  <li>
+    <strong>Manage billing:</strong> Open the <em>Billing Portal</em> to update payment methods, download receipts,
+    view past invoices, or cancel your subscription.
+  </li>
+  <li>
+    <strong>Trials &amp; past-due:</strong> Your dashboard shows remaining trial days and highlights past-due invoices.
+  </li>
 </ol>
-<div class="alert alert-info small">
-  <strong>Tip:</strong> Annual billing can reduce cost; check the plan details for discounts.
+
+<div class="alert alert-info small" role="note">
+  <strong>Tip:</strong> Annual billing often includes discounts compared to monthly. Check the plan details to see if it reduces your cost.
 </div>
 {% endblock %}

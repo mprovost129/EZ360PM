@@ -6,12 +6,16 @@ from . import views
 app_name = "accounts"
 
 urlpatterns = [
-    # Auth
+    # ------------------------------------------------------------------
+    # Authentication
+    # ------------------------------------------------------------------
     path("login/", views.login_view, name="login"),
     path("logout/", views.logout_view, name="logout"),
     path("register/", views.register_view, name="register"),
 
+    # ------------------------------------------------------------------
     # Password management
+    # ------------------------------------------------------------------
     path("password/change/", views.password_change, name="password_change"),
     path("password/change/done/", views.password_change_done, name="password_change_done"),
     path("password/reset/", views.password_reset, name="password_reset"),
@@ -23,8 +27,17 @@ urlpatterns = [
     ),
     path("password/reset/complete/", views.password_reset_complete, name="password_reset_complete"),
 
+    # ------------------------------------------------------------------
     # Email verification
+    # ------------------------------------------------------------------
     path("verify-needed/", views.verify_needed, name="verify_needed"),
     path("verify-resend/", views.verify_resend, name="verify_resend"),
     path("verify/<uidb64>/<token>/", views.verify_email, name="verify_email"),
+
+    # ------------------------------------------------------------------
+    # User Profile
+    # ------------------------------------------------------------------
+    path("me/", views.my_profile, name="my_profile"),
+    path("me/edit/", views.my_profile_edit, name="my_profile_edit"),
 ]
+

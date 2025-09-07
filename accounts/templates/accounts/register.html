@@ -5,11 +5,14 @@
     <div class="card-body">
       <h1 class="h4 mb-3">{{ APP_NAME|default:"EZ360PM" }} — Create your account</h1>
 
-      <form method="post" autocomplete="off" novalidate>
+      <form method="post" action="" autocomplete="off" novalidate>
         {% csrf_token %}
 
+        {# Hidden fields (future-proof: next, honeypot, etc.) #}
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+
         {% if form.non_field_errors %}
-          <div class="alert alert-danger">
+          <div class="alert alert-danger" role="alert">
             {% for e in form.non_field_errors %}{{ e }}<br>{% endfor %}
           </div>
         {% endif %}
@@ -18,8 +21,11 @@
         <div class="mb-3">
           <label class="form-label" for="{{ form.email.id_for_label }}">Email</label>
           {{ form.email }}
+          {% if form.email.help_text %}
+            <div id="{{ form.email.id_for_label }}_help" class="form-text">{{ form.email.help_text }}</div>
+          {% endif %}
           {% for e in form.email.errors %}
-            <div class="invalid-feedback d-block">{{ e }}</div>
+            <div class="invalid-feedback d-block" aria-live="polite">{{ e }}</div>
           {% endfor %}
         </div>
 
@@ -27,8 +33,11 @@
         <div class="mb-3">
           <label class="form-label" for="{{ form.name.id_for_label }}">Name (optional)</label>
           {{ form.name }}
+          {% if form.name.help_text %}
+            <div id="{{ form.name.id_for_label }}_help" class="form-text">{{ form.name.help_text }}</div>
+          {% endif %}
           {% for e in form.name.errors %}
-            <div class="invalid-feedback d-block">{{ e }}</div>
+            <div class="invalid-feedback d-block" aria-live="polite">{{ e }}</div>
           {% endfor %}
         </div>
 
@@ -36,8 +45,11 @@
         <div class="mb-3">
           <label class="form-label" for="{{ form.password1.id_for_label }}">Password</label>
           {{ form.password1 }}
+          {% if form.password1.help_text %}
+            <div id="{{ form.password1.id_for_label }}_help" class="form-text">{{ form.password1.help_text|safe }}</div>
+          {% endif %}
           {% for e in form.password1.errors %}
-            <div class="invalid-feedback d-block">{{ e }}</div>
+            <div class="invalid-feedback d-block" aria-live="polite">{{ e }}</div>
           {% endfor %}
         </div>
 
@@ -46,7 +58,7 @@
           <label class="form-label" for="{{ form.password2.id_for_label }}">Confirm password</label>
           {{ form.password2 }}
           {% for e in form.password2.errors %}
-            <div class="invalid-feedback d-block">{{ e }}</div>
+            <div class="invalid-feedback d-block" aria-live="polite">{{ e }}</div>
           {% endfor %}
         </div>
 
@@ -57,7 +69,7 @@
             I agree to the <a href="{% url 'dashboard:terms' %}" target="_blank" rel="noopener">Terms of Service</a>
           </label>
           {% for e in form.accept_terms.errors %}
-            <div class="invalid-feedback d-block">{{ e }}</div>
+            <div class="invalid-feedback d-block" aria-live="polite">{{ e }}</div>
           {% endfor %}
         </div>
 
@@ -68,7 +80,7 @@
             I agree to the <a href="{% url 'dashboard:privacy' %}" target="_blank" rel="noopener">Privacy Policy</a>
           </label>
           {% for e in form.accept_privacy.errors %}
-            <div class="invalid-feedback d-block">{{ e }}</div>
+            <div class="invalid-feedback d-block" aria-live="polite">{{ e }}</div>
           {% endfor %}
         </div>
 

@@ -1,56 +1,60 @@
 {% extends "base_public.html" %}
+{% load widget_tweaks %}
+
 {% block content %}
-<div class="container py-5" style="max-width: 520px">
+<div class="container py-5" style="max-width:480px">
   <div class="card shadow-sm">
     <div class="card-body">
-      <h1 class="h4 mb-3">
-        {{ APP_NAME|default:"EZ360PM" }} — Sign in
-      </h1>
+      <h1 class="h5 mb-3">Sign in</h1>
 
-      <form method="post" autocomplete="off" novalidate>
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
+
+      <form method="post" novalidate>
         {% csrf_token %}
-        {% if next %}
-          <input type="hidden" name="next" value="{{ next }}">
-        {% endif %}
 
-        {% if form.non_field_errors %}
-          <div class="alert alert-danger" role="alert">
-            {% for e in form.non_field_errors %}
-              {{ e }}<br>
-            {% endfor %}
-          </div>
-        {% endif %}
+        {# Preserve hidden fields like "next" if present #}
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
 
-        {% for field in form %}
+        {# Visible fields #}
+        {% for field in form.visible_fields %}
           <div class="mb-3">
-            <label class="form-label" for="{{ field.id_for_label }}">
-              {{ field.label }}
-            </label>
-            {# Add is-invalid class if field has errors #}
-            {% if field.errors %}
-              {% with classes=field.field.widget.attrs.class|default:'' %}
-                {% render_field field class=classes|add:' is-invalid' %}
-              {% endwith %}
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+
+            {# Choose Bootstrap class by widget type #}
+            {% if field.field.widget.input_type == "checkbox" %}
+              {% render_field field class+="form-check-input" %}
+            {% elif field.field.widget.input_type == "select" %}
+              {% render_field field class+="form-select" %}
             {% else %}
-              {{ field }}
+              {% if field.errors %}
+                {% render_field field class+="form-control is-invalid" %}
+              {% else %}
+                {% render_field field class+="form-control" %}
+              {% endif %}
             {% endif %}
 
             {% if field.help_text %}
-              <div class="form-text">{{ field.help_text }}</div>
+              <div class="form-text">{{ field.help_text|safe }}</div>
             {% endif %}
 
-            {% for e in field.errors %}
-              <div class="invalid-feedback d-block">{{ e }}</div>
-            {% endfor %}
+            {% if field.errors %}
+              <div class="invalid-feedback d-block" aria-live="polite">
+                {{ field.errors|striptags }}
+              </div>
+            {% endif %}
           </div>
         {% endfor %}
 
         <button class="btn btn-primary w-100" type="submit">Sign in</button>
       </form>
 
-      <div class="mt-3 d-flex justify-content-between">
-        <a href="{% url 'accounts:password_reset' %}">Forgot password?</a>
-        <a href="{% url 'accounts:register' %}">Create an account</a>
+      <div class="mt-3 d-flex justify-content-between align-items-center">
+        <a class="small text-decoration-none" href="{% url 'accounts:password_reset' %}">Forgot your password?</a>
+        <a class="small text-decoration-none" href="{% url 'accounts:register' %}">Create an account</a>
       </div>
     </div>
   </div>

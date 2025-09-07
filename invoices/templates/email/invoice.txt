@@ -1,0 +1,30 @@
+{# templates/emails/invoice.txt #}
+Hi {{ inv.client.first_name|default:inv.client.org|default:"there" }},
+
+{% if mode == "reminder" -%}
+This is a friendly reminder about invoice {{ inv.number }} from {{ inv.company.name }}.
+{%- else -%}
+Here’s invoice {{ inv.number }} from {{ inv.company.name }}.
+{%- endif %}
+
+Total: ${{ inv.total|default:"0"|floatformat:2 }}
+Paid: ${{ inv.amount_paid|default:"0"|floatformat:2 }}
+Balance due: ${{ inv.balance|default:"0"|floatformat:2 }}
+Issued: {{ inv.issue_date|date:"Y-m-d" }}{% if inv.due_date %} · Due: {{ inv.due_date|date:"Y-m-d" }}{% endif %}
+
+View & pay securely:
+{{ public_url }}
+
+{% if note %}
+Message:
+{{ note }}
+{% endif %}
+
+{% if mode == "reminder" -%}
+If you’ve already paid, please ignore this message.
+{%- endif %}
+
+Thank you,
+{{ inv.company.name }}
+
+Sent via {{ APP_NAME }}.

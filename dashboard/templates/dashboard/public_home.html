@@ -35,7 +35,13 @@
         </div>
       </div>
       <div class="col-lg-6">
-        <img class="img-fluid rounded shadow-soft" src="{% static 'img/marketing/hero.jpg' %}" alt="EZ360PM app preview">
+        <img
+          class="img-fluid rounded shadow-soft"
+          src="{% static 'img/marketing/hero.jpg' %}"
+          alt="EZ360PM app preview"
+          width="960" height="600"
+          decoding="async" loading="eager"
+          sizes="(max-width: 992px) 100vw, 50vw">
       </div>
     </div>
   </div>
@@ -47,7 +53,13 @@
     <!-- Section 1 (image left) -->
     <div class="row align-items-center g-5 mb-5">
       <div class="col-md-6">
-        <img class="feature-img shadow-soft" src="{% static 'img/marketing/feature-invoices.jpg' %}" alt="Invoices">
+        <img
+          class="feature-img shadow-soft"
+          src="{% static 'img/marketing/feature-invoices.jpg' %}"
+          alt="Invoices feature preview"
+          width="1200" height="700"
+          decoding="async" loading="lazy"
+          sizes="(max-width: 768px) 100vw, 50vw">
       </div>
       <div class="col-md-6">
         <h2 class="h3 fw-semibold">Invoices that get you paid faster</h2>
@@ -61,7 +73,13 @@
     <!-- Section 2 (image right) -->
     <div class="row align-items-center g-5 mb-5">
       <div class="col-md-6 order-md-2">
-        <img class="feature-img shadow-soft" src="{% static 'img/marketing/feature-time.jpg' %}" alt="Time tracking">
+        <img
+          class="feature-img shadow-soft"
+          src="{% static 'img/marketing/feature-time.jpg' %}"
+          alt="Time tracking feature preview"
+          width="1200" height="700"
+          decoding="async" loading="lazy"
+          sizes="(max-width: 768px) 100vw, 50vw">
       </div>
       <div class="col-md-6 order-md-1">
         <h2 class="h3 fw-semibold">Time tracking that feels invisible</h2>
@@ -75,7 +93,13 @@
     <!-- Section 3 (image left) -->
     <div class="row align-items-center g-5 mb-5">
       <div class="col-md-6">
-        <img class="feature-img shadow-soft" src="{% static 'img/marketing/feature-expenses.jpg' %}" alt="Expenses">
+        <img
+          class="feature-img shadow-soft"
+          src="{% static 'img/marketing/feature-expenses.jpg' %}"
+          alt="Expenses feature preview"
+          width="1200" height="700"
+          decoding="async" loading="lazy"
+          sizes="(max-width: 768px) 100vw, 50vw">
       </div>
       <div class="col-md-6">
         <h2 class="h3 fw-semibold">Expenses without the spreadsheet</h2>
@@ -96,29 +120,44 @@
           <p class="text-muted mb-4">
             We’re building <strong>EZ360PM</strong> for small studios and freelancers. Tell us what would make it perfect for you.
           </p>
+
           {% if messages %}
             {% for m in messages %}
-              <div class="alert alert-{{ m.tags|default:'info' }} mb-3">{{ m }}</div>
+              <div class="alert alert-{{ m.tags|default:'info' }} mb-3" role="status">{{ m }}</div>
             {% endfor %}
           {% endif %}
-          <!-- Post to the open contact endpoint (works logged-out) -->
-          <form method="post" action="{% url 'dashboard:contact' %}">
+
+          <!-- Post to the lightweight public endpoint -->
+          <form method="post" action="{% url 'dashboard:contact_submit' %}" novalidate>
             {% csrf_token %}
+            <input type="hidden" name="page_url" value="{{ request.build_absolute_uri|default:'' }}">
+            <!-- Honeypot (leave empty) -->
+            <div style="position:absolute; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
+              <label>Website <input type="text" name="website"></label>
+            </div>
+
             <div class="mb-2">
-              <label class="form-label">Your name</label>
-              <input class="form-control" type="text" name="name" placeholder="Jane Doe">
+              <label class="form-label" for="contact-name">Your name</label>
+              <input id="contact-name" class="form-control" type="text" name="name"
+                     placeholder="Jane Doe" autocomplete="name">
             </div>
             <div class="mb-2">
-              <label class="form-label">Email</label>
-              <input class="form-control" type="email" name="email" required placeholder="jane@example.com">
+              <label class="form-label" for="contact-email">Email</label>
+              <input id="contact-email" class="form-control" type="email" name="email" required
+                     placeholder="jane@example.com" autocomplete="email">
             </div>
             <div class="mb-3">
-              <label class="form-label">Message</label>
-              <textarea class="form-control" name="message" rows="4" required placeholder="How can we help?"></textarea>
+              <label class="form-label" for="contact-message">Message</label>
+              <textarea id="contact-message" class="form-control" name="message" rows="4" required
+                        placeholder="How can we help?" autocomplete="off"></textarea>
             </div>
-            <button class="btn btn-primary">Send</button>
+            <button class="btn btn-primary" type="submit">Send</button>
           </form>
+          <p class="text-muted small mt-2 mb-0">
+            We’ll only use your email to reply. No spam—promise.
+          </p>
         </div>
+
         <div class="col-lg-6">
           <div class="p-4 bg-white border rounded shadow-soft h-100">
             <h3 class="h5 fw-semibold mb-3">Why EZ360PM?</h3>

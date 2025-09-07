@@ -1,13 +1,13 @@
 {% extends "base.html" %}
+{% load widget_tweaks %}
 
 {% block content %}
-<div class="container py-5" style="max-width:720px">
-
+<div class="container py-5" style="max-width:720px" id="contact-form">
   {# Flash messages #}
   {% if messages %}
     <div class="mb-3">
       {% for m in messages %}
-        <div class="alert alert-{{ m.tags|default:'info' }} mb-2" role="alert">{{ m }}</div>
+        <div class="alert alert-{{ m.tags|default:'info' }} mb-2" role="status">{{ m }}</div>
       {% endfor %}
     </div>
   {% endif %}
@@ -17,10 +17,10 @@
       <h1 class="h4 mb-1">Contact &amp; Suggestions</h1>
       <p class="text-muted mb-3">Tell us what would make <strong>EZ360PM</strong> better.</p>
 
-      <form method="post" novalidate>
+      <form method="post" novalidate id="suggestionForm">
         {% csrf_token %}
 
-        {# Non-field errors at the top #}
+        {# Non-field errors #}
         {% if form.non_field_errors %}
           <div class="alert alert-danger" role="alert">
             {{ form.non_field_errors }}
@@ -35,49 +35,129 @@
         {# Visible fields except consent checkboxes (styled separately) #}
         {% for field in form.visible_fields %}
           {% if field.name != 'accept_terms' and field.name != 'accept_privacy' %}
-            {% if field.field.widget.input_type == 'checkbox' %}
-              <div class="form-check mb-3">
-                {{ field }}
-                <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
-              </div>
-            {% else %}
-              <div class="mb-3">
-                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
-              </div>
-            {% endif %}
+            {% with has_err=field.errors %}
+              {% if field.field.widget.input_type == 'checkbox' %}
+                <div class="form-check mb-3">
+                  {% if has_err %}
+                    {% render_field field class+="form-check-input is-invalid" %}
+                  {% else %}
+                    {% render_field field class+="form-check-input" %}
+                  {% endif %}
+                  <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                  {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                  {% if has_err %}<div class="invalid-feedback d-block">{{ field.errors|striptags }}</div>{% endif %}
+                </div>
+              {% else %}
+                <div class="mb-3">
+                  <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+
+                  {# Build aria-describedby id once #}
+                  {% with desc_id=field.id_for_label|add:"-desc" %}
+                    {# Choose autocomplete #}
+                    {% if field.name == "email" %}
+                      {% with ac="email" %}
+                        {% if has_err %}
+                          {% render_field field class+="form-control is-invalid" aria-describedby=desc_id autocomplete=ac %}
+                        {% else %}
+                          {% render_field field class+="form-control" aria-describedby=desc_id autocomplete=ac %}
+                        {% endif %}
+                      {% endwith %}
+                    {% elif field.name == "name" %}
+                      {% with ac="name" %}
+                        {% if has_err %}
+                          {% render_field field class+="form-control is-invalid" aria-describedby=desc_id autocomplete=ac %}
+                        {% else %}
+                          {% render_field field class+="form-control" aria-describedby=desc_id autocomplete=ac %}
+                        {% endif %}
+                      {% endwith %}
+                    {% else %}
+                      {% with ac="off" %}
+                        {% if has_err %}
+                          {% render_field field class+="form-control is-invalid" aria-describedby=desc_id autocomplete=ac %}
+                        {% else %}
+                          {% render_field field class+="form-control" aria-describedby=desc_id autocomplete=ac %}
+                        {% endif %}
+                      {% endwith %}
+                    {% endif %}
+
+                    {% if field.help_text %}
+                      <div id="{{ desc_id }}" class="form-text">{{ field.help_text }}</div>
+                    {% endif %}
+                    {% if has_err %}
+                      <div class="invalid-feedback d-block">{{ field.errors|striptags }}</div>
+                    {% endif %}
+                  {% endwith %}
+                </div>
+              {% endif %}
+            {% endwith %}
           {% endif %}
         {% endfor %}
 
         {# Terms checkbox (optional) #}
         {% if form.accept_terms %}
           <div class="form-check mb-2">
-            {{ form.accept_terms }}
+            {% if form.accept_terms.errors %}
+              {% render_field form.accept_terms class+="form-check-input is-invalid" %}
+            {% else %}
+              {% render_field form.accept_terms class+="form-check-input" %}
+            {% endif %}
             <label class="form-check-label" for="{{ form.accept_terms.id_for_label }}">
               I agree to the <a href="{% url 'dashboard:terms' %}" target="_blank" rel="noopener">Terms of Service</a>
             </label>
-            {% if form.accept_terms.errors %}<div class="text-danger small">{{ form.accept_terms.errors }}</div>{% endif %}
+            {% if form.accept_terms.errors %}
+              <div class="invalid-feedback d-block">{{ form.accept_terms.errors|striptags }}</div>
+            {% endif %}
           </div>
         {% endif %}
 
         {# Privacy checkbox (optional) #}
         {% if form.accept_privacy %}
           <div class="form-check mb-3">
-            {{ form.accept_privacy }}
+            {% if form.accept_privacy.errors %}
+              {% render_field form.accept_privacy class+="form-check-input is-invalid" %}
+            {% else %}
+              {% render_field form.accept_privacy class+="form-check-input" %}
+            {% endif %}
             <label class="form-check-label" for="{{ form.accept_privacy.id_for_label }}">
               I agree to the <a href="{% url 'dashboard:privacy' %}" target="_blank" rel="noopener">Privacy Policy</a>
             </label>
-            {% if form.accept_privacy.errors %}<div class="text-danger small">{{ form.accept_privacy.errors }}</div>{% endif %}
+            {% if form.accept_privacy.errors %}
+              <div class="invalid-feedback d-block">{{ form.accept_privacy.errors|striptags }}</div>
+            {% endif %}
           </div>
         {% endif %}
 
-        <button type="submit" class="btn btn-primary">Send</button>
+        <button type="submit" class="btn btn-primary" id="sendBtn">
+          <span class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
+          Send
+        </button>
       </form>
     </div>
   </div>
 </div>
+
+<script>
+  (function () {
+    const form = document.getElementById('suggestionForm');
+    const btn  = document.getElementById('sendBtn');
+
+    // Autofocus first visible input/textarea
+    const firstField = form && form.querySelector('input:not([type=hidden]):not([type=checkbox]), textarea, select');
+    if (firstField) firstField.focus();
+
+    // Prevent double submit + show spinner
+    if (form && btn) {
+      form.addEventListener('submit', function () {
+        const sp = btn.querySelector('.spinner-border');
+        if (sp) sp.classList.remove('d-none');
+        btn.setAttribute('disabled', 'disabled');
+      });
+    }
+
+    // If there are field errors, scroll to the form on load (useful after POST)
+    {% if form.errors %}
+      window.location.hash = '#contact-form';
+    {% endif %}
+  })();
+</script>
 {% endblock %}

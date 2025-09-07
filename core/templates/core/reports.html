@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block page_title %}Reports{% endblock %}
+
+{% block app_content %}
+<form class="row g-2 mb-3 align-items-end" method="get" action="">
+  <div class="col-auto">
+    <label for="start" class="visually-hidden">Start date</label>
+    <input id="start" class="form-control" type="date" name="start" value="{{ start|date:'Y-m-d' }}">
+  </div>
+  <div class="col-auto">
+    <label for="end" class="visually-hidden">End date</label>
+    <input id="end" class="form-control" type="date" name="end" value="{{ end|date:'Y-m-d' }}">
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-primary" type="submit">Apply</button>
+  </div>
+
+  <div class="col ms-auto text-end">
+    <div class="btn-group">
+      <a class="btn btn-outline-secondary"
+         href="{% url 'core:report_pnl' %}?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}&basis=cash">
+        View P&amp;L
+      </a>
+      <a class="btn btn-outline-primary"
+         href="{% url 'core:report_pnl_csv' %}?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}&basis=cash">
+        Download CSV
+      </a>
+    </div>
+  </div>
+</form>
+
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">Income</div>
+        <div class="fs-4 fw-semibold">
+          ${{ income|floatformat:2|intcomma }}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">Expenses</div>
+        <div class="fs-4 fw-semibold">
+          ${{ expenses|floatformat:2|intcomma }}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">Profit</div>
+        <div class="fs-4 fw-semibold">
+          {% if profit >= 0 %}
+            <span class="text-success">${{ profit|floatformat:2|intcomma }}</span>
+          {% else %}
+            <span class="text-danger">${{ profit|floatformat:2|intcomma }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

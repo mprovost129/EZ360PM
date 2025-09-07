@@ -1,13 +1,24 @@
 {% extends "dashboard/help/_article_base.html" %}
+
 {% block help_title %}Payments{% endblock %}
-{% block help_intro %}Record payments and enable online checkout for faster collection.{% endblock %}
+{% block help_intro %}Record payments manually or enable online checkout for faster collection in {{ APP_NAME }}.{% endblock %}
+
 {% block help_body %}
-<ol class="mb-4">
-  <li><strong>Record a payment:</strong> Open an invoice → <em>Add Payment</em>. Choose method, date, and amount.</li>
-  <li><strong>Online payments:</strong> Connect Stripe in <em>Billing</em> to let clients pay by card or wallet.</li>
-  <li><strong>Reconciliation:</strong> Verify paid invoices and follow up on overdue balances.</li>
+<h2 class="h6 mt-3">How to manage payments</h2>
+<ol class="mb-4" aria-label="Steps for recording and managing payments">
+  <li>
+    <strong>Record a payment:</strong> Open an invoice → <em>Add Payment</em>. Choose the method, date, and amount received.
+  </li>
+  <li>
+    <strong>Enable online payments:</strong> Connect Stripe in <em>Billing</em> to let clients pay instantly by card or digital wallet.
+  </li>
+  <li>
+    <strong>Reconcile balances:</strong> Confirm paid invoices and follow up on any overdue amounts from the <em>Payments</em> page.
+  </li>
 </ol>
-<div class="alert alert-info small">
-  <strong>Tip:</strong> Automated reminders reduce DSO. Configure dunning in invoice settings.
+
+<div class="alert alert-info small" role="note">
+  <strong>Tip:</strong> Set up automatic reminders (“dunning”) in invoice settings to reduce days sales outstanding (DSO)
+  and speed up collection.
 </div>
 {% endblock %}

@@ -1,4 +1,4 @@
-{% extends "_app_shell.html" %}
+{% extends "base.html" %}
 {% load humanize %}
 {% block page_title %}Plans & Billing{% endblock %}
 
@@ -9,6 +9,7 @@
     <div class="alert alert-warning">Checkout canceled.</div>
   {% endif %}
 
+  {# Current subscription summary #}
   {% if company and sub %}
     <div class="mb-3">
       <div class="card">
@@ -22,12 +23,20 @@
             {% if sub.current_period_end %}
               <div class="text-muted small">
                 Renews / ends: {{ sub.current_period_end|date:"Y-m-d H:i" }}
+                <span class="ms-2">•</span>
+                <span class="small text-muted">{{ sub.current_period_end|naturaltime }}</span>
               </div>
+            {% endif %}
+            {% if sub.cancel_at_period_end %}
+              <div class="small text-danger">Auto-renew is off; will end at period close.</div>
             {% endif %}
           </div>
           <div class="ms-auto">
             {% if sub.stripe_customer_id %}
-              <a class="btn btn-outline-secondary" href="{% url 'billing:portal' %}">Manage in Billing Portal</a>
+              <form method="post" action="{% url 'billing:portal' %}" class="d-inline">
+                {% csrf_token %}
+                <button class="btn btn-outline-secondary">Manage in Billing Portal</button>
+              </form>
             {% endif %}
           </div>
         </div>
@@ -35,64 +44,80 @@
     </div>
   {% endif %}
 
+  {# Plans grid #}
   <div class="row g-3">
     {% for t in tiers %}
-      {% with is_current=sub and sub.tier and sub.tier.pk == t.pk %}
-      <div class="col-lg-4">
-        <div class="card shadow-sm h-100 {% if is_current %}border-primary{% endif %}">
-          <div class="card-body d-flex flex-column">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-              <div class="h5 mb-0">{{ t.name }}</div>
-              {% if is_current %}
-                <span class="badge bg-primary">Current</span>
-              {% endif %}
-            </div>
-
-            {% if t.description %}
-              <p class="text-muted mb-3">{{ t.description }}</p>
-            {% endif %}
-
-            {# Features list (booleans) #}
-            {% if t.features %}
-              <ul class="list-unstyled small mb-3">
-                {% for key, val in t.features.items %}
-                  <li class="mb-1">
-                    {% if val %}
-                      <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle me-2">✓</span>
-                    {% else %}
-                      <span class="badge rounded-pill bg-secondary-subtle text-secondary border border-secondary-subtle me-2">—</span>
-                    {% endif %}
-                    <span class="{% if not val %}text-muted{% endif %}">{{ key|capfirst }}</span>
-                  </li>
-                {% endfor %}
-              </ul>
-            {% endif %}
-
-            {# Limits list (numbers/strings) #}
-            {% if t.limits %}
-              <div class="mb-3">
-                {% for key, val in t.limits.items %}
-                  <div class="d-flex justify-content-between small border-top py-1">
-                    <span class="text-muted">{{ key|capfirst }}</span>
-                    <span class="fw-semibold">{{ val }}</span>
-                  </div>
-                {% endfor %}
+      {# Hide inactive tiers for non-staff (no {% continue %} in Django templates) #}
+      {% if t.active or request.user.is_staff %}
+        <div class="col-lg-4">
+          <div class="card shadow-sm h-100 {% if sub and sub.tier and sub.tier.pk == t.pk %}border-primary{% endif %}">
+            <div class="card-body d-flex flex-column">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="h5 mb-0">{{ t.name }}</div>
+                <div class="d-flex gap-1">
+                  {% if sub and sub.tier and sub.tier.pk == t.pk %}
+                    <span class="badge bg-primary">Current</span>
+                  {% endif %}
+                  {% if not t.active %}
+                    <span class="badge bg-secondary">Inactive</span>
+                  {% endif %}
+                  {% if t.trial_days %}
+                    <span class="badge bg-info-subtle text-info border border-info-subtle">{{ t.trial_days }}-day trial</span>
+                  {% endif %}
+                </div>
               </div>
-            {% endif %}
 
-            <div class="mt-auto">
-              {% if is_current %}
-                <button class="btn btn-outline-secondary w-100" disabled>Selected</button>
-              {% else %}
-                <a class="btn btn-primary w-100" href="{% url 'billing:subscribe' t.slug %}">
-                  Choose {{ t.name }}
-                </a>
+              {% if t.description %}
+                <p class="text-muted mb-3">{{ t.description }}</p>
               {% endif %}
+
+              {# Features list (booleans) #}
+              {% if t.features %}
+                <ul class="list-unstyled small mb-3">
+                  {% for key, val in t.features.items %}
+                    <li class="mb-1 d-flex align-items-center">
+                      {% if val %}
+                        <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle me-2">✓</span>
+                        <span>{{ key|capfirst }}</span>
+                      {% else %}
+                        <span class="badge rounded-pill bg-secondary-subtle text-secondary border border-secondary-subtle me-2">—</span>
+                        <span class="text-muted">{{ key|capfirst }}</span>
+                      {% endif %}
+                    </li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+
+              {# Limits list (numbers/strings) #}
+              {% if t.limits %}
+                <div class="mb-3">
+                  {% for key, val in t.limits.items %}
+                    <div class="d-flex justify-content-between small border-top py-1">
+                      <span class="text-muted">{{ key|capfirst }}</span>
+                      <span class="fw-semibold">{{ val }}</span>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+
+              <div class="mt-auto">
+                {% if sub and sub.tier and sub.tier.pk == t.pk %}
+                  <button class="btn btn-outline-secondary w-100" disabled>Selected</button>
+                {% else %}
+                  {% if t.active %}
+                    <form method="post" action="{% url 'billing:subscribe' t.slug %}">
+                      {% csrf_token %}
+                      <button class="btn btn-primary w-100">Choose {{ t.name }}</button>
+                    </form>
+                  {% else %}
+                    <button class="btn btn-outline-secondary w-100" disabled>Unavailable</button>
+                  {% endif %}
+                {% endif %}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      {% endwith %}
+      {% endif %}
     {% empty %}
       <div class="col-12">
         <div class="alert alert-info">No plans configured yet. Add tiers in admin.</div>

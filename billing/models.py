@@ -1,12 +1,17 @@
 # billing/models.py
 from __future__ import annotations
 
-from typing import Any
+from datetime import timedelta
+from decimal import Decimal
+from typing import Any, Optional
 
 from django.db import models
 from django.utils import timezone
 
 
+# ---------------------------------------------------------------------
+# Plan / Tier
+# ---------------------------------------------------------------------
 class SubscriptionTier(models.Model):
     """
     A purchasable subscription tier (mapped to a Stripe Price).
@@ -15,34 +20,43 @@ class SubscriptionTier(models.Model):
     name = models.CharField(max_length=100)
     stripe_price_id = models.CharField(max_length=200, help_text="Stripe Price ID (price_...).")
     description = models.TextField(blank=True)
+
+    # Sorting & visibility
     sort = models.PositiveIntegerField(default=0, help_text="Higher values show higher in plan lists.")
+    active = models.BooleanField(default=True)
+    trial_days = models.PositiveIntegerField(null=True, blank=True, help_text="Optional trial period (days).")
 
     # Feature flags / soft limits (kept flexible via JSON)
-    features = models.JSONField(default=dict, blank=True)  # e.g. {"estimates": true, "client_portal": false}
-    limits = models.JSONField(default=dict, blank=True)    # e.g. {"max_clients": 50, "max_projects": 50}
+    features = models.JSONField(default=dict, blank=True)
+    limits = models.JSONField(default=dict, blank=True)
 
     class Meta:
         ordering = ("-sort", "name")
         indexes = [
             models.Index(fields=("slug",)),
+            models.Index(fields=("active", "sort")),
         ]
 
     def __str__(self) -> str:
         return self.name
 
-    # Convenience helpers
+    # --- helpers ---------------------------------------------------------
     def has_feature(self, key: str, default: bool = False) -> bool:
-        v = self.features.get(key, default) if isinstance(self.features, dict) else default
-        return bool(v)
+        data = self.features if isinstance(self.features, dict) else {}
+        return bool(data.get(key, default))
 
-    def limit_for(self, key: str, default: int | None = None) -> int | None:
-        v = self.limits.get(key, default) if isinstance(self.limits, dict) else default
+    def limit_for(self, key: str, default: Optional[int] = None) -> Optional[int]:
+        data = self.limits if isinstance(self.limits, dict) else {}
+        val = data.get(key, default)
         try:
-            return int(v) if v is not None else None
+            return int(val) if val is not None else None
         except (TypeError, ValueError):
             return default
 
 
+# ---------------------------------------------------------------------
+# Company Subscription (synced from Stripe)
+# ---------------------------------------------------------------------
 class CompanySubscription(models.Model):
     """
     One subscription record per Company; synced from Stripe events.
@@ -64,7 +78,7 @@ class CompanySubscription(models.Model):
     ]
 
     company = models.OneToOneField(
-        "core.Company",
+        "company.Company",               # <-- updated app label
         on_delete=models.CASCADE,
         related_name="subscription",
     )
@@ -89,20 +103,37 @@ class CompanySubscription(models.Model):
     class Meta:
         verbose_name = "Company subscription"
         verbose_name_plural = "Company subscriptions"
+        indexes = [
+            models.Index(fields=("status", "current_period_end")),
+            models.Index(fields=("stripe_customer_id",)),
+            models.Index(fields=("stripe_subscription_id",)),
+        ]
 
     def __str__(self) -> str:
         return f"{self.company} — {self.tier or 'No Tier'} ({self.status})"
 
+    # --- helpers ---------------------------------------------------------
     def is_active(self) -> bool:
         """
-        Active if status is trialing/active and not expired (or no period end set).
+        True if status is trialing/active and not expired (or no period end set).
         """
-        now = timezone.now()
         if self.status not in {self.STATUS_TRIALING, self.STATUS_ACTIVE}:
             return False
-        return self.current_period_end is None or self.current_period_end > now
+        return self.current_period_end is None or self.current_period_end > timezone.now()
+
+    def days_left(self) -> Optional[int]:
+        """
+        Days left in current period (rounded down), or None if no end.
+        """
+        if not self.current_period_end:
+            return None
+        delta = self.current_period_end - timezone.now()
+        return max(delta.days, 0)
 
 
+# ---------------------------------------------------------------------
+# Webhook Logs (Stripe)
+# ---------------------------------------------------------------------
 class WebhookLog(models.Model):
     """
     Raw Stripe webhook event logs, plus resolution outcome and joins for debugging.
@@ -118,7 +149,7 @@ class WebhookLog(models.Model):
 
     # Helpful joins (optional)
     invoice = models.ForeignKey(
-        "core.Invoice",
+        "invoices.Invoice",              # <-- updated app label
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
@@ -133,7 +164,20 @@ class WebhookLog(models.Model):
         ordering = ("-created_at",)
         indexes = [
             models.Index(fields=("type", "processed_ok")),
+            models.Index(fields=("created_at",)),
         ]
 
     def __str__(self) -> str:
         return f"{self.type} · {self.stripe_event_id}"
+
+    # --- helpers ---------------------------------------------------------
+    def mark_processed(self, ok: bool = True, message: str = "") -> None:
+        self.processed_ok = ok
+        self.processed_at = timezone.now()
+        if message:
+            self.message = (self.message + "\n" + message).strip() if self.message else message
+        self.save(update_fields=["processed_ok", "processed_at", "message"])
+
+    def mark_failed(self, message: str = "") -> None:
+        self.mark_processed(ok=False, message=message or "Failed")
+

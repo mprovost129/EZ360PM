@@ -1,0 +1,123 @@
+/* Make document height explicit */
+html, body { 
+  height: 100%;
+}
+
+/* Optional: small screens collapse sidebar (simple fallback) */
+@media (max-width: 991.98px){
+  .app-topbar{ left: 0; }
+  .app-sidebar{ transform: translateX(-100%); } /* hide, or swap to offcanvas if you add it */
+  .app-main{ margin-left: 0; }
+}
+
+/* Icon helper (if you use <img> svgs) */
+.icon{ width:16px; height:16px; vertical-align:-0.125em; display:inline-block; }
+
+
+/* ---------- Fixed app chrome (final) ---------- */
+:root{
+  --topbar-h: 60px;         /* match your actual topbar height */
+  --app-sidebar-w: 260px;   /* your requested width */
+  --box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  --box-border: 1px solid lightgray;
+  --box-radius: .5rem;
+}
+
+/* Sidebar: fixed, no internal scroll, sits under topbar */
+.app-sidebar{
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--app-sidebar-w);
+  background: var(--bs-secondary-bg);
+  border: 1px solid black;
+  z-index: 1030;            /* below topbar; above main */
+  overflow: hidden;         /* stationary (no inner scroll) */
+}
+
+/* Topbar: fixed across the top, shifted right by sidebar width */
+.app-topbar{
+  position: fixed;
+  top: 0;
+  left: var(--app-sidebar-w);
+  right: 0;
+  height: var(--topbar-h);
+  display: flex;            /* keep your existing layout behavior */
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bs-secondary-bg);
+  border: 1px solid black;
+  z-index: 1040;            /* above everything else except modals */
+}
+
+/* Main scrollable region: offset for fixed chrome */
+.app-main{
+  margin-left: var(--app-sidebar-w);
+  padding: 1rem;
+  padding-top: calc(var(--topbar-h) + 1rem); /* clears fixed topbar */
+  min-height: 100vh;
+}
+
+/* Footer container that follows the main width (not under sidebar) */
+.app-main-footer{
+  margin-left: var(--app-sidebar-w);
+}
+
+/* Company block styling (optional) */
+.sidebar-company{
+  height: var(--topbar-h);
+  padding: .6rem 1rem;
+  background: var(--bs-secondary-bg);
+  border-bottom: 1px solid black;
+}
+.sidebar-company .brand-logo{ height:40px; width:auto; display:block; border: var(--box-border); border-radius: 5px;}
+.sidebar-company .brand-name{ font-weight:600; max-width:170px; min-width:0; }
+
+/* Prevent old grid/sticky rules (if still present) from fighting this layout */
+.app-grid,
+.app-topbar-area,
+.app-sidebar-area{
+  /* neutralize any legacy grid/sticky wrappers if they exist */
+  position: static !important;
+}
+
+/* Cards (covers every dashboard/stat panel) */
+.card{
+  box-shadow: var(--bs-box-shadow-lg) !important; /* override shadow-sm/shadow */
+  border: var(--box-border);
+  border-radius: var(--box-radius);
+  background: #fff;
+}
+
+/* Optional: give non-card “boxes” a subtle shell too */
+.table-responsive,
+.list-group:not(.list-group-flush),
+.toast,
+.dropdown-menu,
+.modal-content,
+.offcanvas{
+  box-shadow: var(--box-shadow);
+  border: var(--box-border);
+  border-radius: var(--box-radius);
+  background: #fff;
+}
+
+/* Keep list-group items tidy inside elevated shells */
+.list-group-item{
+  border-color: rgba(0,0,0,.06);
+}
+
+/* Sidebar icon helpers */
+.bi-svg{
+  width:16px;
+  height:16px;
+  flex:0 0 16px;
+  opacity:.8;
+}
+.list-group-item.active .bi-svg{
+  /* make dark svg appear light on the active background */
+  filter: invert(1) brightness(2);
+  opacity:1;
+}
+.icon{ width:16px; height:16px; }

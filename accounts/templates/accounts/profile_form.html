@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block page_title %}Edit Profile{% endblock %}
+
+{% block app_content %}
+<div class="card shadow">
+  <div class="card-body">
+    <form method="post" enctype="multipart/form-data" class="row g-3" novalidate>
+      {% csrf_token %}
+
+      {# Hidden fields (honeypot/next etc.) #}
+      {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+
+      {# Error summary (no bracket indexing) #}
+      {% if form.non_field_errors or form.errors %}
+        <div class="col-12">
+          <div class="alert alert-danger mb-0" role="alert">
+            <div class="fw-semibold">Please fix the errors below.</div>
+
+            {% if form.non_field_errors %}
+              <div class="mt-2">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            {% if form.errors %}
+              <ul class="mb-0 mt-2">
+                {% for field in form %}
+                  {% if field.errors %}
+                    <li><strong>{{ field.label }}:</strong> {{ field.errors|join:", " }}</li>
+                  {% endif %}
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+
+      {# — Personal — #}
+      <div class="col-12">
+        <h6 class="text-uppercase text-muted mb-2">Personal</h6>
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.first_name.id_for_label }}">First name</label>
+        {{ form.first_name }}
+        {% for e in form.first_name.errors %}<div class="text-danger small" aria-live="polite">{{ e }}</div>{% endfor %}
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.last_name.id_for_label }}">Last name</label>
+        {{ form.last_name }}
+        {% for e in form.last_name.errors %}<div class="text-danger small" aria-live="polite">{{ e }}</div>{% endfor %}
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.title.id_for_label }}">Title</label>
+        {{ form.title }}
+        {% for e in form.title.errors %}<div class="text-danger small" aria-live="polite">{{ e }}</div>{% endfor %}
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.phone.id_for_label }}">Phone</label>
+        {{ form.phone }}
+        {% for e in form.phone.errors %}<div class="text-danger small" aria-live="polite">{{ e }}</div>{% endfor %}
+      </div>
+
+      {# — Preferences — #}
+      <div class="col-12">
+        <h6 class="text-uppercase text-muted mb-2">Preferences</h6>
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.timezone.id_for_label }}">Timezone</label>
+        {{ form.timezone }}
+        {% for e in form.timezone.errors %}<div class="text-danger small" aria-live="polite">{{ e }}</div>{% endfor %}
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.locale.id_for_label }}">Locale</label>
+        {{ form.locale }}
+        {% for e in form.locale.errors %}<div class="text-danger small" aria-live="polite">{{ e }}</div>{% endfor %}
+      </div>
+
+      <div class="col-12">
+        <div class="form-check">
+          {{ form.dark_mode }}
+          <label class="form-check-label" for="{{ form.dark_mode.id_for_label }}">Enable dark mode</label>
+        </div>
+        {% for e in form.dark_mode.errors %}<div class="text-danger small" aria-live="polite">{{ e }}</div>{% endfor %}
+      </div>
+
+      {# — Avatar — #}
+      <div class="col-12">
+        <h6 class="text-uppercase text-muted mb-2">Avatar</h6>
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.avatar.id_for_label }}">Avatar</label>
+        {{ form.avatar }}
+        {% for e in form.avatar.errors %}<div class="text-danger small" aria-live="polite">{{ e }}</div>{% endfor %}
+
+        {% with inst=form.instance %}
+          {% if inst and inst.avatar %}
+            <div class="mt-2 d-flex align-items-center gap-3">
+              <img src="{{ inst.avatar.url }}" alt="Current avatar"
+                   class="rounded-circle" style="width:80px;height:80px;object-fit:cover;">
+            </div>
+          {% endif %}
+        {% endwith %}
+      </div>
+
+      {# — About — #}
+      <div class="col-12">
+        <h6 class="text-uppercase text-muted mb-2">About</h6>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label" for="{{ form.bio.id_for_label }}">Bio</label>
+        {{ form.bio }}
+        {% for e in form.bio.errors %}<div class="text-danger small" aria-live="polite">{{ e }}</div>{% endfor %}
+      </div>
+
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-primary" type="submit">Save</button>
+        <a class="btn btn-outline-secondary" href="{% url 'accounts:my_profile' %}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

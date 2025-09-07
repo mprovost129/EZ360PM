@@ -1,5 +1,4 @@
-{# templates/core/notifications.html #}
-{% extends "_app_shell.html" %}
+{% extends "base.html" %}
 {% block page_title %}Notifications{% endblock %}
 
 {% block app_content %}
@@ -25,38 +24,57 @@
 </div>
 
 <div class="card shadow-sm">
-  <ul class="list-group list-group-flush">
-    {% for n in items %}
-      <li class="list-group-item d-flex justify-content-between align-items-start {% if not n.read_at %}bg-body-tertiary{% endif %}">
-        <div class="me-3">
-          <div class="d-flex align-items-center gap-2">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead class="visually-hidden">
+        <tr>
+          <th scope="col">Notification</th>
+          <th scope="col">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="list-group list-group-flush">
+      {% for n in items %}
+        <tr class="list-group-item {% if not n.read_at %}bg-body-tertiary{% endif %}">
+          <td>
+            <div class="d-flex align-items-start gap-2">
+              {% if not n.read_at %}
+                <span class="badge rounded-pill text-bg-primary mt-1" title="Unread">●</span>
+              {% endif %}
+              <div>
+                <div class="{% if not n.read_at %}fw-semibold{% endif %}">{{ n.text }}</div>
+                <div class="small text-muted mt-1">
+                  <time datetime="{{ n.created_at|date:'c' }}" title="{{ n.created_at|date:'Y-m-d H:i' }}">
+                    {{ n.created_at|timesince }} ago
+                  </time>
+                  {% if n.kind %}
+                    · <span class="badge text-bg-light text-capitalize">{{ n.kind|cut:'_'|title }}</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </td>
+          <td class="text-end">
+            {% if n.link %}
+              <a class="btn btn-sm btn-outline-primary" href="{{ n.link }}" title="Open related item">Open</a>
+            {% else %}
+              <span class="text-muted small me-2">—</span>
+            {% endif %}
             {% if not n.read_at %}
-              <span class="badge rounded-pill text-bg-primary" title="Unread">●</span>
+              <form method="post" action="{% url 'core:notification_read' n.pk %}" class="d-inline m-0">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-secondary" type="submit" title="Mark this notification as read">
+                  Mark read
+                </button>
+              </form>
             {% endif %}
-            <span class="{% if not n.read_at %}fw-semibold{% endif %}">{{ n.text }}</span>
-          </div>
-          <div class="small text-muted mt-1">
-            <time datetime="{{ n.created_at|date:'c' }}" title="{{ n.created_at|date:'Y-m-d H:i' }}">
-              {{ n.created_at|timesince }} ago
-            </time>
-            {% if n.kind %}
-              · <span class="badge text-bg-light text-capitalize">{{ n.kind|cut:'_'|title }}</span>
-            {% endif %}
-          </div>
-        </div>
-
-        <div class="d-flex align-items-center gap-2">
-          {# Always route through notification_read to mark as read then redirect #}
-          <a class="btn btn-sm btn-outline-primary" href="{% url 'core:notification_read' n.pk %}">Open</a>
-          {% if not n.read_at %}
-            <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:notification_read' n.pk %}">Mark read</a>
-          {% endif %}
-        </div>
-      </li>
-    {% empty %}
-      <li class="list-group-item text-center text-muted py-4">Nothing yet.</li>
-    {% endfor %}
-  </ul>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="2" class="text-center text-muted py-4">Nothing yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 
 {# Optional paginator (rendered only if the view provides page_obj) #}

@@ -12,23 +12,23 @@
     <input type="hidden" name="choice" value="custom">
 
     <div class="form-check mb-2">
-      <input class="form-check-input" type="checkbox" id="essential" checked disabled>
-      <label class="form-check-label" for="essential">
-        Essential cookies (always on)
-      </label>
-      <div class="form-text">Required for login, security, and core features.</div>
+      <input class="form-check-input" type="checkbox" id="essential" checked disabled aria-describedby="essentialHelp">
+      <label class="form-check-label" for="essential">Essential cookies (always on)</label>
+      <div id="essentialHelp" class="form-text">Required for login, security, and core features.</div>
     </div>
 
     <div class="form-check mb-2">
-      <input class="form-check-input" type="checkbox" name="analytics" id="analytics" {% if analytics %}checked{% endif %}>
+      <input class="form-check-input" type="checkbox" name="analytics" id="analytics"
+             {% if analytics %}checked{% endif %} aria-describedby="analyticsHelp">
       <label class="form-check-label" for="analytics">Analytics cookies</label>
-      <div class="form-text">Help us understand usage and improve the product.</div>
+      <div id="analyticsHelp" class="form-text">Help us understand usage and improve the product.</div>
     </div>
 
     <div class="form-check mb-3">
-      <input class="form-check-input" type="checkbox" name="marketing" id="marketing" {% if marketing %}checked{% endif %}>
+      <input class="form-check-input" type="checkbox" name="marketing" id="marketing"
+             {% if marketing %}checked{% endif %} aria-describedby="marketingHelp">
       <label class="form-check-label" for="marketing">Marketing cookies</label>
-      <div class="form-text">Used for advertising or retargeting (if applicable).</div>
+      <div id="marketingHelp" class="form-text">Used for advertising or retargeting (if applicable).</div>
     </div>
 
     <div class="d-flex gap-2">
