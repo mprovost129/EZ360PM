@@ -32,7 +32,7 @@ def _max_suffix_for_prefix(values: Iterable[str], prefix: str) -> int:
 def generate_project_number(
     company: "Company",
     *,
-    seq_width: int = 3,
+    seq_width: int = 2,
     width: Optional[int] = None,  # legacy kwarg support
 ) -> str:
     if width is not None:
@@ -40,7 +40,7 @@ def generate_project_number(
 
     # Current local date -> YYMM prefix
     try:
-        today = timezone.localdate()          # Django util
+        today = timezone.localdate()          # type: ignore # Django util
     except Exception:
         from datetime import date             # fallback if needed
         today = date.today()
@@ -57,7 +57,7 @@ def generate_project_number(
     n = start + 1
 
     while True:
-        candidate = f"{prefix}{n:0{seq_width}d}"  # e.g., 2509001
+        candidate = f"{prefix}{n:0{seq_width}d}"  # e.g., 250901
         if not Project.objects.filter(company=company, number__iexact=candidate).exists():
             return candidate
         n += 1
