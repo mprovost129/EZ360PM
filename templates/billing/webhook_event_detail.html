@@ -1,0 +1,57 @@
+{% extends "base_app.html" %}
+
+{% block title %}Webhook Event · EZ360PM{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">Webhook event</h1>
+      <div class="text-secondary">
+        <span class="font-monospace">{{ event.stripe_event_id }}</span>
+        {% if event.event_type %}· {{ event.event_type }}{% endif %}
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-dark" href="{% url 'billing:webhook_history' %}">
+        <i class="bi bi-arrow-left me-1"></i>Back to history
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="fw-semibold">Status</div>
+            {% if event.ok %}
+              <span class="badge text-bg-success">OK</span>
+            {% else %}
+              <span class="badge text-bg-danger">Fail</span>
+            {% endif %}
+          </div>
+
+          <div class="small text-secondary">Received</div>
+          <div class="mb-2">{{ event.received_at|date:"Y-m-d H:i:s" }}</div>
+
+          <div class="small text-secondary">Processed</div>
+          <div class="mb-2">{{ event.processed_at|date:"Y-m-d H:i:s" }}</div>
+
+          {% if event.error %}
+            <div class="small text-secondary">Error</div>
+            <div class="text-danger small">{{ event.error }}</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2">Payload</div>
+          <pre class="mb-0 small" style="white-space: pre-wrap;">{{ event.payload_json|pprint }}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
