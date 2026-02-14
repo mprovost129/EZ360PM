@@ -1,0 +1,145 @@
+{% extends "base_app.html" %}
+
+{% block title %}{% if mode == 'edit' %}Edit recurring plan{% else %}New recurring plan{% endif %} · EZ360PM{% endblock %}
+
+{% block app_content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">{% if mode == 'edit' %}Edit recurring plan{% else %}New recurring plan{% endif %}</h1>
+    <div class="text-secondary small">Define the schedule and the line items that will appear on generated invoices.</div>
+  </div>
+  <div>
+    <a class="btn btn-outline-dark" href="{% url 'documents:recurring_plan_list' %}">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+  </div>
+</div>
+
+<form method="post" class="card shadow-sm">
+  {% csrf_token %}
+  <div class="card-body">
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="row g-3">
+      <div class="col-lg-6">
+        <label class="form-label">Plan name</label>
+        {{ form.name }}
+        {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}
+      </div>
+      <div class="col-lg-6">
+        <label class="form-label">Client</label>
+        {{ form.client }}
+        {% if form.client.errors %}<div class="text-danger small">{{ form.client.errors }}</div>{% endif %}
+      </div>
+      <div class="col-lg-6">
+        <label class="form-label">Project (optional)</label>
+        {{ form.project }}
+      </div>
+      <div class="col-lg-6">
+        <label class="form-label">Notes (optional)</label>
+        {{ form.notes }}
+      </div>
+    </div>
+
+    <hr class="my-4">
+
+    <div class="row g-3">
+      <div class="col-lg-3">
+        <label class="form-label">Frequency</label>
+        {{ form.frequency }}
+      </div>
+      <div class="col-lg-3">
+        <label class="form-label">Interval</label>
+        {{ form.interval }}
+        <div class="text-secondary small mt-1">Every N months/weeks.</div>
+      </div>
+      <div class="col-lg-3">
+        <label class="form-label">Day of month</label>
+        {{ form.day_of_month }}
+        <div class="text-secondary small mt-1">Used for monthly plans.</div>
+      </div>
+      <div class="col-lg-3">
+        <label class="form-label">Next run date</label>
+        {{ form.next_run_date }}
+      </div>
+      <div class="col-lg-3">
+        <label class="form-label">Due days</label>
+        {{ form.due_days }}
+      </div>
+      <div class="col-lg-3 d-flex align-items-end">
+        <div class="form-check">
+          {{ form.auto_mark_sent }}
+          <label class="form-check-label" for="{{ form.auto_mark_sent.id_for_label }}">Mark invoices as Sent</label>
+        </div>
+      </div>
+
+      <div class="col-lg-3 d-flex align-items-end">
+        <div class="form-check">
+          {{ form.auto_email }}
+          <label class="form-check-label" for="{{ form.auto_email.id_for_label }}">Auto-email invoices</label>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <label class="form-label">Email override (optional)</label>
+        {{ form.email_to_override }}
+        <div class="text-secondary small mt-1">Leave blank to send to the client’s email.</div>
+      </div>
+      <div class="col-lg-3 d-flex align-items-end">
+        <div class="form-check">
+          {{ form.is_active }}
+          <label class="form-check-label" for="{{ form.is_active.id_for_label }}">Active</label>
+        </div>
+      </div>
+    </div>
+
+    <hr class="my-4">
+
+    <div class="d-flex align-items-center justify-content-between">
+      <div>
+        <h2 class="h6 mb-0">Line items</h2>
+        <div class="text-secondary small">These will be copied onto each generated invoice.</div>
+      </div>
+    </div>
+
+    <div class="table-responsive mt-3">
+      {{ formset.management_form }}
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th style="width:60px;">#</th>
+            <th>Item</th>
+            <th style="width:120px;">Qty</th>
+            <th style="width:160px;">Unit price</th>
+            <th style="width:90px;">Taxable</th>
+            <th style="width:90px;">Delete</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in formset.forms %}
+            <tr>
+              <td>{{ f.sort_order }}</td>
+              <td>
+                {{ f.name }}
+                <div class="mt-1">{{ f.description }}</div>
+                {% if f.name.errors %}<div class="text-danger small">{{ f.name.errors }}</div>{% endif %}
+              </td>
+              <td>{{ f.qty }}</td>
+              <td>{{ f.unit_price_cents }}</td>
+              <td class="text-center">{{ f.is_taxable }}</td>
+              <td class="text-center">{{ f.DELETE }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mt-3">
+      <a class="btn btn-outline-dark" href="{% url 'documents:recurring_plan_list' %}">Cancel</a>
+      <button class="btn btn-dark" type="submit">Save</button>
+    </div>
+  </div>
+</form>
+{% endblock %}
