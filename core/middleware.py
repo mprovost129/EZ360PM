@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
+import time
 
+from django.conf import settings
 from django.contrib import messages
 from django.http import HttpRequest
 from django.shortcuts import redirect
 from django.utils.deprecation import MiddlewareMixin
+from django.db import connection
 
 from billing.services import company_is_locked
 from companies.services import get_active_company
@@ -13,6 +17,9 @@ from companies.services import get_active_company
 import uuid
 
 from .request_context import set_request_id
+
+
+logger_perf = logging.getLogger("ez360pm.perf")
 
 
 @dataclass(frozen=True)
@@ -82,7 +89,84 @@ class RequestIDMiddleware:
         return response
 
 
-from django.conf import settings
+class PerformanceLoggingMiddleware:
+    """Lightweight request/query timing logger (dev/staging friendly).
+
+    Enabled via settings.EZ360_PERF_LOGGING_ENABLED.
+
+    Logs:
+      - slow requests over EZ360_PERF_REQUEST_MS
+      - slow ORM queries over EZ360_PERF_QUERY_MS
+
+    Notes:
+      - Uses connection.queries (DEBUG required to populate).
+      - Safe to keep installed in dev only.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from django.conf import settings
+
+        enabled = bool(getattr(settings, "EZ360_PERF_LOGGING_ENABLED", False))
+        if not enabled:
+            return self.get_response(request)
+
+        request_ms = int(getattr(settings, "EZ360_PERF_REQUEST_MS", 600))
+        query_ms = int(getattr(settings, "EZ360_PERF_QUERY_MS", 120))
+        top_n = int(getattr(settings, "EZ360_PERF_TOP_N", 5))
+
+        t0 = time.perf_counter()
+        # Reset per-request query log (best-effort)
+        try:
+            if hasattr(connection, "queries_log"):
+                connection.queries_log.clear()  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+        response = self.get_response(request)
+        dt_ms = (time.perf_counter() - t0) * 1000.0
+
+        # Collect query timings
+        slow_queries = []
+        total_queries = 0
+        try:
+            queries = list(getattr(connection, "queries", []) or [])
+            total_queries = len(queries)
+            for q in queries:
+                # Django stores seconds as string
+                raw = q.get("time")
+                try:
+                    q_ms = float(raw) * 1000.0
+                except Exception:
+                    q_ms = 0.0
+                if q_ms >= query_ms:
+                    sql = (q.get("sql") or "").strip().replace("\n", " ")
+                    slow_queries.append((q_ms, sql))
+            slow_queries.sort(key=lambda x: x[0], reverse=True)
+        except Exception:
+            slow_queries = []
+
+        path = (request.path or "/")
+        method = getattr(request, "method", "?")
+        status = getattr(response, "status_code", "?")
+
+        if dt_ms >= request_ms or slow_queries:
+            logger_perf.warning(
+                "PERF %s %s %s in %.1fms (%s queries)",
+                method,
+                path,
+                status,
+                dt_ms,
+                total_queries,
+            )
+
+            for ms, sql in slow_queries[: max(1, top_n)]:
+                logger_perf.warning("  SLOW SQL %.1fms: %s", ms, sql[:900])
+
+        return response
+
 from companies.services import get_active_employee_profile
 from companies.models import EmployeeRole
 

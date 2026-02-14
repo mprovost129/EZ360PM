@@ -14,6 +14,8 @@ from .forms import PaymentForm, PaymentRefundForm
 from .models import ClientCreditLedgerEntry, Payment, PaymentStatus, PaymentMethod, PaymentRefund, PaymentRefundStatus
 from .services import apply_payment_and_recalc, refund_payment_and_recalc
 
+from core.pagination import paginate
+
 
 @require_min_role(EmployeeRole.MANAGER)
 def payment_list(request):
@@ -34,11 +36,16 @@ def payment_list(request):
 
     statuses = [("", "All")] + list(PaymentStatus.choices)
 
+    paged = paginate(request, qs)
+
     return render(
         request,
         "payments/payment_list.html",
         {
-            "payments": qs[:500],
+            "payments": paged.object_list,
+            "paginator": paged.paginator,
+            "page_obj": paged.page_obj,
+            "per_page": paged.per_page,
             "q": q,
             "status": status,
             "statuses": statuses,
@@ -266,3 +273,69 @@ def credit_summary(request):
     )
 
     return render(request, "payments/credit_summary.html", {"entries": entries[:500]})
+
+
+@require_min_role(EmployeeRole.MANAGER)
+def invoice_reconcile(request, invoice_id):
+    company = request.active_company
+    employee = request.active_employee
+
+    from documents.models import Document, DocumentType, DocumentStatus
+    from documents.models import CreditNote, CreditNoteStatus
+    from payments.models import ClientCreditApplication
+    from payments.services import recalc_invoice_financials
+
+    invoice = get_object_or_404(Document, company=company, pk=invoice_id, doc_type=DocumentType.INVOICE)
+
+    if request.method == "POST":
+        recalc_invoice_financials(invoice, actor=employee)
+        messages.success(request, "Recalculated invoice financials.")
+        return redirect("payments:invoice_reconcile", invoice_id=str(invoice.id))
+
+    payments = (
+        Payment.objects.filter(company=company, invoice=invoice, deleted_at__isnull=True)
+        .order_by("-payment_date", "-created_at")
+    )
+    refunds = (
+        PaymentRefund.objects.filter(company=company, payment__invoice=invoice, deleted_at__isnull=True)
+        .order_by("-created_at")
+        .select_related("payment")
+    )
+    credit_notes = (
+        CreditNote.objects.filter(company=company, invoice=invoice, deleted_at__isnull=True)
+        .order_by("-created_at")
+    )
+    credit_apps = (
+        ClientCreditApplication.objects.filter(company=company, invoice=invoice, deleted_at__isnull=True)
+        .order_by("-created_at")
+    )
+
+    # rollups (in cents)
+    payments_gross = sum(int(p.amount_cents or 0) for p in payments if p.status in [PaymentStatus.SUCCEEDED, PaymentStatus.REFUNDED])
+    payments_refunded = sum(int(p.refunded_cents or 0) for p in payments if p.status in [PaymentStatus.SUCCEEDED, PaymentStatus.REFUNDED])
+    payments_net = payments_gross - payments_refunded
+
+    refunds_total = sum(int(r.amount_cents or 0) for r in refunds if r.status in [PaymentRefundStatus.SUCCEEDED, PaymentRefundStatus.PENDING])
+    credit_note_ar_applied = sum(int(cn.ar_applied_cents or 0) for cn in credit_notes if getattr(cn, "status", None) == CreditNoteStatus.POSTED)
+    credit_apps_total = sum(int(a.cents or 0) for a in credit_apps)
+
+    computed_balance = max(0, int(invoice.total_cents or 0) - int(payments_net) - int(credit_note_ar_applied) - int(credit_apps_total))
+
+    return render(
+        request,
+        "payments/invoice_reconcile.html",
+        {
+            "invoice": invoice,
+            "payments": payments,
+            "refunds": refunds,
+            "credit_notes": credit_notes,
+            "credit_apps": credit_apps,
+            "payments_gross": payments_gross,
+            "payments_refunded": payments_refunded,
+            "payments_net": payments_net,
+            "refunds_total": refunds_total,
+            "credit_note_ar_applied": credit_note_ar_applied,
+            "credit_apps_total": credit_apps_total,
+            "computed_balance": computed_balance,
+        },
+    )

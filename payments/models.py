@@ -47,6 +47,14 @@ class Payment(SyncModel):
 
     created_by = models.ForeignKey(EmployeeProfile, null=True, blank=True, on_delete=models.SET_NULL)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["company", "status", "payment_date"]),
+            models.Index(fields=["company", "invoice"]),
+            models.Index(fields=["company", "client"]),
+            models.Index(fields=["company", "stripe_payment_intent_id"]),
+        ]
+
 
 
 class PaymentRefundStatus(models.TextChoices):
@@ -90,6 +98,12 @@ class ClientCreditLedgerEntry(SyncModel):
     reason = models.CharField(max_length=120, blank=True, default="")
     created_by = models.ForeignKey(EmployeeProfile, null=True, blank=True, on_delete=models.SET_NULL)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["company", "client", "created_at"]),
+            models.Index(fields=["company", "invoice"]),
+        ]
+
 
 
 
@@ -113,10 +127,11 @@ class ClientCreditApplication(SyncModel):
         related_name="credit_applications",
     )
 
-    indexes = [
-        models.Index(fields=["company", "client", "applied_at"]),
-        models.Index(fields=["company", "invoice"]),
-    ]
+    class Meta:
+        indexes = [
+            models.Index(fields=["company", "client", "applied_at"]),
+            models.Index(fields=["company", "invoice"]),
+        ]
 
     def __str__(self) -> str:
         return f"{self.company.name} · {self.client.id} · {self.cents}c → {self.invoice.id}"

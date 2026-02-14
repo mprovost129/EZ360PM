@@ -274,3 +274,38 @@ def ops_retention_prune(request: HttpRequest) -> HttpResponse:
             },
         )
     return redirect("ops:retention")
+
+
+# --------------------------------------------------------------------------------------
+# Health check endpoint (no auth) for uptime monitors / load balancers.
+# GET /healthz/
+# --------------------------------------------------------------------------------------
+from django.http import JsonResponse
+from django.db import connection
+from django.core.cache import cache
+
+
+def healthz(request):
+    data = {"status": "ok"}
+    # DB check
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1;")
+            cursor.fetchone()
+        data["db"] = "ok"
+    except Exception as e:
+        data["status"] = "error"
+        data["db"] = "error"
+        data["db_error"] = str(e)[:200]
+
+    # Cache check (best-effort)
+    try:
+        cache.set("healthz_ping", "1", timeout=5)
+        v = cache.get("healthz_ping")
+        data["cache"] = "ok" if v == "1" else "degraded"
+    except Exception as e:
+        data["cache"] = "error"
+        data["cache_error"] = str(e)[:200]
+
+    status_code = 200 if data["status"] == "ok" else 500
+    return JsonResponse(data, status=status_code)

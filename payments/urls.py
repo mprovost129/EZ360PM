@@ -10,5 +10,6 @@ urlpatterns = [
     path("payments/<uuid:pk>/edit/", views.payment_edit, name="payment_edit"),
     path("payments/<uuid:pk>/refund/", views.payment_refund, name="payment_refund"),
     path("payments/<uuid:pk>/delete/", views.payment_delete, name="payment_delete"),
+    path("invoices/<uuid:invoice_id>/reconcile/", views.invoice_reconcile, name="invoice_reconcile"),
     path("credits/", views.credit_summary, name="credit_summary"),
 ]

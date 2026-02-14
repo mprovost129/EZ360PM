@@ -18,6 +18,8 @@ from crm.models import Client
 from .forms import TimeEntryForm, TimeEntryServiceFormSet, TimeFilterForm, TimerStartForm, TimeSettingsForm
 from .models import TimeEntry, TimeEntryService, TimeStatus, TimerState, TimeTrackingSettings
 
+from core.pagination import paginate
+
 
 def _preset_dates(preset: str) -> tuple[date | None, date | None]:
     today = timezone.localdate()
@@ -98,12 +100,17 @@ def time_entry_list(request):
     timer_state, _ = TimerState.objects.get_or_create(company=company, employee=employee)
     timer_running = bool(timer_state.is_running and timer_state.started_at)
 
+    paged = paginate(request, qs)
+
     return render(
         request,
         "timetracking/time_list.html",
         {
             "filter_form": form,
-            "entries": qs[:500],
+            "entries": paged.object_list,
+            "paginator": paged.paginator,
+            "page_obj": paged.page_obj,
+            "per_page": paged.per_page,
             "total_minutes": total_minutes,
             "timer_state": timer_state,
             "timer_running": timer_running,

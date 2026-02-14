@@ -5,8 +5,11 @@ from django.conf.urls.static import static
 
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from ops import views as ops_views
+
 
 urlpatterns = [
+    path("healthz/", ops_views.healthz, name="healthz"),
     # Public + app pages
     path("", include("core.urls")),
     path("accounts/", include("accounts.urls")),

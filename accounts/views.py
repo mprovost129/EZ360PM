@@ -103,6 +103,11 @@ def login_view(request):
                 pass
 
             login(request, user)
+            # Session rotation on successful auth (security hardening)
+            try:
+                request.session.cycle_key()
+            except Exception:
+                pass
             log_login_success(request, user, method=LoginEvent.METHOD_PASSWORD)
             messages.success(request, "Welcome back.")
             return _post_login_redirect(request, user)

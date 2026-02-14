@@ -44,8 +44,19 @@ def _create_entry(
 
 
 def _replace_lines(entry: JournalEntry, lines: list[dict]) -> None:
-    # Idempotent: clear and recreate lines for this entry
-    entry.lines.all().delete()
+    """Create the journal lines once.
+
+    Hardening rule: journal entries are immutable once posted.
+    We treat "has any lines" as "posted".
+    """
+    if entry.lines.exists():
+        return
+
+    debit_total = sum(int(l.get("debit_cents") or 0) for l in lines)
+    credit_total = sum(int(l.get("credit_cents") or 0) for l in lines)
+    if debit_total != credit_total:
+        raise ValueError("Unbalanced journal entry (debits must equal credits).")
+
     for l in lines:
         JournalLine.objects.create(
             entry=entry,

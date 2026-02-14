@@ -57,6 +57,8 @@ class JournalEntry(SyncModel):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="journal_entries_created"
     )
 
+    posted_at = models.DateTimeField(default=timezone.now, editable=False)
+
     class Meta:
         unique_together = [("company", "source_type", "source_id")]
         ordering = ["-entry_date", "-created_at"]
@@ -75,6 +77,13 @@ class JournalEntry(SyncModel):
     @property
     def is_balanced(self) -> bool:
         return self.total_debits_cents == self.total_credits_cents
+
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            # Immutable once created (posted)
+            raise ValidationError("Journal entries are immutable once posted.")
+        return super().save(*args, **kwargs)
 
 
 class JournalLine(SyncModel):
@@ -101,6 +110,17 @@ class JournalLine(SyncModel):
             raise ValueError("A line cannot have both debit and credit.")
         if (not d) and (not c):
             raise ValueError("A line must have a debit or credit amount.")
+
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError("Journal lines are immutable once posted.")
+        if self.entry_id:
+            # If entry already has lines, treat as posted
+            if self.entry and self.entry.lines.exists():
+                # allow the initial creation only; existing lines block
+                pass
+        return super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         amt = self.debit_cents if self.debit_cents else -self.credit_cents

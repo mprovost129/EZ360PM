@@ -58,6 +58,16 @@ def send_templated_email(spec: EmailSpec, *, fail_silently: bool = False) -> int
     except Exception as e:
         logger.exception("email_send_failed subject=%s to=%s err=%s", subject, spec.to, str(e)[:500])
         try:
+            if getattr(settings, "EZ360_ALERT_ON_EMAIL_FAILURE", False):
+                from core.ops_alerts import alert_admins
+                alert_admins(
+                    "EZ360PM: email delivery failed",
+                    "An email failed to send.",
+                    extra={"subject": subject, "to": ",".join(spec.to)[:500], "error": str(e)[:500]},
+                )
+        except Exception:
+            pass
+        try:
             import sentry_sdk
 
             sentry_sdk.capture_exception(e)

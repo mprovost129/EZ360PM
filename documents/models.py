@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from django.db import models
+from django.db.models import Q
 from django.core.exceptions import ValidationError
 
 
@@ -105,6 +106,18 @@ class Document(SyncModel):
             models.Index(fields=["company", "doc_type", "status"]),
             models.Index(fields=["company", "updated_at"]),
             models.Index(fields=["company", "number"]),
+            # Phase 3W: list pages are driven by company+doc_type and ordered by created_at.
+            # Use a partial index to ignore soft-deleted rows.
+            models.Index(
+                fields=["company", "doc_type", "created_at"],
+                name="co_type_create_live_idx",
+                condition=Q(deleted_at__isnull=True),
+            ),
+            models.Index(
+                fields=["company", "doc_type", "status", "created_at"],
+                name="co_type_status_create_live_idx",
+                condition=Q(deleted_at__isnull=True),
+            ),
         ]
 
     def __str__(self) -> str:
@@ -214,7 +227,7 @@ class DocumentLineItem(SyncModel):
         ):
             raise ValidationError("Cannot modify invoice line items once the invoice is sent.")
 
-def __str__(self) -> str:
+    def __str__(self) -> str:
         return f"{self.document_id} · {self.name}"
 
 

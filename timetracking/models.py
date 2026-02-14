@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 from core.models import SyncModel
@@ -52,6 +53,23 @@ class TimeEntry(SyncModel):
         indexes = [
             models.Index(fields=["company", "employee", "started_at"]),
             models.Index(fields=["company", "status"]),
+            # Phase 3W: the list view filters by company, deleted_at is null,
+            # optionally employee (staff), status/billable, and date range on started_at.
+            models.Index(
+                fields=["company", "status", "started_at"],
+                name="co_status_start_live_idx",
+                condition=Q(deleted_at__isnull=True),
+            ),
+            models.Index(
+                fields=["company", "employee", "status", "started_at"],
+                name="co_emp_status_start_live_idx",
+                condition=Q(deleted_at__isnull=True),
+            ),
+            models.Index(
+                fields=["company", "billable", "started_at"],
+                name="co_billable_start_live_idx",
+                condition=Q(deleted_at__isnull=True),
+            ),
         ]
 
 

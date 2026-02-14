@@ -15,6 +15,7 @@ from audit.services import log_event
 
 from billing.services import build_subscription_summary, can_add_seat
 from core.models import SyncModel
+from core.pagination import paginate
 
 from .decorators import company_context_required, require_min_role
 from .forms import CompanyCreateForm, CompanyInviteForm
@@ -120,11 +121,13 @@ def team_list(request: HttpRequest) -> HttpResponse:
     summary = build_subscription_summary(company)
     can_add = can_add_seat(company)
 
-    employees = (
+    employees_qs = (
         EmployeeProfile.objects.filter(company=company, deleted_at__isnull=True)
         .select_related("user")
         .order_by("role", "username_public")
     )
+
+    employees_paged = paginate(request, employees_qs)
 
     invites = (
         CompanyInvite.objects.filter(company=company, deleted_at__isnull=True, accepted_at__isnull=True)
@@ -132,7 +135,7 @@ def team_list(request: HttpRequest) -> HttpResponse:
     )
 
     # Lockout status (account-based). Keyed by user email.
-    emails = [e.user.email for e in employees if getattr(e.user, 'email', None)]
+    emails = [e.user.email for e in employees_paged.object_list if getattr(e.user, 'email', None)]
     lockouts = {}
     try:
         from accounts.models import AccountLockout
@@ -151,7 +154,10 @@ def team_list(request: HttpRequest) -> HttpResponse:
         "companies/team_list.html",
         {
             "company": company,
-            "employees": employees,
+            "employees": employees_paged.object_list,
+            "paginator": employees_paged.paginator,
+            "page_obj": employees_paged.page_obj,
+            "per_page": employees_paged.per_page,
             "invites": invites,
             "subscription_summary": summary,
             "can_add_seat": can_add,

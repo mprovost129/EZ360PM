@@ -16,6 +16,8 @@ from companies.decorators import company_context_required, require_min_role
 from companies.models import EmployeeRole
 from projects.models import Project
 
+from core.pagination import paginate
+
 from .forms import (
     CLIENT_EXPORT_FIELDS,
     ClientForm,
@@ -72,7 +74,8 @@ def client_list(request: HttpRequest) -> HttpResponse:
             | Q(email__icontains=q)
         )
 
-    clients = list(qs.order_by("company_name", "last_name", "first_name")[:500])
+    paged = paginate(request, qs.order_by("company_name", "last_name", "first_name"))
+    clients = paged.object_list
 
     # annotate display strings
     rows = []
@@ -99,6 +102,9 @@ def client_list(request: HttpRequest) -> HttpResponse:
             "q": q,
             "rows": rows,
             "can_manage": can_manage,
+            "paginator": paged.paginator,
+            "page_obj": paged.page_obj,
+            "per_page": paged.per_page,
         },
     )
 

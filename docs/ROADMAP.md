@@ -1,7 +1,7 @@
 # EZ360PM Roadmap (Locked After Phase 3A Layer 2)
 
 
-## Current Hardening Track (Phase 3F → 3J)
+## Current Hardening Track (Phase 3F → Launch)
 
 ### Completed
 - **3F** Financial integrity + credit notes + reconciliation (baseline)
@@ -11,16 +11,20 @@
 - **3J** Client Credit Ledger + Auto-Apply Credit
 - **3K** Ops Console + Support Mode (staff-only)
 - **3L** Ops Timeline + Stripe Subscription Diagnostics (staff-only)
+- **3M** Refund Linkage (refunds tied to payments/invoices; balance + journal recalcs)
+- **3N** Accounting Period Locks (Professional+; admin+; enforcement)
+- **3O** Advanced Reporting Enhancements
 - **3P** Launch Readiness Checks (staff-only UI + ez360_check command)
 - **3Q** Ops Retention & Pruning (staff-only UI + ez360_prune command)
 - **3R** Security Defaults (production-on email verification gate, secure cookies/HSTS/SSL defaults, default company 2FA policy)
+- **3S** Financial Integrity + Invoice Reconciliation (manager+)
+- **3T** Ops Alerts + Session Hardening (admin alerts on webhook/email failure; session key rotation on login)
+- **3U** UX Perf Polish: pagination across major lists + CSP rollout fix (report-only toggle + jsDelivr allowlist)
 
 ### Next (Planned)
-- Stripe refund linkage
-- Operational alerts (email/Slack) + SLO dashboards
+- SLO dashboards (active users, webhook health, email health) + optional Slack/Webhook
 - PII export tooling
-- Accounting period locks
-- Advanced reporting enhancements
+- Optional: enforce CSP (move from report-only to enforced) once validated
 
 ---
 
@@ -127,5 +131,63 @@ Next recommended hardening priorities:
 - Added staff-only Launch Checks page under Ops Console.
 - Added `python manage.py ez360_check` management command for deploy validation (non-zero exit on errors).
 
-## Next (Phase 3Q)
-- Notification/alert hooks for critical ops events (stripe webhook failures, failed backups, repeated 500s) and retention for ops logs.
+## Phase 3Q — Ops Retention + Alerts (DONE)
+- Added retention policy + pruning tooling (CLI + Ops UI).
+- Added ops report runner for alert-style emails.
+
+## Phase 3R — Security Defaults (DONE)
+- Production-on defaults for email verification + secure cookies/SSL/HSTS (env overridable).
+- Production default for 2FA requirement for admin/manager roles (env overridable).
+
+## Phase 3S — Financial Integrity + Reconciliation (DONE)
+- Added invoice reconciliation view and “recalculate” affordance.
+- Hardened journal posting immutability and balance checks.
+
+## Phase 3T — Ops Alerts + Session Hardening (DONE)
+- Best-effort admin alerts for webhook/email failures (production-on defaults).
+- Session key rotation on password login.
+
+## Phase 3U — Pagination + CSP (DONE)
+- Shared pagination helper + UI applied across major list pages.
+- Fixed CSP settings typing and added env toggles; report-only defaults in production.
+
+## Phase 3V — Performance Indexing (DONE)
+- Added missing DB indexes for Payments + Client Credit ledger/application tables.
+- Fixed `ClientCreditApplication` index declaration (was not in Meta; indexes were not being created).
+
+## Phase 3W — Perf Sanity Checks + Documents/TimeEntry Indexes (DONE)
+- Added dev-only per-request perf logging middleware (slow requests + slow ORM queries; env-driven thresholds).
+- Added `python manage.py perf_check` management command for repeatable queryset benchmarks.
+- Added Postgres partial indexes for Documents and TimeEntry list filters (ignoring soft-deleted rows).
+
+## Phase 3X — Settings Profiles Fix (DONE)
+- Restored clean settings layering (base/dev/prod) so local dev remains reliable.
+- Removed base→dev import shim behavior and hard-coded hosts.
+- Centralized DEBUG-derived defaults in `apply_runtime_defaults()` and re-run in dev/prod after setting DEBUG.
+
+## Phase 3Y — Dev HTTP/HTTPS Access Fix (DONE)
+- Dev no longer gets forced into HTTPS redirects due to production-style env values.
+- `config/settings/dev.py` defaults to HTTP access and supports explicit local HTTPS testing via `DEV_SECURE_SSL_REDIRECT=1`.
+
+## Next hardening items (after Phase 3S)
+
+- [ ] Add links to Reconciliation from invoice detail screen (UI affordance).
+- [ ] Add staff-only “Create correcting journal entry” tooling (optional v1, but useful).
+- [ ] Expand data integrity: block edits to invoices/line-items after SENT, except controlled actions (void, credit note, refunds).
+- [ ] Add lightweight performance checks (query counts on dashboard/report pages).
+
+## Next hardening items (after Phase 3Y)
+
+- [ ] Review Projects + Clients list filters and add indexes if needed (based on actual queryset usage).
+- [ ] Add a small set of targeted prefetch/select_related improvements for any remaining N+1 hotspots found by perf logs.
+- [ ] Consider Postgres trigram search (optional) if search boxes become a real perf hotspot.
+
+- [x] Phase 4A — Monitoring & Observability
+  - [x] Add `/healthz/` endpoint with DB + cache checks
+  - [x] Add Sentry wiring (env-driven, safe import) for dev/staging/prod
+  - [x] Complete `.env.example` with all required env vars
+
+Next (Phase 4B):
+- [ ] Add a lightweight “ops alerts” page to summarize recent webhook failures, email failures, and health check status (staff-only).
+- [ ] Add a basic “slow request” sampling option for staging/prod (avoid noisy logs).
+

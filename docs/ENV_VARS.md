@@ -46,11 +46,24 @@ or
 - `COMPANY_DEFAULT_REQUIRE_2FA_ADMINS_MANAGERS` ("1"/"0")
   - If not set, defaults to **ON in production (DEBUG=False)**.
 
+## CSP (Content Security Policy)
+
+- `EZ360_CSP_ENABLED` ("1"/"0")
+  - Default: **ON in production**, OFF in dev.
+- `EZ360_CSP_REPORT_ONLY` ("1"/"0")
+  - Default: **Report-only in production**. Set to 0 to enforce CSP.
+
 ## Caching (optional)
 - `EZ360_CACHE_ENABLED=1`
 - `REDIS_URL` (optional, if using Redis cache)
 
 ## Dropbox (optional)
+
+## Development-only overrides
+
+- `DEV_SECURE_SSL_REDIRECT` (default: `0`)
+  - If set to `1`, forces `SECURE_SSL_REDIRECT=True` in `config/settings/dev.py`.
+  - Only use this if you run a local HTTPS-capable server; otherwise keep it `0` so local dev stays reachable via plain HTTP.
 - `DROPBOX_APP_KEY`
 - `DROPBOX_APP_SECRET`
 - `DROPBOX_REDIRECT_URI` (optional)
@@ -69,3 +82,5 @@ or
 - `EZ360_AUDIT_RETENTION_DAYS` — prune `audit.AuditEvent` older than this (default 365)
 - `EZ360_STRIPE_WEBHOOK_RETENTION_DAYS` — prune `billing.BillingWebhookEvent` older than this (default 90)
 - `EZ360_ADMINS` — optional admin emails for ops alerts (format: `Name:email,Name2:email2`)
+- `EZ360_ALERT_ON_WEBHOOK_FAILURE` — send immediate admin email when Stripe webhook processing fails (default: ON in production)
+- `EZ360_ALERT_ON_EMAIL_FAILURE` — send immediate admin email when email sending fails (default: ON in production)

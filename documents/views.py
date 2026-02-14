@@ -23,6 +23,8 @@ from .models import Document, DocumentLineItem, DocumentStatus, DocumentTemplate
 from .services import allocate_document_number, ensure_numbering_scheme, recalc_document_totals
 from .services_email import send_document_to_client_from_request
 
+from core.pagination import paginate
+
 
 def _doc_label(doc_type: str) -> str:
     return {
@@ -70,12 +72,17 @@ def document_list(request, doc_type: str):
 
     qs = qs.order_by("-created_at")
 
+    paged = paginate(request, qs)
+
     ctx = {
         "doc_type": doc_type,
         "doc_label": _doc_label(doc_type),
         "q": q,
         "status": status,
-        "documents": qs[:500],
+        "documents": paged.object_list,
+        "paginator": paged.paginator,
+        "page_obj": paged.page_obj,
+        "per_page": paged.per_page,
         "status_choices": DocumentStatus.choices,
     }
     return render(request, "documents/document_list.html", ctx)

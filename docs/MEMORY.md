@@ -1,5 +1,24 @@
 # EZ360PM — Project Snapshot
 
+## Snapshot 2026-02-13 — Phase 3U (UX Perf Polish: Pagination + CSP)
+
+### Shipped
+- Standardized list pagination via `core.pagination.paginate` and applied it to:
+  - Clients, Projects, Documents, Payments, Expenses, Merchants, Time Entries, Team.
+- Added shared pagination UI partial: `templates/includes/pagination.html`.
+- Added querystring helper template tag: `{% qs_replace %}` in `core.templatetags.querystring`.
+
+### Security / CSP fix
+- Fixed CSP configuration so it correctly works with `core.middleware.SecurityHeadersMiddleware`:
+  - `SECURE_CSP` is now the policy (dict/string), and `SECURE_CSP_REPORT_ONLY` is a **bool**.
+  - Added env flags:
+    - `EZ360_CSP_ENABLED` (default ON in production)
+    - `EZ360_CSP_REPORT_ONLY` (default ON in production; turn OFF to enforce)
+- Updated policy allowlist to support Bootstrap + Icons via jsDelivr CDN.
+
+### Notes
+- The Clients list header “Showing X clients” is now page-scoped (X = current page rows) rather than a global count.
+
 ## Snapshot 2026-02-13 — Phase 3R (Security Defaults)
 
 ### Shipped
@@ -193,3 +212,59 @@ Advanced corrective workflows pending.
   - `EZ360_STRIPE_WEBHOOK_RETENTION_DAYS` (default 90)
 - Added management command: `python manage.py ez360_prune` (dry-run by default; use `--execute` to delete).
 - Added staff-only Ops page: /ops/retention/ with prune-now button and dry-run eligible counts.
+
+## 2026-02-13 — Phase 3S (Financial Integrity + Reconciliation)
+
+- Added **Invoice Reconciliation** page to help diagnose invoice balances (payments, refunds, credit notes, client credit applications) and provide a one-click **Recalculate** action.
+- Hardened accounting journaling: journal lines are now **write-once** (no mutation once posted) and entries must be balanced.
+- Fixed `DocumentLineItem.__str__` placement (was a stray global function).
+
+## 2026-02-13 — Phase 3T: Ops Alerts + Session Hardening
+
+- Added best-effort ops alert emails for **Stripe webhook** failures and **email** delivery failures (controlled by env defaults ON in production).
+- Added session key rotation on successful password login.
+- Added `core.ops_alerts.alert_admins()` helper.
+
+## 2026-02-13 — Phase 3U: Pagination + CSP
+
+- Added shared pagination helpers (helper, querystring tag, pagination partial) and applied pagination across major list pages.
+- Fixed CSP settings typing and added rollout toggles (report-only defaults in production).
+
+## 2026-02-13 — Phase 3V: Performance Indexing
+
+- Added missing DB indexes for Payments and client credit ledger/application tables.
+- Fixed `ClientCreditApplication` index declaration (previously not in Meta; indexes were not being created).
+
+## 2026-02-13 — Phase 3W: Lightweight Perf Checks + Documents/TimeEntry Indexes
+
+- Added dev-only **PerformanceLoggingMiddleware** (logs slow requests + slow ORM queries; thresholds are env-driven).
+- Added `python manage.py perf_check` management command to run and time the core list querysets for **Documents** and **TimeEntry**, reporting query counts and slowest SQL.
+- Added Postgres partial indexes (ignoring soft-deleted rows) to speed up common list filters:
+  - Documents: (company, doc_type, created_at) and (company, doc_type, status, created_at) where deleted_at IS NULL
+  - TimeEntry: (company, status, started_at), (company, employee, status, started_at), (company, billable, started_at) where deleted_at IS NULL
+
+## 2026-02-13 — Phase 3X: Settings Profiles Fix (Dev/Prod Separation)
+
+- Fixed a settings architecture issue that made **dev mode unreliable**:
+  - Removed an accidental “settings shim” behavior from `config/settings/base.py` that was importing `dev` inside `base` and overriding values.
+  - Removed hard-coded `ALLOWED_HOSTS` that forced production hosts even in local dev.
+- Re-established the intended pattern:
+  - `base.py` contains shared settings only.
+  - `dev.py` and `prod.py` override environment-specific behavior.
+- Added `apply_runtime_defaults()` in `base.py` for settings derived from `DEBUG` (email verification defaults, security cookie defaults, CSP rollout defaults, etc.).
+  - `dev.py`/`prod.py` now re-run it after setting `DEBUG` so defaults stay consistent.
+- Cleaned up `prod.py` duplicate/invalid logging definition and fixed the formatter string.
+
+## 2026-02-13 — Phase 3Y: Dev HTTP/HTTPS Access Fix
+
+- Fixed a dev usability issue where local development could be forced into HTTPS redirects due to production-style env values.
+- `config/settings/dev.py` now defaults to **HTTP** (no SSL redirect) regardless of `SECURE_SSL_REDIRECT` in the environment.
+- Optional local HTTPS testing is now explicit via `DEV_SECURE_SSL_REDIRECT=1` (requires an HTTPS-capable local server).
+
+## 2026-02-13 — Phase 4A: Monitoring & Observability
+
+Phase 4A — Monitoring & Observability
+
+- Added public health check endpoint: `GET /healthz/` (includes DB + cache checks).
+- Centralized Sentry initialization via `init_sentry_if_configured()` in `config/settings/base.py` and called from `dev.py` and `prod.py`.
+- Updated `.env.example` to be a complete, copy/paste-ready reference for all required environment variables (dev + prod), including Phase 4 monitoring vars.

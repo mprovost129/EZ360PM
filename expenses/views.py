@@ -12,12 +12,19 @@ from companies.models import EmployeeRole
 from .forms import ExpenseForm, MerchantForm
 from .models import Expense, ExpenseStatus, Merchant
 
+from core.pagination import paginate
+
 
 @require_min_role(EmployeeRole.MANAGER)
 def merchant_list(request):
     company = request.active_company
-    merchants = Merchant.objects.filter(company=company, is_deleted=False).order_by("name")
-    return render(request, "expenses/merchant_list.html", {"merchants": merchants})
+    qs = Merchant.objects.filter(company=company, is_deleted=False).order_by("name")
+    paged = paginate(request, qs)
+    return render(
+        request,
+        "expenses/merchant_list.html",
+        {"merchants": paged.object_list, "paginator": paged.paginator, "page_obj": paged.page_obj, "per_page": paged.per_page},
+    )
 
 
 @require_min_role(EmployeeRole.MANAGER)
@@ -66,7 +73,20 @@ def expense_list(request):
 
     statuses = [("", "All")] + list(ExpenseStatus.choices)
 
-    return render(request, "expenses/expense_list.html", {"expenses": qs[:500], "q": q, "status": status, "statuses": statuses})
+    paged = paginate(request, qs)
+    return render(
+        request,
+        "expenses/expense_list.html",
+        {
+            "expenses": paged.object_list,
+            "paginator": paged.paginator,
+            "page_obj": paged.page_obj,
+            "per_page": paged.per_page,
+            "q": q,
+            "status": status,
+            "statuses": statuses,
+        },
+    )
 
 
 @require_min_role(EmployeeRole.MANAGER)

@@ -13,6 +13,8 @@ from companies.decorators import company_context_required, require_min_role
 from companies.models import EmployeeRole
 from timetracking.models import TimeEntry, TimeStatus
 
+from core.pagination import paginate
+
 from integrations.models import DropboxConnection, IntegrationConfig
 from integrations.services import (
     build_dropbox_project_folder,
@@ -70,7 +72,18 @@ def project_list(request):
             | Q(client__first_name__icontains=q)
         )
 
-    return render(request, 'projects/project_list.html', {'projects': qs, 'q': q})
+    paged = paginate(request, qs)
+    return render(
+        request,
+        'projects/project_list.html',
+        {
+            'projects': paged.object_list,
+            'q': q,
+            'paginator': paged.paginator,
+            'page_obj': paged.page_obj,
+            'per_page': paged.per_page,
+        },
+    )
 
 
 @company_context_required

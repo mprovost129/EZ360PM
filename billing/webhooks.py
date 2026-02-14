@@ -15,6 +15,18 @@ from .stripe_service import sync_subscription_from_stripe, verify_and_construct_
 logger = logging.getLogger(__name__)
 
 
+def _alert_webhook_failure(subject: str, message: str, *, extra: dict | None = None) -> None:
+    """Best-effort ops alert for webhook failures."""
+    try:
+        from django.conf import settings
+        if not getattr(settings, "EZ360_ALERT_ON_WEBHOOK_FAILURE", False):
+            return
+        from core.ops_alerts import alert_admins
+        alert_admins(subject, message, extra=extra)
+    except Exception:
+        return
+
+
 def _infer_from_subscription_object(data_object: dict) -> tuple[str | None, str | None, int | None]:
     """
     Best-effort inference for (plan, interval, extra_seats) from Stripe subscription payload.
@@ -92,6 +104,11 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
         event = verify_and_construct_event(payload, sig)
     except Exception as e:
         logger.exception("stripe_webhook_signature_invalid err=%s", str(e)[:500])
+        _alert_webhook_failure(
+            "EZ360PM: Stripe webhook signature invalid",
+            "A Stripe webhook was received but signature validation failed.",
+            extra={"error": str(e)[:500]},
+        )
         return HttpResponse(status=400)
 
     event_id = str(getattr(event, "id", "") or event.get("id", ""))
@@ -193,6 +210,11 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
         ok = False
         error = str(e)[:5000]
         logger.exception("stripe_webhook_processing_failed event_id=%s type=%s err=%s", event_id, event_type, str(e)[:500])
+        _alert_webhook_failure(
+            "EZ360PM: Stripe webhook processing failed",
+            "A Stripe webhook was received but processing raised an exception.",
+            extra={"event_id": event_id, "event_type": event_type, "error": str(e)[:500]},
+        )
         try:
             import sentry_sdk
             sentry_sdk.capture_exception(e)

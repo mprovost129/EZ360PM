@@ -6,6 +6,19 @@
 - Company onboarding defaults to require **2FA for managers/admins/owners** in production (override via `COMPANY_DEFAULT_REQUIRE_2FA_ADMINS_MANAGERS`).
 - `SECURE_SSL_REDIRECT`, secure cookies, and HSTS default ON in production.
 
+## 2026-02-13 — CSP rollout is report-only by default (Phase 3U)
+
+- CSP is enabled by default in production (`EZ360_CSP_ENABLED=1`) but ships in **report-only** mode (`EZ360_CSP_REPORT_ONLY=1`) until validated.
+- Enforcing CSP is an explicit opt-in (`EZ360_CSP_REPORT_ONLY=0`).
+- CSP allowlist must reflect runtime template assets (currently allows jsDelivr CDN for Bootstrap + Icons).
+
+## 2026-02-13 — Ops alerting is best-effort (Phase 3T)
+
+- Immediate ops alerts for Stripe webhook processing failures and email delivery failures are **best-effort** and must never break the request path.
+- Enabled by default in production and controlled by:
+  - `EZ360_ALERT_ON_WEBHOOK_FAILURE`
+  - `EZ360_ALERT_ON_EMAIL_FAILURE`
+
 
 ## 2026-02-13 — Client Credit Ledger & Applications (Phase 3J)
 
@@ -115,3 +128,37 @@
 - Retention policy is **env-driven** (no DB settings) to allow ops changes without migrations.
 - Pruning uses **bulk deletes** (permanent removal) and is staff-only via Ops UI and a management command.
 - We prune only operational data (audit events, Stripe webhook payloads); financial records are never pruned automatically.
+
+## 2026-02-13 — Financial integrity hardening
+
+- **Journal entries are immutable once posted.** If a correction is needed, we will create a correcting entry rather than mutating history.
+- **Reconciliation is an explicit workflow.** Invoice balances must be explainable from: payments (net of refunds), posted credit notes, and applied client credits.
+
+## 2026-02-13 — Performance indexing
+
+- We add targeted composite indexes for the most common filters (company + status/date, company + invoice/client) rather than broad/duplicate indexing.
+- `ClientCreditApplication` must declare indexes in `Meta.indexes` (class attribute `indexes = [...]` is ignored by Django); we fixed this to ensure indexes are actually created.
+
+## 2026-02-13 — Phase 3W perf tooling and soft-delete indexing
+
+- For soft-deleted models with heavy list views, prefer **partial indexes** with `condition=Q(deleted_at__isnull=True)` so Postgres can ignore deleted rows.
+- Lightweight perf logging is done via a **dev-only middleware** (no extra dependencies) with env-driven thresholds.
+- Perf checks are intentionally implemented as a management command that exercises the exact list querysets, providing a repeatable baseline without needing browser-driven profiling.
+
+## 2026-02-13 — Phase 3X settings profiles
+
+- Settings follow standard Django module layering:
+  - `config.settings.base` contains shared defaults only.
+  - `config.settings.dev` and `config.settings.prod` apply environment-specific overrides.
+- Any defaults that depend on `DEBUG` (e.g., email verification on/off, secure cookie defaults, CSP rollout defaults) are centralized in `apply_runtime_defaults()` and re-run after `DEBUG` is set in the environment-specific modules.
+
+## 2026-02-13 — Phase 3Y dev HTTP/HTTPS behavior
+
+- Development must be reachable over plain HTTP by default; `SECURE_SSL_REDIRECT` and related production env values must not break local work.
+- Local HTTPS testing is opt-in via `DEV_SECURE_SSL_REDIRECT=1` and requires running an HTTPS-capable local server.
+
+## 2026-02-13 — Phase 4A: Observability defaults
+
+- Health checks: Provide a lightweight `/healthz/` endpoint for uptime monitors and load balancers. It must not leak secrets and should return 500 on failed DB checks.
+- Sentry: Initialize Sentry only when `SENTRY_DSN` is present. Initialization must be safe if `sentry-sdk` is not installed (app should still boot).
+- Settings layering: Sentry init belongs in base as a helper and is invoked by environment-specific settings (dev/prod), not duplicated inline.
