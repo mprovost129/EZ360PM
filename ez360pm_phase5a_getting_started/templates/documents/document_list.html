@@ -1,0 +1,104 @@
+{% extends "base_app.html" %}
+{% load formatting %}
+{% block title %}{{ doc_label }}s · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">{{ doc_label }}s</h1>
+    <div class="text-secondary small">Create, send, and track your {{ doc_label|lower }}s.</div>
+  </div>
+
+  {% if is_manager %}
+    <a class="btn btn-dark" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_wizard' %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_wizard' %}{% else %}{% url 'documents:proposal_wizard' %}{% endif %}">
+      <i class="bi bi-plus-lg me-1"></i>New {{ doc_label }}
+    </a>
+  {% endif %}
+</div>
+
+<form class="card card-body mb-3" method="get">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-6">
+      <label class="form-label">Search</label>
+      <input class="form-control" name="q" value="{{ q }}" placeholder="Number, title, client...">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Status</label>
+      <select class="form-select" name="status">
+        <option value="">All</option>
+        {% for v,l in status_choices %}
+          <option value="{{ v }}" {% if status == v %}selected{% endif %}>{{ l }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3 d-flex gap-2">
+      <button class="btn btn-outline-dark w-100" type="submit"><i class="bi bi-search me-1"></i>Filter</button>
+      <a class="btn btn-outline-secondary w-100" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_list' %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_list' %}{% else %}{% url 'documents:proposal_list' %}{% endif %}">Reset</a>
+    </div>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th style="width: 140px;">Number</th>
+          <th>Client</th>
+          <th>Project</th>
+          <th style="width: 140px;">Date</th>
+          <th style="width: 140px;" class="text-end">Amount</th>
+          <th style="width: 160px;">Status</th>
+          <th style="width: 80px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in documents %}
+          <tr>
+            <td class="fw-semibold">
+              {% if d.number %}{{ d.number }}{% else %}<span class="text-secondary">(draft)</span>{% endif %}
+            </td>
+            <td>
+              {% if d.client %}
+                <div class="fw-semibold">{{ d.client.display_name }}</div>
+                <div class="text-secondary small">{{ d.client.email|default:"" }}</div>
+              {% else %}
+                <span class="text-secondary">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if d.project %}
+                <div class="fw-semibold">{{ d.project.name }}</div>
+                <div class="text-secondary small">{{ d.project.project_number }}</div>
+              {% else %}
+                <span class="text-secondary">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if d.issue_date %}{{ d.issue_date }}{% else %}<span class="text-secondary">—</span>{% endif %}
+            </td>
+            <td class="text-end">{{ d.total_cents|cents_to_dollars }}</td>
+            <td>
+              <span class="badge text-bg-light border">{{ d.get_status_display }}</span>
+            </td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-dark" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_edit' d.id %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_edit' d.id %}{% else %}{% url 'documents:proposal_edit' d.id %}{% endif %}">
+                Open
+              </a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="7" class="text-center text-secondary py-4">
+              No {{ doc_label|lower }}s found.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% include "includes/pagination.html" %}
+
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "base_app.html" %}
+{% load formatting %}
+{% block title %}Projects · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Projects</h1>
+    <div class="text-secondary small">Track work, assign staff, and manage billable time.</div>
+  </div>
+  {% if is_manager %}
+    <a class="btn btn-dark" href="{% url 'projects:project_create' %}"><i class="bi bi-plus-lg me-1"></i>New project</a>
+  {% endif %}
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form class="row g-2" method="get">
+      <div class="col-md-6">
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input class="form-control" name="q" value="{{ q }}" placeholder="Search by project #, name, or client">
+        </div>
+      </div>
+      <div class="col-md-6 text-md-end">
+        <button class="btn btn-outline-dark" type="submit">Search</button>
+        <a class="btn btn-outline-secondary" href="{% url 'projects:project_list' %}">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Project #</th>
+          <th>Project</th>
+          <th>Client</th>
+          <th class="text-end">Hours logged</th>
+          <th class="text-end">Unbilled</th>
+          <th>Assigned</th>
+          <th>Due</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in projects %}
+          <tr>
+            <td class="text-nowrap"><a class="fw-semibold" href="{% url 'projects:project_detail' p.id %}">{{ p.project_number|default:"—" }}</a></td>
+            <td>
+              <div class="fw-semibold">{{ p.name }}</div>
+              {% if p.description %}<div class="text-secondary small text-truncate" style="max-width:420px;">{{ p.description }}</div>{% endif %}
+            </td>
+            <td>
+              {% if p.client %}
+                {{ p.client.display_label }}
+              {% else %}
+                <span class="text-secondary">—</span>
+              {% endif %}
+            </td>
+            <td class="text-end">{{ p.total_minutes|minutes_to_hhmm }}</td>
+            <td class="text-end">{{ p.unbilled_minutes|minutes_to_hhmm }}</td>
+            <td>
+              {% if p.assigned_to %}{{ p.assigned_to.username_public }}{% else %}<span class="text-secondary">—</span>{% endif %}
+            </td>
+            <td class="text-nowrap">{% if p.due_date %}{{ p.due_date }}{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="text-center text-secondary py-4">No projects found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% include "includes/pagination.html" %}
+
+{% endblock %}

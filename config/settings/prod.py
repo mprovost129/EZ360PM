@@ -3,19 +3,11 @@ from __future__ import annotations
 import os
 
 from .base import *  # noqa
+import dj_database_url
 
 # --------------------------------------------------------------------------------------
 # Production settings
 # --------------------------------------------------------------------------------------
-
-def _getenv(key, default=None):
-    return os.environ.get(key, default)
-
-def _getenv_bool(key, default=False):
-    val = os.environ.get(key, None)
-    if val is None:
-        return default
-    return val.strip().lower() not in {"0", "false", "no"}
 
 DEBUG = False
 

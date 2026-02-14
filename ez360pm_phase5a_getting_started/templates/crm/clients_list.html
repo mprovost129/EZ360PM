@@ -1,0 +1,109 @@
+{% extends "base_app.html" %}
+
+{% block title %}Clients · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">Clients</h1>
+    <div class="text-secondary small">All clients for your active company.</div>
+  </div>
+
+  <div class="d-flex gap-2">
+    {% if can_manage %}
+      <a class="btn btn-outline-secondary" href="{% url 'crm:client_import' %}">
+        <i class="bi bi-upload me-1"></i>Import clients
+      </a>
+      <a class="btn btn-outline-secondary" href="{% url 'crm:client_export' %}">
+        <i class="bi bi-download me-1"></i>Export clients
+      </a>
+      <a class="btn btn-dark" href="{% url 'crm:client_create' %}">
+        <i class="bi bi-plus-lg me-1"></i>New client
+      </a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-center">
+      <div class="col-12 col-md-6">
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input class="form-control" name="q" value="{{ q }}" placeholder="Search clients (name/email)…">
+        </div>
+      </div>
+      <div class="col-12 col-md-auto">
+        <button class="btn btn-outline-dark" type="submit">Search</button>
+        {% if q %}
+          <a class="btn btn-link" href="{% url 'crm:client_list' %}">Clear</a>
+        {% endif %}
+      </div>
+      <div class="col-12 col-md">
+        <div class="text-secondary small">
+          Showing {{ rows|length }} client{{ rows|length|pluralize }}
+          {% if q %}for “{{ q }}”{% endif %}
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-sm mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Client</th>
+          <th>Primary contact</th>
+          <th>Internal note</th>
+          <th class="text-end">Credit</th>
+          <th class="text-end">Total outstanding</th>
+          {% if can_manage %}<th class="text-end">Actions</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td>
+              <div class="fw-semibold">{{ r.name }}</div>
+              <div class="text-secondary small">{{ r.obj.city }}{% if r.obj.city and r.obj.state %}, {% endif %}{{ r.obj.state }}</div>
+            </td>
+            <td>
+              <div>{{ r.primary_contact|default:"—" }}</div>
+            </td>
+            <td style="max-width: 420px;">
+              <div class="text-truncate" style="max-width: 420px;">{{ r.obj.internal_note|default:"" }}</div>
+            </td>
+            <td class="text-end">${{ r.credit }}</td>
+            <td class="text-end">${{ r.outstanding }}</td>
+            {% if can_manage %}
+              <td class="text-end">
+                <div class="btn-group btn-group-sm">
+                  <a class="btn btn-outline-dark" href="{% url 'crm:client_edit' r.obj.id %}">Edit</a>
+                  <a class="btn btn-outline-danger" href="{% url 'crm:client_delete' r.obj.id %}">Delete</a>
+                </div>
+              </td>
+            {% endif %}
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-secondary py-4">
+              No clients found.
+              {% if can_manage %}
+                <div class="mt-2">
+                  <a class="btn btn-sm btn-dark" href="{% url 'crm:client_create' %}">
+                    <i class="bi bi-plus-lg me-1"></i>Create your first client
+                  </a>
+                </div>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% include "includes/pagination.html" %}
+{% endblock %}

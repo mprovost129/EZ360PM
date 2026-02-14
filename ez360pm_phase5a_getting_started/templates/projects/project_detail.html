@@ -1,0 +1,113 @@
+{% extends "base_app.html" %}
+{% load formatting %}
+{% block title %}{{ project.project_number }} · {{ project.name }} · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h3 mb-1">{{ project.name }}</h1>
+    <div class="text-secondary small">
+      <span class="me-2"><strong>{{ project.project_number|default:"—" }}</strong></span>
+      {% if project.client %}<span class="me-2"><i class="bi bi-building me-1"></i>{{ project.client.display_label }}</span>{% endif %}
+      {% if project.assigned_to %}<span class="me-2"><i class="bi bi-person-badge me-1"></i>{{ project.assigned_to.username_public }}</span>{% endif %}
+      {% if project.due_date %}<span class="me-2"><i class="bi bi-calendar-event me-1"></i>Due {{ project.due_date }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-dark" href="{% url 'timetracking:timer_panel' %}?project={{ project.id }}{% if project.client %}&client={{ project.client.id }}{% endif %}">
+        <i class="bi bi-stopwatch me-1"></i>Start timer
+      </a>
+    {% if is_manager %}
+      <a class="btn btn-outline-dark" href="{% url 'projects:project_edit' project.id %}"><i class="bi bi-pencil me-1"></i>Edit</a>
+      <a class="btn btn-outline-danger" href="{% url 'projects:project_delete' project.id %}"><i class="bi bi-trash me-1"></i>Delete</a>
+    {% endif %}
+    <a class="btn btn-outline-dark" href="{% url 'projects:project_files' project.id %}"><i class="bi bi-paperclip me-1"></i>Files</a>
+    <a class="btn btn-outline-secondary" href="{% url 'projects:project_list' %}"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-secondary small">Hours logged</div>
+        <div class="h4 mb-0">{{ total_minutes|minutes_to_hhmm }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-secondary small">Unbilled time</div>
+        <div class="h4 mb-0">{{ unbilled_minutes|minutes_to_hhmm }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-secondary small">Billing</div>
+        <div class="fw-semibold">
+          {% if project.billing_type == 'hourly' %}
+            Hourly · {{ project.hourly_rate_cents|cents_to_dollars }}/hr
+          {% else %}
+            Flat · {{ project.flat_fee_cents|cents_to_dollars }}
+          {% endif %}
+        </div>
+        <div class="text-secondary small">Estimated: {{ project.estimated_minutes|minutes_to_hhmm }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h2 class="h5 mb-2">Description</h2>
+    {% if project.description %}
+      <div style="white-space: pre-wrap;">{{ project.description }}</div>
+    {% else %}
+      <div class="text-secondary">No description.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body d-flex align-items-center justify-content-between">
+    <h2 class="h5 mb-0">Time entries</h2>
+    <button class="btn btn-outline-dark btn-sm" disabled title="Timer + time entry UI comes next">
+      <i class="bi bi-stopwatch me-1"></i>Start timer
+    </button>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Employee</th>
+          <th>Date</th>
+          <th>Client</th>
+          <th>Service</th>
+          <th>Note</th>
+          <th class="text-end">Time</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in time_entries %}
+          <tr>
+            <td>{% if t.employee %}{{ t.employee.username_public }}{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+            <td class="text-nowrap">{% if t.started_at %}{{ t.started_at|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+            <td>{% if t.client %}{{ t.client.display_label }}{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+            <td class="text-secondary">(multi-service next)</td>
+            <td class="text-truncate" style="max-width: 380px;">{{ t.note|default:"" }}</td>
+            <td class="text-end">{{ t.duration_minutes|minutes_to_hhmm }}</td>
+            <td><span class="badge bg-secondary">{{ t.status }}</span></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="text-center text-secondary py-4">No time entries yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
