@@ -18,7 +18,7 @@
         Check your inbox for the verification link. If you don’t see it, check spam/junk.
       </p>
 
-      <form method="post" action="{% url 'accounts:verify_email' %}">
+      <form method="post" action="{% url 'accounts:verify_email_required' %}">
         {% csrf_token %}
         <button class="btn btn-primary">Resend verification email</button>
         <a class="btn btn-link" href="{% url 'accounts:logout' %}">Sign out</a>
