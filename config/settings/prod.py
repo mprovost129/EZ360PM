@@ -8,6 +8,15 @@ from .base import *  # noqa
 # Production settings
 # --------------------------------------------------------------------------------------
 
+def _getenv(key, default=None):
+    return os.environ.get(key, default)
+
+def _getenv_bool(key, default=False):
+    val = os.environ.get(key, None)
+    if val is None:
+        return default
+    return val.strip().lower() not in {"0", "false", "no"}
+
 DEBUG = False
 
 # Re-apply derived defaults that depend on DEBUG.
