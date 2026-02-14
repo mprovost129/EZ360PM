@@ -58,6 +58,25 @@ def send_templated_email(spec: EmailSpec, *, fail_silently: bool = False) -> int
     except Exception as e:
         logger.exception("email_send_failed subject=%s to=%s err=%s", subject, spec.to, str(e)[:500])
         try:
+            from ops.services_alerts import create_ops_alert
+            from ops.models import OpsAlertLevel, OpsAlertSource
+
+            create_ops_alert(
+                title="Email send failed",
+                message="An email failed to send.",
+                level=OpsAlertLevel.ERROR,
+                source=OpsAlertSource.EMAIL,
+                company=None,
+                details={
+                    "subject": subject[:200],
+                    "to": ",".join(spec.to)[:500],
+                    "error": str(e)[:500],
+                    "template_html": spec.template_html,
+                },
+            )
+        except Exception:
+            pass
+        try:
             if getattr(settings, "EZ360_ALERT_ON_EMAIL_FAILURE", False):
                 from core.ops_alerts import alert_admins
                 alert_admins(

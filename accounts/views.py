@@ -17,6 +17,9 @@ from core.throttle import hit
 
 from companies.services import pop_pending_invite, user_companies_qs
 
+from ops.services_alerts import create_ops_alert
+from ops.models import OpsAlertLevel, OpsAlertSource
+
 from .email_verification import parse_verify_token, send_verify_email
 from .forms import (
     LoginForm,
@@ -59,6 +62,25 @@ def _require_recaptcha(request, *, action: str) -> bool:
 
 def _throttle_or_block(request, *, prefix: str, limit: int, window_seconds: int) -> bool:
     result = hit(prefix, _client_ip(request), limit=limit, window_seconds=window_seconds)
+    if not result.allowed:
+        # Best-effort ops visibility (Phase 4C)
+        try:
+            create_ops_alert(
+                title=f"Throttle block: {prefix}",
+                message="Request blocked by throttle policy.",
+                level=OpsAlertLevel.WARN,
+                source=OpsAlertSource.THROTTLE,
+                details={
+                    "prefix": prefix,
+                    "ip": _client_ip(request),
+                    "path": request.path,
+                    "method": request.method,
+                    "limit": result.limit,
+                    "window_seconds": result.window_seconds,
+                },
+            )
+        except Exception:
+            pass
     return result.allowed
 
 
@@ -85,6 +107,22 @@ def login_view(request):
                     request,
                     "This account is temporarily locked due to failed login attempts. Please wait and try again, or contact your admin.",
                 )
+                # Best-effort ops visibility (Phase 4C)
+                try:
+                    create_ops_alert(
+                        title="Login blocked: account locked",
+                        message="Login attempt blocked due to progressive lockout.",
+                        level=OpsAlertLevel.WARN,
+                        source=OpsAlertSource.AUTH,
+                        details={
+                            "ident": ident,
+                            "locked_until": status.locked_until.isoformat() if status.locked_until else None,
+                            "ip": _client_ip(request),
+                            "path": request.path,
+                        },
+                    )
+                except Exception:
+                    pass
                 return render(request, "accounts/login.html", {"form": form})
 
         # reCAPTCHA (Pack Q)

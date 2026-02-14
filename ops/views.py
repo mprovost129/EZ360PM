@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import os
+
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views.decorators.http import require_POST
+from django.utils import timezone
 
 from audit.services import log_event
 from billing.models import BillingWebhookEvent, CompanySubscription, PlanCode, SubscriptionStatus
+from accounts.models import AccountLockout
 from companies.models import Company, EmployeeProfile
 from companies.services import set_active_company_id
 from companies.services import get_active_company
@@ -16,6 +21,8 @@ from core.support_mode import get_support_mode, set_support_mode
 from billing.stripe_service import fetch_and_sync_subscription_from_stripe
 from core.launch_checks import run_launch_checks
 from core.retention import get_retention_days, run_prune_jobs
+
+from .models import OpsAlertEvent, OpsAlertSource, OpsAlertLevel
 
 
 def _is_staff(user) -> bool:
@@ -49,6 +56,9 @@ def _recent_webhooks_for_company(company: Company, limit: int = 50):
 
 
 
+
+@login_required
+@user_passes_test(_is_staff)
 
 @login_required
 @user_passes_test(_is_staff)
@@ -87,6 +97,21 @@ def ops_dashboard(request: HttpRequest) -> HttpResponse:
         "active_subscriptions": CompanySubscription.objects.filter(
             status__in=[SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING, SubscriptionStatus.PAST_DUE]
         ).count(),
+        "open_alerts": OpsAlertEvent.objects.filter(is_resolved=False).count(),
+    }
+
+    system_status = {
+        "settings_module": os.getenv("DJANGO_SETTINGS_MODULE", ""),
+        "debug": bool(getattr(settings, "DEBUG", False)),
+        "secure_ssl_redirect": bool(getattr(settings, "SECURE_SSL_REDIRECT", False)),
+        "session_cookie_secure": bool(getattr(settings, "SESSION_COOKIE_SECURE", False)),
+        "csrf_cookie_secure": bool(getattr(settings, "CSRF_COOKIE_SECURE", False)),
+        "allowed_hosts": list(getattr(settings, "ALLOWED_HOSTS", []) or []),
+        "csrf_trusted_origins": list(getattr(settings, "CSRF_TRUSTED_ORIGINS", []) or []),
+        "db_engine": (getattr(settings, "DATABASES", {}).get("default", {}) or {}).get("ENGINE", ""),
+        "cache_backend": (getattr(settings, "CACHES", {}).get("default", {}) or {}).get("BACKEND", ""),
+        "email_backend": str(getattr(settings, "EMAIL_BACKEND", "")),
+        "sentry_enabled": bool(getattr(settings, "SENTRY_DSN", "")),
     }
 
     return render(
@@ -96,8 +121,74 @@ def ops_dashboard(request: HttpRequest) -> HttpResponse:
             "q": q,
             "rows": rows,
             "metrics": metrics,
+            "open_alerts": OpsAlertEvent.objects.filter(is_resolved=False).count(),
         },
     )
+
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_alerts(request: HttpRequest) -> HttpResponse:
+    """Ops alerts (staff-only)."""
+    status = (request.GET.get("status") or "open").strip().lower()
+    source = (request.GET.get("source") or "").strip()
+    level = (request.GET.get("level") or "").strip()
+    q = (request.GET.get("q") or "").strip()
+
+    qs = OpsAlertEvent.objects.all().select_related("company").order_by("-created_at")
+
+    if status == "open":
+        qs = qs.filter(is_resolved=False)
+    elif status == "resolved":
+        qs = qs.filter(is_resolved=True)
+
+    if source:
+        qs = qs.filter(source=source)
+    if level:
+        qs = qs.filter(level=level)
+    if q:
+        qs = qs.filter(
+            Q(title__icontains=q)
+            | Q(message__icontains=q)
+            | Q(company__name__icontains=q)
+        )
+
+    items = list(qs[:200])
+
+    summary = {
+        "open_total": OpsAlertEvent.objects.filter(is_resolved=False).count(),
+        "open_webhooks": OpsAlertEvent.objects.filter(is_resolved=False, source=OpsAlertSource.STRIPE_WEBHOOK).count(),
+        "open_email": OpsAlertEvent.objects.filter(is_resolved=False, source=OpsAlertSource.EMAIL).count(),
+        "open_slow": OpsAlertEvent.objects.filter(is_resolved=False, source=OpsAlertSource.SLOW_REQUEST).count(),
+    }
+
+    return render(
+        request,
+        "ops/alerts.html",
+        {
+            "items": items,
+            "status": status,
+            "source": source,
+            "level": level,
+            "q": q,
+            "summary": summary,
+            "sources": OpsAlertSource.choices,
+            "levels": OpsAlertLevel.choices,
+        },
+    )
+
+
+@login_required
+@user_passes_test(_is_staff)
+@require_POST
+def ops_alert_resolve(request: HttpRequest, alert_id: int) -> HttpResponse:
+    obj = get_object_or_404(OpsAlertEvent, pk=alert_id)
+    try:
+        obj.resolve(by_email=getattr(getattr(request, "user", None), "email", "") or "")
+        messages.success(request, "Alert marked as resolved.")
+    except Exception:
+        messages.error(request, "Could not resolve alert.")
+    return redirect("ops:alerts")
 
 
 @login_required
@@ -309,3 +400,28 @@ def healthz(request):
 
     status_code = 200 if data["status"] == "ok" else 500
     return JsonResponse(data, status=status_code)
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_security(request: HttpRequest) -> HttpResponse:
+    """Security & protection signals: auth lockouts + throttle blocks."""
+    days = int(request.GET.get('days') or 7)
+    days = max(1, min(days, 30))
+    since = timezone.now() - timezone.timedelta(days=days)
+
+    lockouts = AccountLockout.objects.filter(created_at__gte=since).order_by('-created_at')[:200]
+    alerts = OpsAlertEvent.objects.filter(created_at__gte=since, source__in=[OpsAlertSource.AUTH, OpsAlertSource.THROTTLE]).order_by('-created_at')[:300]
+
+    counts = {
+        'auth_alerts_open': OpsAlertEvent.objects.filter(is_resolved=False, source=OpsAlertSource.AUTH, created_at__gte=since).count(),
+        'throttle_alerts_open': OpsAlertEvent.objects.filter(is_resolved=False, source=OpsAlertSource.THROTTLE, created_at__gte=since).count(),
+        'lockouts_total': AccountLockout.objects.filter(created_at__gte=since).count(),
+    }
+
+    return render(request, 'ops/security.html', {
+        'days': days,
+        'since': since,
+        'lockouts': lockouts,
+        'alerts': alerts,
+        'counts': counts,
+    })

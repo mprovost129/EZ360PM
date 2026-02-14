@@ -27,6 +27,24 @@ def _alert_webhook_failure(subject: str, message: str, *, extra: dict | None = N
         return
 
 
+def _record_ops_alert(*, title: str, message: str, details: dict | None = None, company: Company | None = None) -> None:
+    """Best-effort DB alert for staff ops console."""
+    try:
+        from ops.services_alerts import create_ops_alert
+        from ops.models import OpsAlertLevel, OpsAlertSource
+
+        create_ops_alert(
+            title=title,
+            message=message,
+            level=OpsAlertLevel.ERROR,
+            source=OpsAlertSource.STRIPE_WEBHOOK,
+            company=company,
+            details=details or {},
+        )
+    except Exception:
+        return
+
+
 def _infer_from_subscription_object(data_object: dict) -> tuple[str | None, str | None, int | None]:
     """
     Best-effort inference for (plan, interval, extra_seats) from Stripe subscription payload.
@@ -104,6 +122,11 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
         event = verify_and_construct_event(payload, sig)
     except Exception as e:
         logger.exception("stripe_webhook_signature_invalid err=%s", str(e)[:500])
+        _record_ops_alert(
+            title="Stripe webhook signature invalid",
+            message="A Stripe webhook was received but signature validation failed.",
+            details={"error": str(e)[:500]},
+        )
         _alert_webhook_failure(
             "EZ360PM: Stripe webhook signature invalid",
             "A Stripe webhook was received but signature validation failed.",
@@ -210,6 +233,12 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
         ok = False
         error = str(e)[:5000]
         logger.exception("stripe_webhook_processing_failed event_id=%s type=%s err=%s", event_id, event_type, str(e)[:500])
+        _record_ops_alert(
+            title="Stripe webhook processing failed",
+            message="A Stripe webhook was received but processing raised an exception.",
+            details={"event_id": event_id, "event_type": event_type, "error": str(e)[:500]},
+            company=company if 'company' in locals() else None,
+        )
         _alert_webhook_failure(
             "EZ360PM: Stripe webhook processing failed",
             "A Stripe webhook was received but processing raised an exception.",

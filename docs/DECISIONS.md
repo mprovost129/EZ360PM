@@ -162,3 +162,16 @@
 - Health checks: Provide a lightweight `/healthz/` endpoint for uptime monitors and load balancers. It must not leak secrets and should return 500 on failed DB checks.
 - Sentry: Initialize Sentry only when `SENTRY_DSN` is present. Initialization must be safe if `sentry-sdk` is not installed (app should still boot).
 - Settings layering: Sentry init belongs in base as a helper and is invoked by environment-specific settings (dev/prod), not duplicated inline.
+
+## 2026-02-13 — Phase 4B: DB-backed ops alerts
+
+- Actionable failures and key degradations are persisted in-app via `ops.OpsAlertEvent` so staff can review and acknowledge them without server log access.
+- Alert creation is **best-effort** (never raises) and must not block the request path.
+- We store only minimal structured context needed to triage (no secrets; no full request bodies).
+- Perf sampling is opt-in via env (`EZ360_PERF_*`) and stores only request-level timing and counts (no SQL persisted).
+
+
+## 2026-02-13 — Phase 4C: Security signals as Ops Alerts
+
+- We persist only **actionable** auth/throttle signals (lockout + throttle blocks), not every invalid password, to avoid alert spam.
+- Ops status widget intentionally shows **configuration state**, not secrets (no DSNs, keys, or payloads).

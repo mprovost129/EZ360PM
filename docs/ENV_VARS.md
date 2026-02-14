@@ -72,6 +72,12 @@ or
 ## Monitoring / Observability
 - EZ360_RELEASE_SHA (optional, e.g. git SHA for deploy traceability)
 - EZ360_SLOW_REQUEST_MS (default 1500)
+- EZ360_PERF_LOGGING_ENABLED ("1"/"0"; dev/staging friendly)
+- EZ360_PERF_REQUEST_MS (default 600)
+- EZ360_PERF_QUERY_MS (default 120; requires DEBUG to collect connection.queries)
+- EZ360_PERF_TOP_N (default 5)
+- EZ360_PERF_SAMPLE_RATE (0.0–1.0; default 1.0)
+- EZ360_PERF_STORE_DB ("1"/"0"; if enabled, stores sampled slow-request alerts to DB)
 - SENTRY_DSN (optional)
 - SENTRY_ENVIRONMENT (optional; defaults to EZ360_ENV)
 - SENTRY_TRACES_SAMPLE_RATE (optional; default 0.05)
@@ -84,3 +90,12 @@ or
 - `EZ360_ADMINS` — optional admin emails for ops alerts (format: `Name:email,Name2:email2`)
 - `EZ360_ALERT_ON_WEBHOOK_FAILURE` — send immediate admin email when Stripe webhook processing fails (default: ON in production)
 - `EZ360_ALERT_ON_EMAIL_FAILURE` — send immediate admin email when email sending fails (default: ON in production)
+
+
+## Ops / Security (Phase 4C)
+
+These features require no new env vars.
+
+Auth/throttle alerts are generated only for:
+- throttle blocks
+- account lockout blocks

@@ -268,3 +268,29 @@ Phase 4A — Monitoring & Observability
 - Added public health check endpoint: `GET /healthz/` (includes DB + cache checks).
 - Centralized Sentry initialization via `init_sentry_if_configured()` in `config/settings/base.py` and called from `dev.py` and `prod.py`.
 - Updated `.env.example` to be a complete, copy/paste-ready reference for all required environment variables (dev + prod), including Phase 4 monitoring vars.
+
+## 2026-02-13 — Phase 4B: Ops Alerts + Perf Sampling (DB-backed)
+
+- Added DB-backed ops alerts (`ops.OpsAlertEvent`) with a staff-only **Ops Alerts** page:
+  - Filters by status (open/resolved), source, level, and search.
+  - Acknowledge/resolve workflow.
+  - Quick KPIs for open webhook/email/perf alerts.
+- Stripe webhook failures now generate DB alerts (signature invalid and processing exceptions) in addition to best-effort admin email alerts.
+- Email send failures now generate DB alerts (in addition to optional admin email alerts + Sentry capture).
+- Performance logging middleware can optionally store sampled **slow request** alerts to the DB (no SQL stored), controlled via env/settings:
+  - `EZ360_PERF_LOGGING_ENABLED`
+  - `EZ360_PERF_REQUEST_MS`
+  - `EZ360_PERF_SAMPLE_RATE`
+  - `EZ360_PERF_STORE_DB`
+
+
+## 2026-02-13 — Phase 4C: Ops Security Dashboard + System Status Widget
+
+- Added Ops Console **System status** widget (settings module, DEBUG, SSL redirect, Sentry enabled, DB/cache/email backends).
+- Added **Ops → Security** page for staff with:
+  - Recent AccountLockout records (progressive lockouts)
+  - Recent Ops alerts for Auth + Throttle
+- Added best-effort OpsAlertEvent creation for:
+  - Login throttle blocks
+  - Login blocked due to account lockout
+- Preserved dev/prod settings profiles (dev remains HTTP-safe by default).

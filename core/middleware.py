@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import logging
 import time
+import random
 
 from django.conf import settings
 from django.contrib import messages
@@ -116,6 +117,8 @@ class PerformanceLoggingMiddleware:
         request_ms = int(getattr(settings, "EZ360_PERF_REQUEST_MS", 600))
         query_ms = int(getattr(settings, "EZ360_PERF_QUERY_MS", 120))
         top_n = int(getattr(settings, "EZ360_PERF_TOP_N", 5))
+        sample_rate = float(getattr(settings, "EZ360_PERF_SAMPLE_RATE", 1.0) or 0.0)
+        store_db = bool(getattr(settings, "EZ360_PERF_STORE_DB", False))
 
         t0 = time.perf_counter()
         # Reset per-request query log (best-effort)
@@ -152,7 +155,9 @@ class PerformanceLoggingMiddleware:
         method = getattr(request, "method", "?")
         status = getattr(response, "status_code", "?")
 
-        if dt_ms >= request_ms or slow_queries:
+        is_slow = bool(dt_ms >= request_ms or slow_queries)
+
+        if is_slow:
             logger_perf.warning(
                 "PERF %s %s %s in %.1fms (%s queries)",
                 method,
@@ -164,6 +169,29 @@ class PerformanceLoggingMiddleware:
 
             for ms, sql in slow_queries[: max(1, top_n)]:
                 logger_perf.warning("  SLOW SQL %.1fms: %s", ms, sql[:900])
+
+            # Optional: store a staff-visible ops alert (sampled)
+            try:
+                if store_db and sample_rate > 0 and random.random() <= min(1.0, max(0.0, sample_rate)):
+                    from ops.services_alerts import create_ops_alert
+                    from ops.models import OpsAlertLevel, OpsAlertSource
+
+                    create_ops_alert(
+                        title="Slow request",
+                        message=f"{method} {path} returned {status} in {dt_ms:.1f}ms",
+                        level=OpsAlertLevel.WARN,
+                        source=OpsAlertSource.SLOW_REQUEST,
+                        company=get_active_company(request),
+                        details={
+                            "method": method,
+                            "path": path,
+                            "status": int(status) if str(status).isdigit() else str(status),
+                            "duration_ms": float(f"{dt_ms:.1f}"),
+                            "query_count": int(total_queries),
+                        },
+                    )
+            except Exception:
+                pass
 
         return response
 

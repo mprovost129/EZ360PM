@@ -7,10 +7,10 @@ def _getenv(key, default=None):
     return os.environ.get(key, default)
 
 def _getenv_bool(key, default=False):
-    val = os.environ.get(key)
+    val = os.environ.get(key, None)
     if val is None:
         return default
-    return val.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return val.strip().lower() not in {"0", "false", "no"}
 
 # --------------------------------------------------------------------------------------
 # Development settings
@@ -55,6 +55,8 @@ EZ360_PERF_LOGGING_ENABLED = (
 EZ360_PERF_REQUEST_MS = int(_getenv("EZ360_PERF_REQUEST_MS", "600"))
 EZ360_PERF_QUERY_MS = int(_getenv("EZ360_PERF_QUERY_MS", "120"))
 EZ360_PERF_TOP_N = int(_getenv("EZ360_PERF_TOP_N", "5"))
+EZ360_PERF_SAMPLE_RATE = float(_getenv("EZ360_PERF_SAMPLE_RATE", "1.0"))
+EZ360_PERF_STORE_DB = _getenv_bool("EZ360_PERF_STORE_DB", False)
 
 # Insert perf middleware early so it captures the full request.
 _mw = list(MIDDLEWARE)

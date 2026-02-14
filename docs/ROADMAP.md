@@ -188,6 +188,13 @@ Next recommended hardening priorities:
   - [x] Complete `.env.example` with all required env vars
 
 Next (Phase 4B):
-- [ ] Add a lightweight “ops alerts” page to summarize recent webhook failures, email failures, and health check status (staff-only).
-- [ ] Add a basic “slow request” sampling option for staging/prod (avoid noisy logs).
+
+- [x] Phase 4B — Ops Alerts + Perf Sampling (DB-backed)
+  - [x] Staff-only Ops Alerts page (open/resolved, filters, search, resolve)
+  - [x] DB alerts for Stripe webhook failures + email send failures
+  - [x] Optional slow-request sampling stored to DB (env-driven)
+
+Next (Phase 4C):
+- [ ] Add rate-limit and abuse dashboards (top throttles, 2FA/verify failures, repeated bad login) (staff-only).
+- [ ] Add “system status” widget on Ops Console (healthz last check, Sentry DSN presence, email backend mode).
 

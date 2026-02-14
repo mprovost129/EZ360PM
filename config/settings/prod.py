@@ -33,6 +33,28 @@ EMAIL_BACKEND = _getenv(
 
 
 # --------------------------------------------------------------------------------------
+# Optional: lightweight performance logging (prod/staging)
+# --------------------------------------------------------------------------------------
+# Disabled by default. Enable only when actively profiling.
+EZ360_PERF_LOGGING_ENABLED = _getenv_bool("EZ360_PERF_LOGGING_ENABLED", False)
+EZ360_PERF_REQUEST_MS = int(_getenv("EZ360_PERF_REQUEST_MS", "800"))
+EZ360_PERF_QUERY_MS = int(_getenv("EZ360_PERF_QUERY_MS", "200"))
+EZ360_PERF_TOP_N = int(_getenv("EZ360_PERF_TOP_N", "3"))
+EZ360_PERF_SAMPLE_RATE = float(_getenv("EZ360_PERF_SAMPLE_RATE", "0.25"))
+EZ360_PERF_STORE_DB = _getenv_bool("EZ360_PERF_STORE_DB", False)
+
+if EZ360_PERF_LOGGING_ENABLED:
+    _mw = list(MIDDLEWARE)
+    if "core.middleware.PerformanceLoggingMiddleware" not in _mw:
+        if "django.middleware.common.CommonMiddleware" in _mw:
+            idx = _mw.index("django.middleware.common.CommonMiddleware") + 1
+        else:
+            idx = 0
+        _mw.insert(idx, "core.middleware.PerformanceLoggingMiddleware")
+    MIDDLEWARE = _mw
+
+
+# --------------------------------------------------------------------------------------
 # Logging (prod-friendly)
 # --------------------------------------------------------------------------------------
 

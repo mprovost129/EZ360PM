@@ -7,6 +7,16 @@
       <h1 class="h4 mb-1">Ops Console</h1>
       <div class="text-secondary small">Internal tools for staff. Use support mode for safe access.</div>
     </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-dark" href="{% url 'ops:alerts' %}">
+        Alerts
+        {% if metrics.open_alerts %}
+          <span class="badge text-bg-danger ms-1">{{ metrics.open_alerts }}</span>
+        {% endif %}
+      </a>
+      <a class="btn btn-outline-dark" href="{% url 'ops:launch_checks' %}">Launch checks</a>
+      <a class="btn btn-outline-dark" href="{% url 'ops:retention' %}">Retention</a>
+    </div>
     <form class="d-flex gap-2" method="get">
       <input class="form-control" name="q" value="{{ q }}" placeholder="Search companies or emails…" style="min-width: 280px;">
       <button class="btn btn-dark" type="submit">Search</button>
@@ -35,6 +45,41 @@
         <div class="card-body">
           <div class="text-secondary small">Active / Trialing / Past due</div>
           <div class="fs-4 fw-semibold">{{ metrics.active_subscriptions }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div>
+              <div class="text-secondary small">System status</div>
+              <div class="fw-semibold">Runtime configuration snapshot</div>
+            </div>
+            <div class="d-flex gap-2">
+              <a class="btn btn-outline-dark btn-sm" href="{% url 'ops:healthz' %}">healthz</a>
+              <a class="btn btn-outline-dark btn-sm" href="{% url 'ops:alerts' %}">alerts</a>
+              <a class="btn btn-outline-dark btn-sm" href="{% url 'ops:security' %}">security</a>
+            </div>
+          </div>
+
+          <div class="row g-2 mt-2 small">
+            <div class="col-md-3"><span class="text-secondary">Settings:</span> <span class="fw-semibold">{{ system_status.settings_module|default:"" }}</span></div>
+            <div class="col-md-2"><span class="text-secondary">DEBUG:</span> {% if system_status.debug %}<span class="badge text-bg-warning">True</span>{% else %}<span class="badge text-bg-success">False</span>{% endif %}</div>
+            <div class="col-md-3"><span class="text-secondary">SSL redirect:</span> {% if system_status.secure_ssl_redirect %}<span class="badge text-bg-danger">On</span>{% else %}<span class="badge text-bg-success">Off</span>{% endif %}</div>
+            <div class="col-md-2"><span class="text-secondary">Sentry:</span> {% if system_status.sentry_enabled %}<span class="badge text-bg-success">Enabled</span>{% else %}<span class="badge text-bg-secondary">Off</span>{% endif %}</div>
+            <div class="col-md-2"><span class="text-secondary">Email:</span> <span class="fw-semibold">{{ system_status.email_backend|default:"" }}</span></div>
+
+            <div class="col-12"><span class="text-secondary">DB:</span> <span class="fw-semibold">{{ system_status.db_engine|default:"" }}</span></div>
+            <div class="col-12"><span class="text-secondary">Cache:</span> <span class="fw-semibold">{{ system_status.cache_backend|default:"" }}</span></div>
+            {% if system_status.allowed_hosts %}
+              <div class="col-12"><span class="text-secondary">ALLOWED_HOSTS:</span> <span class="fw-semibold">{{ system_status.allowed_hosts|join:", " }}</span></div>
+            {% endif %}
+          </div>
         </div>
       </div>
     </div>
