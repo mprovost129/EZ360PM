@@ -5,6 +5,15 @@ import os
 from .base import *  # noqa
 import dj_database_url
 
+def _getenv(key, default=None):
+    return os.environ.get(key, default)
+
+def _getenv_bool(key, default=False):
+    val = os.environ.get(key, None)
+    if val is None:
+        return default
+    return val.strip().lower() not in {"0", "false", "no"}
+
 # --------------------------------------------------------------------------------------
 # Production settings
 # --------------------------------------------------------------------------------------
@@ -30,8 +39,19 @@ if _getenv_bool("TRUST_X_FORWARDED_PROTO", True):
 EMAIL_BACKEND = _getenv(
     "EMAIL_BACKEND",
     "django.core.mail.backends.smtp.EmailBackend",
+    
 )
 
+# --------------------------------------------------------------------------------------
+# Database (Render)
+# --------------------------------------------------------------------------------------
+DATABASES = {
+    "default": dj_database_url.config(
+        default=_getenv("DATABASE_URL"),
+        conn_max_age=600,
+        ssl_require=True,
+    )
+}
 
 # --------------------------------------------------------------------------------------
 # Optional: lightweight performance logging (prod/staging)
