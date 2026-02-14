@@ -1,0 +1,45 @@
+from django.contrib import admin
+from django.urls import include, path
+from django.conf import settings
+from django.conf.urls.static import static
+
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
+from ops import views as ops_views
+
+
+urlpatterns = [
+    path("healthz/", ops_views.healthz, name="healthz"),
+    # Public + app pages
+    path("", include("core.urls")),
+    path("accounts/", include("accounts.urls")),
+    path("companies/", include("companies.urls")),
+    path("", include("integrations.urls")),
+    path("", include("billing.urls")),
+    path("", include("crm.urls")),
+    path("", include("projects.urls")),
+    path("", include("timetracking.urls")),
+    path("", include("documents.urls")),
+    path("", include("payments.urls")),
+    path("", include("expenses.urls")),
+    path("", include("audit.urls")),
+
+    path("", include("accounting.urls")),
+
+    path("ops/", include("ops.urls")),
+    # Django admin
+    path("admin/", admin.site.urls),
+
+    # API auth (JWT)
+    path("api/v1/auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/v1/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+
+    # Sync API
+    path("api/v1/sync/", include("sync.urls")),
+]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+handler404 = 'core.error_views.error_404'
+handler500 = 'core.error_views.error_500'
