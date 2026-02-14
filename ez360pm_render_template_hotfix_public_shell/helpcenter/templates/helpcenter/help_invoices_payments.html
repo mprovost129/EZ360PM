@@ -1,0 +1,24 @@
+{% extends "helpcenter/_help_base.html" %}
+
+{% block help_h1 %}Invoices & payments{% endblock %}
+
+{% block help_body %}
+<p>Documents live under <strong>Documents</strong>:</p>
+<ul>
+  <li><strong>Proposals</strong> — early-stage scope / pre-estimate.</li>
+  <li><strong>Estimates</strong> — quoted work; may be converted to invoice.</li>
+  <li><strong>Invoices</strong> — billable documents; can accept partial payments.</li>
+</ul>
+
+<div class="fw-semibold mb-2">Payments</div>
+<ul>
+  <li>Record payments against invoices. The system recalculates balance and status.</li>
+  <li>Overpayments automatically create a <strong>client credit</strong> ledger entry.</li>
+  <li>Payments can be recorded manually or via Stripe flows (depending on your billing configuration).</li>
+</ul>
+
+<div class="alert alert-secondary mb-0">
+  <div class="fw-semibold">Accounting linkage</div>
+  <div class="small">Invoices, payments, and expenses post journal entries via the accounting engine (idempotent posting).</div>
+</div>
+{% endblock %}

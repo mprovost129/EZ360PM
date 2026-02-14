@@ -1,0 +1,39 @@
+{% extends "base_app.html" %}
+{% block title %}Support Mode Status · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="max-width: 1100px;">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h3 mb-0">Support Mode Status</h1>
+      <div class="text-secondary small">Support mode is audited and expires automatically.</div>
+    </div>
+    <a class="btn btn-outline-secondary" href="{% url 'core:support_mode_enter' %}">Enter</a>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      {% if state.is_active %}
+        <div class="alert alert-warning">
+          <div class="fw-semibold">Support mode is ACTIVE</div>
+          <div class="small">
+            Company: <span class="fw-semibold">{{ company.name }}</span><br>
+            Expires: {{ state.expires_at|date:"Y-m-d H:i:s" }}<br>
+            Reason: {{ state.reason|default:"—" }}
+          </div>
+        </div>
+
+        <form method="post" action="{% url 'core:support_mode_exit' %}">
+          {% csrf_token %}
+          <button class="btn btn-outline-danger" type="submit">Exit Support Mode</button>
+        </form>
+      {% else %}
+        <div class="alert alert-success">
+          Support mode is not active.
+        </div>
+        <a class="btn btn-danger" href="{% url 'core:support_mode_enter' %}">Enable Support Mode</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

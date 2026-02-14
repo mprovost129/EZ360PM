@@ -1,0 +1,62 @@
+{% extends "base_app.html" %}
+
+{% block title %}Billing Webhooks · EZ360PM{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">Billing webhooks</h1>
+      <div class="text-secondary">Staff-only view of Stripe webhook events processed by EZ360PM.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-dark" href="{% url 'billing:overview' %}">
+        <i class="bi bi-arrow-left me-1"></i>Back to Billing
+      </a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr class="text-secondary small">
+              <th>Type</th>
+              <th class="text-nowrap">Stripe event id</th>
+              <th class="text-nowrap">OK</th>
+              <th class="text-nowrap">Received</th>
+              <th class="text-nowrap">Processed</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in events %}
+              <tr>
+                <td>
+                  <a href="{% url 'billing:webhook_event_detail' e.pk %}" class="text-decoration-none">
+                    {{ e.event_type|default:"(unknown)" }}
+                  </a>
+                </td>
+                <td class="font-monospace small">{{ e.stripe_event_id }}</td>
+                <td>
+                  {% if e.ok %}
+                    <span class="badge text-bg-success">OK</span>
+                  {% else %}
+                    <span class="badge text-bg-danger">Fail</span>
+                  {% endif %}
+                </td>
+                <td class="text-nowrap small">{{ e.received_at|date:"Y-m-d H:i" }}</td>
+                <td class="text-nowrap small">{{ e.processed_at|date:"Y-m-d H:i" }}</td>
+                <td class="small text-danger">{{ e.error|truncatechars:120 }}</td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="6" class="text-secondary">No webhook events yet.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endblock %}
