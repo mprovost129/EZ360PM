@@ -28,3 +28,4 @@ urllib3==2.6.3
 gunicorn==25.1.0
 packaging==26.0
 dj-database-url==3.1.0
+sentry-sdk==2.52.0
