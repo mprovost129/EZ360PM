@@ -4,12 +4,10 @@ import os
 
 from .base import *  # noqa
 
-# --------------------------------------------------------------------------------------
-# Production settings
-# --------------------------------------------------------------------------------------
 
 def _getenv(key, default=None):
     return os.environ.get(key, default)
+
 
 def _getenv_bool(key, default=False):
     val = os.environ.get(key, None)
@@ -17,15 +15,11 @@ def _getenv_bool(key, default=False):
         return default
     return val.strip().lower() in {"1", "true", "yes", "y", "on"}
 
+
 DEBUG = False
 
 # Re-apply derived defaults that depend on DEBUG.
 apply_runtime_defaults()
-
-# In production you SHOULD set ALLOWED_HOSTS (and CSRF_TRUSTED_ORIGINS) via env.
-# Example:
-#   ALLOWED_HOSTS=ez360pm.com,www.ez360pm.com
-#   CSRF_TRUSTED_ORIGINS=https://ez360pm.com,https://www.ez360pm.com
 
 # If behind a proxy/load balancer
 USE_X_FORWARDED_HOST = _getenv_bool("USE_X_FORWARDED_HOST", True)
@@ -34,17 +28,12 @@ USE_X_FORWARDED_HOST = _getenv_bool("USE_X_FORWARDED_HOST", True)
 if _getenv_bool("TRUST_X_FORWARDED_PROTO", True):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-# Email: default to SMTP in prod (set EMAIL_HOST etc in env)
 EMAIL_BACKEND = _getenv(
     "EMAIL_BACKEND",
     "django.core.mail.backends.smtp.EmailBackend",
 )
 
-
-# --------------------------------------------------------------------------------------
-# Optional: lightweight performance logging (prod/staging)
-# --------------------------------------------------------------------------------------
-# Disabled by default. Enable only when actively profiling.
+# Optional perf logging
 EZ360_PERF_LOGGING_ENABLED = _getenv_bool("EZ360_PERF_LOGGING_ENABLED", False)
 EZ360_PERF_REQUEST_MS = int(_getenv("EZ360_PERF_REQUEST_MS", "800"))
 EZ360_PERF_QUERY_MS = int(_getenv("EZ360_PERF_QUERY_MS", "200"))
@@ -62,14 +51,8 @@ if EZ360_PERF_LOGGING_ENABLED:
         _mw.insert(idx, "core.middleware.PerformanceLoggingMiddleware")
     MIDDLEWARE = _mw
 
-
-# --------------------------------------------------------------------------------------
-# Logging (prod-friendly)
-# --------------------------------------------------------------------------------------
-
-LOGGING = LOGGING  # from base.py (request-id aware)
-
-# Production tweaks (levels can be controlled via DJANGO_LOG_LEVEL)
+# Logging tweaks
+LOGGING = LOGGING
 LOGGING["loggers"].update(
     {
         "billing.webhooks": {"handlers": ["console"], "level": "INFO", "propagate": False},
@@ -77,15 +60,5 @@ LOGGING["loggers"].update(
     }
 )
 
-
-
-
-# --------------------------------------------------------------------------------------
-# Monitoring / Observability (optional)
-# --------------------------------------------------------------------------------------
-
+# Monitoring
 init_sentry_if_configured()
-
-
-# Backups (prod is env-driven)
-# BACKUP_ENABLED is read in base.py from BACKUP_ENABLED or EZ360_BACKUP_ENABLED

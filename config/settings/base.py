@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from dotenv import load_dotenv
 
@@ -37,6 +38,34 @@ def _getenv_int(name: str, default: int = 0) -> int:
         return default
 
 
+def _is_render() -> bool:
+    return any(os.getenv(k) for k in ("RENDER", "RENDER_SERVICE_ID", "RENDER_EXTERNAL_URL", "RENDER_INSTANCE_ID"))
+
+
+IS_RENDER = _is_render()
+
+
+def _ensure_sslmode_require(db_url: str) -> str:
+    """
+    Ensure sslmode=require is present for Postgres URLs.
+    On Render, Postgres expects SSL. This prevents the common 'SSL negotiation' error.
+    """
+    try:
+        u = urlparse(db_url)
+        scheme = (u.scheme or "").lower()
+        if scheme not in {"postgres", "postgresql"}:
+            return db_url
+
+        qs = dict(parse_qsl(u.query, keep_blank_values=True))
+        if "sslmode" not in qs:
+            qs["sslmode"] = "require"
+            u = u._replace(query=urlencode(qs))
+            return urlunparse(u)
+        return db_url
+    except Exception:
+        return db_url
+
+
 # --------------------------------------------------------------------------------------
 # Core
 # --------------------------------------------------------------------------------------
@@ -50,13 +79,14 @@ SECRET_KEY = _getenv("SECRET_KEY", "django-insecure-CHANGE_ME")
 ALLOWED_HOSTS = [h.strip() for h in _getenv("ALLOWED_HOSTS", "").split(",") if h.strip()]
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in _getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
 
-
 # Build / release metadata (safe to expose via /version and Ops)
-# Populate these in your deploy pipeline (or leave blank in dev).
 APP_ENVIRONMENT = _getenv("APP_ENVIRONMENT", "")
 BUILD_VERSION = _getenv("BUILD_VERSION", "")
 BUILD_SHA = _getenv("BUILD_SHA", "") or _getenv("EZ360_RELEASE_SHA", "")
 BUILD_DATE = _getenv("BUILD_DATE", "")
+
+ENVIRONMENT = os.getenv("EZ360_ENV", "dev")
+RELEASE_SHA = os.getenv("EZ360_RELEASE_SHA", "")
 
 
 INSTALLED_APPS = [
@@ -98,8 +128,6 @@ if _getenv_bool("USE_S3", False):
     if "storages" not in INSTALLED_APPS:
         INSTALLED_APPS.append("storages")
 
-
-
 AUTH_USER_MODEL = "accounts.User"
 
 
@@ -125,7 +153,6 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "core.middleware.SecurityHeadersMiddleware",
 ]
-
 
 ROOT_URLCONF = "config.urls"
 
@@ -153,28 +180,81 @@ ASGI_APPLICATION = "config.asgi.application"
 # --------------------------------------------------------------------------------------
 # Database
 # --------------------------------------------------------------------------------------
-
-# Supports either:
-# - DATABASE_URL (recommended, future)
-# - or individual POSTGRES_* vars
-# - or legacy NAME/USER/PASSWORD/HOST/PORT vars
+#
+# Priority order:
+#  1) DATABASE_URL (Render recommended)
+#  2) POSTGRES_* vars
+#  3) legacy NAME/USER/PASSWORD/HOST/PORT vars
+#  4) sqlite fallback (local boot convenience)
+#
 DATABASE_URL = _getenv("DATABASE_URL", "").strip()
 
 if DATABASE_URL:
-    # Placeholder: if you later add dj-database-url, switch here.
-    pass
+    if IS_RENDER:
+        DATABASE_URL = _ensure_sslmode_require(DATABASE_URL)
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": _getenv("POSTGRES_DB", _getenv("NAME", "ez360pm")),
-        "USER": _getenv("POSTGRES_USER", _getenv("USER", "ez360pmuser")),
-        "PASSWORD": _getenv("POSTGRES_PASSWORD", _getenv("PASSWORD", "")),
-        "HOST": _getenv("POSTGRES_HOST", _getenv("HOST", "localhost")),
-        "PORT": _getenv("POSTGRES_PORT", _getenv("PORT", "5432")),
-        "CONN_MAX_AGE": _getenv_int("DB_CONN_MAX_AGE", 0),
-    }
-}
+    # Use dj-database-url if installed, else parse manually
+    try:
+        import dj_database_url  # type: ignore
+
+        DATABASES = {
+            "default": dj_database_url.parse(
+                DATABASE_URL,
+                conn_max_age=_getenv_int("DB_CONN_MAX_AGE", 600),
+                ssl_require=IS_RENDER or _getenv_bool("DB_SSL_REQUIRE", False),
+            )
+        }
+    except Exception:
+        u = urlparse(DATABASE_URL)
+        if u.scheme.lower() not in {"postgres", "postgresql"}:
+            raise RuntimeError("DATABASE_URL must be a postgres:// URL")
+
+        qs = dict(parse_qsl(u.query, keep_blank_values=True))
+        options = {}
+        if IS_RENDER and qs.get("sslmode") is None:
+            options["sslmode"] = "require"
+
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.postgresql",
+                "NAME": (u.path or "").lstrip("/"),
+                "USER": u.username or "",
+                "PASSWORD": u.password or "",
+                "HOST": u.hostname or "",
+                "PORT": str(u.port or 5432),
+                "CONN_MAX_AGE": _getenv_int("DB_CONN_MAX_AGE", 600),
+                "OPTIONS": options,
+            }
+        }
+else:
+    # Discrete env var config
+    db_name = _getenv("POSTGRES_DB", _getenv("NAME", "")).strip()
+    db_user = _getenv("POSTGRES_USER", _getenv("USER", "")).strip()
+    db_pass = _getenv("POSTGRES_PASSWORD", _getenv("PASSWORD", "")).strip()
+    db_host = _getenv("POSTGRES_HOST", _getenv("HOST", "")).strip()
+    db_port = _getenv("POSTGRES_PORT", _getenv("PORT", "")).strip()
+
+    if db_host or db_name or db_user:
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.postgresql",
+                "NAME": db_name or "ez360pm",
+                "USER": db_user or "ez360pmuser",
+                "PASSWORD": db_pass,
+                "HOST": db_host or "localhost",
+                "PORT": db_port or "5432",
+                "CONN_MAX_AGE": _getenv_int("DB_CONN_MAX_AGE", 0),
+                "OPTIONS": {"sslmode": "require"} if (IS_RENDER or _getenv_bool("DB_SSL_REQUIRE", False)) else {},
+            }
+        }
+    else:
+        # Local fallback so dev boots without any DB vars
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": str(BASE_DIR / "db.sqlite3"),
+            }
+        }
 
 
 # --------------------------------------------------------------------------------------
@@ -240,7 +320,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 # --------------------------------------------------------------------------------------
 # Media / file storage
 # --------------------------------------------------------------------------------------
-# Default: local filesystem (MEDIA_ROOT). Optional: S3 via django-storages if USE_S3=1.
+
 USE_S3 = _getenv_bool("USE_S3", False)
 
 AWS_ACCESS_KEY_ID = _getenv("AWS_ACCESS_KEY_ID", "")
@@ -251,28 +331,22 @@ AWS_S3_ENDPOINT_URL = _getenv("AWS_S3_ENDPOINT_URL", "")
 AWS_S3_CUSTOM_DOMAIN = _getenv("AWS_S3_CUSTOM_DOMAIN", "")
 AWS_DEFAULT_ACL = _getenv("AWS_DEFAULT_ACL", "")
 
-
 S3_PUBLIC_MEDIA_BUCKET = _getenv("S3_PUBLIC_MEDIA_BUCKET", "")
 S3_PRIVATE_MEDIA_BUCKET = _getenv("S3_PRIVATE_MEDIA_BUCKET", "")
 S3_PUBLIC_MEDIA_LOCATION = _getenv("S3_PUBLIC_MEDIA_LOCATION", "public-media")
 S3_PRIVATE_MEDIA_LOCATION = _getenv("S3_PRIVATE_MEDIA_LOCATION", "private-media")
 S3_PRIVATE_MEDIA_EXPIRE_SECONDS = int(_getenv("S3_PRIVATE_MEDIA_EXPIRE_SECONDS", "600") or "600")
 
-# Optional: browser direct uploads to S3 (presigned POST). Keep OFF unless configured.
 S3_DIRECT_UPLOADS = _getenv_bool("S3_DIRECT_UPLOADS", False)
 S3_PRESIGN_EXPIRE_SECONDS = int(_getenv("S3_PRESIGN_EXPIRE_SECONDS", "120") or "120")
 S3_PRESIGN_MAX_SIZE_MB = int(_getenv("S3_PRESIGN_MAX_SIZE_MB", "50") or "50")
 
-
-# Django 4.2+ storage configuration
-STORAGES = {
+STORAGES: dict[str, dict[str, str] | dict[str, object]] = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
 
 if USE_S3:
-    # Note: requires 'django-storages[boto3]' to be installed.
-    # Default storage uses the PUBLIC media bucket (logos/avatars/general media).
     public_bucket = S3_PUBLIC_MEDIA_BUCKET or AWS_STORAGE_BUCKET_NAME
     STORAGES["default"] = {
         "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
@@ -283,7 +357,6 @@ if USE_S3:
         },
     }
 
-    # MEDIA_URL: prefer custom domain; otherwise derive from endpoint/bucket
     if AWS_S3_CUSTOM_DOMAIN:
         MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{S3_PUBLIC_MEDIA_LOCATION.strip('/')}/"
     elif public_bucket:
@@ -291,6 +364,7 @@ if USE_S3:
             MEDIA_URL = f"{AWS_S3_ENDPOINT_URL.rstrip('/')}/{public_bucket}/{S3_PUBLIC_MEDIA_LOCATION.strip('/')}/"
         else:
             MEDIA_URL = f"https://{public_bucket}.s3.amazonaws.com/{S3_PUBLIC_MEDIA_LOCATION.strip('/')}/"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
@@ -364,66 +438,43 @@ if _raw_price_map:
 # Security / hardening knobs (derived defaults applied via apply_runtime_defaults)
 # --------------------------------------------------------------------------------------
 
-# If behind a proxy/load balancer (Render/ELB)
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-# Two-factor auth (TOTP)
 TWO_FACTOR_ISSUER = _getenv("TWO_FACTOR_ISSUER", "EZ360PM")
 
-
-# reCAPTCHA v3
 RECAPTCHA_ENABLED = os.getenv("RECAPTCHA_ENABLED", "0") == "1"
 RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY", "")
 RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "")
 RECAPTCHA_MIN_SCORE = float(os.getenv("RECAPTCHA_MIN_SCORE", "0.5"))
 
-
-# Dropbox Integration (Pack U)
 DROPBOX_APP_KEY = _getenv("DROPBOX_APP_KEY", "").strip()
 DROPBOX_APP_SECRET = _getenv("DROPBOX_APP_SECRET", "").strip()
 DROPBOX_REDIRECT_URI = _getenv("DROPBOX_REDIRECT_URI", "").strip()
 
-
-# Backups
 EZ360_BACKUP_DIR = Path(_getenv("EZ360_BACKUP_DIR", str(BASE_DIR / "backups")))
 EZ360_BACKUP_RETENTION_DAYS = _getenv_int("EZ360_BACKUP_RETENTION_DAYS", 14)
-BACKUP_MAX_FILES = (int(os.getenv("BACKUP_MAX_FILES")) if (os.getenv("BACKUP_MAX_FILES") not in (None, "")) else None)
+_backup_max_files_env = os.getenv("BACKUP_MAX_FILES")
+BACKUP_MAX_FILES = int(_backup_max_files_env) if _backup_max_files_env not in (None, "") else None
 EZ360_BACKUP_KEEP_LAST = _getenv_int("EZ360_BACKUP_KEEP_LAST", 14)
 
-
-# Backup / restore visibility (Phase 6C)
 BACKUP_ENABLED = _getenv_bool("BACKUP_ENABLED", _getenv_bool("EZ360_BACKUP_ENABLED", False))
 BACKUP_RETENTION_DAYS = _getenv_int("BACKUP_RETENTION_DAYS", EZ360_BACKUP_RETENTION_DAYS)
-BACKUP_STORAGE = _getenv("BACKUP_STORAGE", "host_managed").strip()  # e.g. host_managed, s3, local
+BACKUP_STORAGE = _getenv("BACKUP_STORAGE", "host_managed").strip()
 _backup_notify_raw = _getenv("BACKUP_NOTIFY_EMAILS", "").strip()
 BACKUP_NOTIFY_EMAILS = [e.strip() for e in _backup_notify_raw.split(",") if e.strip()]
 
-
-
-ENVIRONMENT = os.getenv("EZ360_ENV", "dev")
-RELEASE_SHA = os.getenv("EZ360_RELEASE_SHA", "")
-
-
-# Ops retention / pruning
 EZ360_AUDIT_RETENTION_DAYS = _getenv_int("EZ360_AUDIT_RETENTION_DAYS", 365)
 EZ360_STRIPE_WEBHOOK_RETENTION_DAYS = _getenv_int("EZ360_STRIPE_WEBHOOK_RETENTION_DAYS", 90)
 
-# Optional external ops alert webhook (Slack/Discord/custom).
 OPS_ALERT_WEBHOOK_URL = _getenv("OPS_ALERT_WEBHOOK_URL", "").strip()
 OPS_ALERT_WEBHOOK_TIMEOUT_SECONDS = float(_getenv("OPS_ALERT_WEBHOOK_TIMEOUT_SECONDS", "2.5") or 2.5)
 
 
 # --------------------------------------------------------------------------------------
-# Derived defaults (must be re-run by dev.py/prod.py after overriding DEBUG)
+# Derived defaults
 # --------------------------------------------------------------------------------------
 
 def apply_runtime_defaults() -> None:
-    """Apply settings that depend on DEBUG and/or are env-tunable.
-
-    IMPORTANT:
-    - base.py defines safe defaults.
-    - dev.py/prod.py may override DEBUG and then re-run this to keep dependent defaults correct.
-    """
     global ACCOUNTS_REQUIRE_EMAIL_VERIFICATION
     global ACCOUNTS_VERIFY_EMAIL_MAX_AGE_SECONDS
     global SECURE_SSL_REDIRECT, SESSION_COOKIE_SECURE, CSRF_COOKIE_SECURE
@@ -436,7 +487,6 @@ def apply_runtime_defaults() -> None:
     global EZ360_ALERT_ON_WEBHOOK_FAILURE, EZ360_ALERT_ON_EMAIL_FAILURE
     global ADMINS
 
-    # ---- Accounts / Verification ----
     _require_verify_env = os.getenv("ACCOUNTS_REQUIRE_EMAIL_VERIFICATION", "").strip()
     if _require_verify_env in {"0", "1"}:
         ACCOUNTS_REQUIRE_EMAIL_VERIFICATION = _require_verify_env == "1"
@@ -447,7 +497,6 @@ def apply_runtime_defaults() -> None:
         os.getenv("ACCOUNTS_VERIFY_EMAIL_MAX_AGE_SECONDS", str(60 * 60 * 24 * 3))
     )
 
-    # ---- Security hardening defaults ----
     _secure_default = not DEBUG
     SECURE_SSL_REDIRECT = _getenv_bool("SECURE_SSL_REDIRECT", _secure_default)
     SESSION_COOKIE_SECURE = _getenv_bool("SESSION_COOKIE_SECURE", _secure_default)
@@ -463,7 +512,6 @@ def apply_runtime_defaults() -> None:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = False
 
-    # ---- CSP rollout ----
     EZ360_CSP_ENABLED = _getenv_bool("EZ360_CSP_ENABLED", not DEBUG)
     SECURE_CSP_REPORT_ONLY = {
         "default-src": ["'self'"],
@@ -472,7 +520,7 @@ def apply_runtime_defaults() -> None:
         "script-src": ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
         "font-src": ["'self'", "data:", "https://cdn.jsdelivr.net"],
         "connect-src": ["'self'"],
-        "frame-ancestors": ["'none'"]
+        "frame-ancestors": ["'none'"],
     }
 
     if EZ360_CSP_ENABLED:
@@ -488,7 +536,6 @@ def apply_runtime_defaults() -> None:
     else:
         SECURE_CSP = ""
 
-    # ---- Company security defaults ----
     _default_company_2fa_env = os.getenv("COMPANY_DEFAULT_REQUIRE_2FA_ADMINS_MANAGERS", "").strip()
     if _default_company_2fa_env in {"0", "1"}:
         COMPANY_DEFAULT_REQUIRE_2FA_ADMINS_MANAGERS = _default_company_2fa_env == "1"
@@ -497,7 +544,6 @@ def apply_runtime_defaults() -> None:
 
     SLOW_REQUEST_THRESHOLD_MS = int(os.getenv("EZ360_SLOW_REQUEST_MS", "1500"))
 
-    # ---- Ops alerts ----
     _alert_webhook_env = _getenv("EZ360_ALERT_ON_WEBHOOK_FAILURE", "").strip()
     if _alert_webhook_env in {"0", "1"}:
         EZ360_ALERT_ON_WEBHOOK_FAILURE = _alert_webhook_env == "1"
@@ -510,7 +556,6 @@ def apply_runtime_defaults() -> None:
     else:
         EZ360_ALERT_ON_EMAIL_FAILURE = not DEBUG
 
-    # Optional: "Name:email,Name2:email2".
     _raw_admins = _getenv("EZ360_ADMINS", "").strip()
     ADMINS = []
     if _raw_admins:
@@ -528,11 +573,8 @@ def apply_runtime_defaults() -> None:
                 ADMINS.append((name, email))
 
 
-
-
-
 # --------------------------------------------------------------------------------------
-# Logging (request-id aware, safe defaults)
+# Logging
 # --------------------------------------------------------------------------------------
 
 LOGGING = {
@@ -560,11 +602,8 @@ LOGGING = {
     },
 }
 
-def init_sentry_if_configured() -> None:
-    """Initialize Sentry if SENTRY_DSN is set.
 
-    Safe to call in any environment; if sentry-sdk isn't installed, app still boots.
-    """
+def init_sentry_if_configured() -> None:
     dsn = _getenv("SENTRY_DSN", "").strip()
     if not dsn:
         return
@@ -593,9 +632,7 @@ def init_sentry_if_configured() -> None:
             send_default_pii=False,
         )
     except Exception:
-        # App must still boot without sentry installed.
         return
 
 
-# Apply once with base's DEBUG (dev/prod will re-run after overriding DEBUG)
 apply_runtime_defaults()
