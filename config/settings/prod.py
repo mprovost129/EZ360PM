@@ -4,25 +4,22 @@ import os
 
 from .base import *  # noqa
 
+# --------------------------------------------------------------------------------------
+# Production settings
+# --------------------------------------------------------------------------------------
 
-def _getenv(key: str, default: str | None = None) -> str:
-    return os.environ.get(key, default or "")
+def _getenv(key, default=None):
+    return os.environ.get(key, default)
 
-
-def _getenv_bool(key: str, default: bool = False) -> bool:
+def _getenv_bool(key, default=False):
     val = os.environ.get(key, None)
     if val is None:
         return default
     return val.strip().lower() in {"1", "true", "yes", "y", "on"}
 
-
-# --------------------------------------------------------------------------------------
-# Production settings
-# --------------------------------------------------------------------------------------
-
 DEBUG = False
 
-# Re-apply derived defaults that depend on DEBUG (imported from base.py)
+# Re-apply derived defaults that depend on DEBUG.
 apply_runtime_defaults()
 
 # In production you SHOULD set ALLOWED_HOSTS (and CSRF_TRUSTED_ORIGINS) via env.
@@ -43,14 +40,16 @@ EMAIL_BACKEND = _getenv(
     "django.core.mail.backends.smtp.EmailBackend",
 )
 
+
 # --------------------------------------------------------------------------------------
 # Optional: lightweight performance logging (prod/staging)
 # --------------------------------------------------------------------------------------
+# Disabled by default. Enable only when actively profiling.
 EZ360_PERF_LOGGING_ENABLED = _getenv_bool("EZ360_PERF_LOGGING_ENABLED", False)
-EZ360_PERF_REQUEST_MS = int(_getenv("EZ360_PERF_REQUEST_MS", "800") or "800")
-EZ360_PERF_QUERY_MS = int(_getenv("EZ360_PERF_QUERY_MS", "200") or "200")
-EZ360_PERF_TOP_N = int(_getenv("EZ360_PERF_TOP_N", "3") or "3")
-EZ360_PERF_SAMPLE_RATE = float(_getenv("EZ360_PERF_SAMPLE_RATE", "0.25") or "0.25")
+EZ360_PERF_REQUEST_MS = int(_getenv("EZ360_PERF_REQUEST_MS", "800"))
+EZ360_PERF_QUERY_MS = int(_getenv("EZ360_PERF_QUERY_MS", "200"))
+EZ360_PERF_TOP_N = int(_getenv("EZ360_PERF_TOP_N", "3"))
+EZ360_PERF_SAMPLE_RATE = float(_getenv("EZ360_PERF_SAMPLE_RATE", "0.25"))
 EZ360_PERF_STORE_DB = _getenv_bool("EZ360_PERF_STORE_DB", False)
 
 if EZ360_PERF_LOGGING_ENABLED:
@@ -63,11 +62,14 @@ if EZ360_PERF_LOGGING_ENABLED:
         _mw.insert(idx, "core.middleware.PerformanceLoggingMiddleware")
     MIDDLEWARE = _mw
 
+
 # --------------------------------------------------------------------------------------
 # Logging (prod-friendly)
 # --------------------------------------------------------------------------------------
+
 LOGGING = LOGGING  # from base.py (request-id aware)
 
+# Production tweaks (levels can be controlled via DJANGO_LOG_LEVEL)
 LOGGING["loggers"].update(
     {
         "billing.webhooks": {"handlers": ["console"], "level": "INFO", "propagate": False},
@@ -75,7 +77,15 @@ LOGGING["loggers"].update(
     }
 )
 
+
+
+
 # --------------------------------------------------------------------------------------
 # Monitoring / Observability (optional)
 # --------------------------------------------------------------------------------------
+
 init_sentry_if_configured()
+
+
+# Backups (prod is env-driven)
+# BACKUP_ENABLED is read in base.py from BACKUP_ENABLED or EZ360_BACKUP_ENABLED
