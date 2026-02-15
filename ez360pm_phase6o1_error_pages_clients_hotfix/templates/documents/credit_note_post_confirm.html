@@ -1,0 +1,30 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% load formatting %}
+{% block title %}Post Credit Note · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="max-width: 900px;">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">Post Credit Note</h1>
+      <div class="text-secondary small">This will create an immutable accounting entry. This cannot be undone except by reversal.</div>
+    </div>
+    <a class="btn btn-outline-secondary" href="{% url 'documents:invoice_edit' credit_note.invoice.id %}">Back to Invoice</a>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="mb-2"><strong>Credit Note:</strong> {{ credit_note.number }}</div>
+      <div class="mb-2"><strong>Total:</strong> {{ credit_note.total_cents|cents_to_dollars }} <span class="text-secondary small">({{ credit_note.total_cents }} cents)</span></div>
+      <div class="mb-3"><strong>Reason:</strong> {{ credit_note.reason|default:"—" }}</div>
+
+      <form method="post">
+        {% csrf_token %}
+        <button class="btn btn-danger" type="submit">Post Credit Note</button>
+        <a class="btn btn-outline-secondary" href="{% url 'documents:invoice_edit' credit_note.invoice.id %}">Cancel</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

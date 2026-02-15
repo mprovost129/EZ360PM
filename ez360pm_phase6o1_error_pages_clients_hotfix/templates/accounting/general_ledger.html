@@ -1,0 +1,75 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% load formatting %}
+{% block title %}General Ledger · EZ360PM{% endblock %}
+
+{% block app_content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">General Ledger</h1>
+    <div class="text-secondary small">Journal lines for a selected account.</div>
+  </div>
+  <a class="btn btn-outline-dark" href="{% url 'accounting:home' %}">Accounting</a>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-lg-4">
+        <label class="form-label small text-secondary">Account</label>
+        <select name="account" class="form-select">
+          <option value="">Select an account…</option>
+          {% for a in accounts %}
+            <option value="{{ a.id }}" {% if selected and selected.id == a.id %}selected{% endif %}>{{ a.code }} {{ a.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-lg-3">
+        <label class="form-label small text-secondary">Start</label>
+        {{ form.start }}
+      </div>
+      <div class="col-6 col-lg-3">
+        <label class="form-label small text-secondary">End</label>
+        {{ form.end }}
+      </div>
+      <div class="col-12 col-lg-2">
+        <button class="btn btn-dark w-100" type="submit">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if selected %}
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="mb-2 fw-semibold">{{ selected.code }} {{ selected.name }}</div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Description</th>
+              <th class="text-end">Debit</th>
+              <th class="text-end">Credit</th>
+              <th class="text-end">Running</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in lines %}
+              <tr>
+                <td class="text-secondary small">{{ r.line.entry.entry_date }}</td>
+                <td>{{ r.line.description|default:r.line.entry.memo }}</td>
+                <td class="text-end">{% if r.line.debit_cents %}{{ r.line.debit_cents|cents_to_dollars }}{% endif %}</td>
+                <td class="text-end">{% if r.line.credit_cents %}{{ r.line.credit_cents|cents_to_dollars }}{% endif %}</td>
+                <td class="text-end">{{ r.running_cents|cents_to_dollars }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="5" class="text-secondary">No activity.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
