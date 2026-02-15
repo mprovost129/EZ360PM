@@ -320,6 +320,11 @@ Next (Phase 4C):
 - Error handlers are defensive to prevent template failures from causing recursive 500s.
 - Error pages display Request ID when available for support correlation.
 
+## 2026-02-15 — Completed: Phase 6O.2 (Pagination crash fix)
+- Fixed template-time `EmptyPage` exceptions caused by unguarded `previous_page_number()` / `next_page_number()` calls.
+- Shared pagination include now guards page-number methods behind `has_previous/has_next`.
+- Audit events list pagination hardened the same way.
+
 ### Next: Phase 6O — UI reliability polish (mobile + dropdowns)
 - Make sidebar + topbar interactions consistent across iOS/Android/desktop (offcanvas + dropdowns + safe areas).
 - Audit all navbar dropdowns for Bootstrap-JS independence (match the timer’s deterministic toggle).

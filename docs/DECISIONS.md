@@ -416,6 +416,15 @@ Rationale:
 - Production errors often occur during partial deploy/config drift; the error page must remain renderable.
 - Prevents “error handler crashed” incidents that hide the real underlying exception.
 
+## 2026-02-15 — Pagination templates must not call page-number methods unless available
+
+Decision:
+- Shared pagination templates must only call `previous_page_number()` when `page_obj.has_previous` is true, and only call `next_page_number()` when `page_obj.has_next` is true.
+
+Rationale:
+- Django raises `EmptyPage` if those methods are called at the bounds (page 1 / last page).
+- “Disabled” pagination UI still evaluates template expressions; guarding prevents template-time exceptions.
+
 ### 2026-02-15 — Launch Check Philosophy
 - Launch checks must be safe to run in dev/staging/prod without elevated DB privileges.
 - Prefer settings/env validation + minimal existence queries over deep reconciliation (use Ops reconciliation/drift tools for that).

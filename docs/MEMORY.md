@@ -78,6 +78,17 @@
 ### Shipped
 - Standardized list pagination via `core.pagination.paginate` and applied it to:
   - Clients, Projects, Documents, Payments, Expenses, Merchants, Time Entries, Team.
+
+## Snapshot 2026-02-15 — Phase 6O2 (Pagination Crash Fix After CSV Import)
+
+### Shipped
+- Fixed a production 500 on `/clients/` caused by templates evaluating `page_obj.previous_page_number` / `next_page_number` even when the pager UI was disabled.
+  - Django raises `EmptyPage: That page number is less than 1` when `previous_page_number()` is called on page 1.
+- Hardened shared pagination include (`templates/includes/pagination.html`) to only resolve page-number methods when `page_obj.has_previous/has_next`.
+- Hardened Audit event list pagination similarly.
+
+### Result
+- Client list (and any view using the shared pagination include) renders reliably on first/last pages.
 - Added shared pagination UI partial: `templates/includes/pagination.html`.
 - Added querystring helper template tag: `{% qs_replace %}` in `core.templatetags.querystring`.
 
