@@ -1,0 +1,32 @@
+{% extends "base_app.html" %}
+{% load static %}
+
+{% block title %}Delete client · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">Delete client</h1>
+    <div class="text-secondary small">This will remove the client from lists. Existing documents may keep historical references.</div>
+  </div>
+  <div>
+    <a class="btn btn-outline-secondary" href="{% url 'crm:client_list' %}"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="alert alert-warning">
+      Are you sure you want to delete <strong>{{ client.display_label }}</strong>?
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="{% url 'crm:client_list' %}">Cancel</a>
+        <button class="btn btn-danger" type="submit">Delete</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

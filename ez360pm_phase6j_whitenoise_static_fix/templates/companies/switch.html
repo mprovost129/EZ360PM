@@ -1,0 +1,28 @@
+{% extends "base_app.html" %}
+{% load static %}
+
+{% block title %}Select company · EZ360PM{% endblock %}
+
+{% block content %}
+  <h1 class="h3">Select a company</h1>
+  <p class="text-secondary">Choose the company you want to work in. You can switch companies anytime from the sidebar.</p>
+
+  <div class="row g-3">
+    {% for c in companies %}
+      <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="fw-semibold mb-2">{{ c.name }}</div>
+            <form method="post" action="{% url 'companies:set_active' %}">
+              {% csrf_token %}
+              <input type="hidden" name="company_id" value="{{ c.id }}">
+              <button class="btn {% if c.id|stringformat:'s' == active_company_id %}btn-dark{% else %}btn-outline-dark{% endif %} w-100" type="submit">
+                {% if c.id|stringformat:'s' == active_company_id %}Active{% else %}Use this company{% endif %}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endblock %}

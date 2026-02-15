@@ -1,0 +1,20 @@
+{% extends "base_app.html" %}
+{% load static %}
+
+{% block title %}Delete Time Entry · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <h1 class="h5 mb-2">Delete time entry?</h1>
+    <p class="text-secondary mb-3">This is a soft delete. You can restore later via admin if needed.</p>
+    <form method="post">
+      {% csrf_token %}
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="{% url 'timetracking:entry_detail' entry.id %}">Cancel</a>
+        <button class="btn btn-danger" type="submit">Delete</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

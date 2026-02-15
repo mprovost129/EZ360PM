@@ -1,0 +1,13 @@
+{% load static %}
+
+{% extends "_public_shell.html" %}
+{% block title %}Page not found · EZ360PM{% endblock %}
+{% block public_content %}
+<div class="container" style="max-width: 720px;">
+  <div class="py-5 text-center">
+    <h1 class="h3 mb-2">Page not found</h1>
+    <div class="text-secondary mb-4">That page doesn’t exist or may have moved.</div>
+    <a class="btn btn-primary" href="{% url 'core:app_dashboard' %}">Go to dashboard</a>
+  </div>
+</div>
+{% endblock %}

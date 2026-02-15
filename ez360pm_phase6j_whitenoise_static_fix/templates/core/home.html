@@ -1,0 +1,70 @@
+
+{% extends "base_public.html" %}
+{% load static %}
+
+{% block title %}EZ360PM · CRM + Desktop Sync{% endblock %}
+
+{% block content %}
+  <div class="py-5">
+    <div class="row align-items-center g-4">
+      <div class="col-lg-7">
+        <h1 class="display-5 fw-bold mb-3">CRM that syncs to your Windows desktop</h1>
+        <p class="lead text-secondary">Clients, projects, estimates, invoices, payments, expenses, time tracking, and reports — online and offline. Built for small teams, with seat-based tiers and role-based permissions.</p>
+
+        <div class="d-flex flex-wrap gap-2 mt-4">
+          <a class="btn btn-dark btn-lg" href="{% url 'accounts:register' %}">
+            Start free trial
+          </a>
+          <a class="btn btn-outline-dark btn-lg" href="{% url 'accounts:login' %}">
+            Log in
+          </a>
+        </div>
+
+        <div class="d-flex flex-wrap gap-3 mt-4 text-secondary small">
+          <div><i class="bi bi-check2-circle me-1"></i>Offline Windows app</div>
+          <div><i class="bi bi-check2-circle me-1"></i>Stripe payments</div>
+          <div><i class="bi bi-check2-circle me-1"></i>QuickBooks/FreshBooks CSV mapping</div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="border rounded-4 p-4 bg-light">
+          <h2 class="h5 fw-semibold mb-3" id="features">What you get in v1</h2>
+          <ul class="mb-0 text-secondary">
+            <li>Company + employees with roles (Staff / Manager / Admin / Owner)</li>
+            <li>Client directory with import/export</li>
+            <li>Projects with assignments and time tracking</li>
+            <li>Estimates/Proposals and invoices with templates</li>
+            <li>Payments, expenses, credits, and reporting</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="my-5" id="pricing">
+
+  <div class="pb-5">
+    <h2 class="h3 fw-bold">Pricing</h2>
+    <p class="text-secondary">Two tiers (Standard / Premium). Seat-based pricing is coming next. Trial is 7–14 days, no card required.</p>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="border rounded-4 p-4">
+          <div class="fw-semibold">Standard</div>
+          <div class="text-secondary small">Core CRM with sensible limits.</div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="border rounded-4 p-4">
+          <div class="fw-semibold">Premium</div>
+          <div class="text-secondary small">More analytics, higher limits, expanded reports.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pb-5" id="help">
+    <h2 class="h3 fw-bold">Help</h2>
+    <p class="text-secondary">Need assistance? In-app Help + support workflows are coming soon.</p>
+  </div>
+{% endblock %}
