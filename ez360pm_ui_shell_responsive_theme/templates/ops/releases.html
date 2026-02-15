@@ -1,0 +1,140 @@
+{% extends "base_app.html" %}
+{% block title %}Releases · Ops · EZ360PM{% endblock %}
+{% block content %}
+<div class="container-fluid" style="max-width: 1200px;">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">Releases</h1>
+      <div class="text-secondary small">Staff release notes + current build metadata.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-dark" href="{% url 'ops:dashboard' %}"><i class="bi bi-arrow-left me-1"></i>Ops console</a>
+      <a class="btn btn-outline-dark" href="{% url 'ops:launch_checks' %}">Launch checks</a>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="text-secondary small">Current build</div>
+              <div class="fw-semibold">{{ build.environment|default:"(unset)" }} · {{ build.version|default:"(version unset)" }}</div>
+              <div class="text-secondary small">SHA: {{ build.sha|default:"(sha unset)" }} · Date: {{ build.date|default:"(date unset)" }}</div>
+            </div>
+            {% if build.debug %}
+              <span class="badge text-bg-secondary">DEBUG</span>
+            {% else %}
+              <span class="badge text-bg-success">LIVE</span>
+            {% endif %}
+          </div>
+          <div class="mt-2 small text-secondary">
+            Tip: set <code>BUILD_VERSION</code>, <code>BUILD_SHA</code>, <code>BUILD_DATE</code> in your env (Phase 7A).
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2">Add release note</div>
+          <form method="post" class="row g-2">
+            {% csrf_token %}
+            <div class="col-md-4">
+              <label class="form-label small text-secondary">Environment</label>
+              {{ form.environment }}
+              {% for e in form.environment.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small text-secondary">Build version</label>
+              {{ form.build_version }}
+              {% for e in form.build_version.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small text-secondary">Build SHA</label>
+              {{ form.build_sha }}
+              {% for e in form.build_sha.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-12">
+              <label class="form-label small text-secondary">Title</label>
+              {{ form.title }}
+              {% for e in form.title.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-12">
+              <label class="form-label small text-secondary">Notes</label>
+              {{ form.notes }}
+              {% for e in form.notes.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-12">
+              <div class="form-check">
+                {{ form.is_published }}
+                <label class="form-check-label">Published</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <button class="btn btn-dark" type="submit"><i class="bi bi-check2-circle me-1"></i>Save release note</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+    <div class="fw-semibold">Recent release notes</div>
+    <form class="d-flex gap-2" method="get">
+      <input class="form-control" name="q" value="{{ q }}" placeholder="Search…" style="min-width: 220px;">
+      <input class="form-control" name="env" value="{{ env }}" placeholder="env (optional)" style="width: 160px;">
+      <button class="btn btn-outline-dark" type="submit">Filter</button>
+    </form>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 160px;">When</th>
+            <th style="width: 120px;">Env</th>
+            <th style="width: 120px;">Version</th>
+            <th style="width: 160px;">SHA</th>
+            <th>Title / Notes</th>
+            <th style="width: 110px;">Published</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for n in notes %}
+            <tr>
+              <td class="small text-secondary">{{ n.created_at|date:"Y-m-d H:i" }}</td>
+              <td>{{ n.environment|default:"—" }}</td>
+              <td><code>{{ n.build_version|default:"—" }}</code></td>
+              <td class="small"><code>{{ n.build_sha|default:"—" }}</code></td>
+              <td>
+                <div class="fw-semibold">{{ n.title }}</div>
+                {% if n.notes %}
+                  <div class="small text-secondary" style="white-space: pre-wrap;">{{ n.notes|truncatechars:600 }}</div>
+                {% endif %}
+                {% if n.created_by_email %}
+                  <div class="small text-secondary">By: {{ n.created_by_email }}</div>
+                {% endif %}
+              </td>
+              <td>
+                {% if n.is_published %}
+                  <span class="badge text-bg-success">Yes</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">No</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="text-secondary small p-3">No release notes yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

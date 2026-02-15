@@ -1,6 +1,6 @@
 <!doctype html>
 {% load static %}
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,58 +12,18 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
-  <style>
-    /* App layout */
-    .app-shell {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-    .app-body {
-      flex: 1;
-      display: flex;
-      min-height: 0;
-    }
-    .app-sidebar {
-      width: 260px;
-      border-right: 1px solid #e5e7eb;
-      background: #fff;
-      position: sticky;
-      top: 0;
-      height: calc(100vh - 56px);
-      overflow: hidden; /* static sidebar: never scroll */
-    }
-    .app-main {
-      flex: 1;
-      min-width: 0;
-      overflow: auto;
-      background: #fafafa;
-    }
-    .nav-icon {
-      width: 18px;
-      text-align: center;
-      display: inline-block;
-    }
-    .sidebar-link {
-      padding: .55rem .75rem;
-      border-radius: .5rem;
-      color: #111827;
-      text-decoration: none;
-      display: flex;
-      gap: .6rem;
-      align-items: center;
-    }
-    .sidebar-link:hover {
-      background: #f3f4f6;
-    }
-  </style>
+  <link rel="stylesheet" href="{% static 'css/ez360pm.css' %}">
 </head>
 
-<body class="bg-white">
+<body>
+  <div id="sidebarOverlay"></div>
   <div class="app-shell">
     <!-- Top navbar (sitewide navigation + search/notifications/help/profile) -->
     <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom" style="height:56px;">
       <div class="container-fluid">
+        <button id="sidebarToggleBtn" class="btn btn-outline-ez btn-sm d-lg-none me-2" type="button" aria-label="Toggle sidebar">
+          <i class="bi bi-list"></i>
+        </button>
         <a class="navbar-brand fw-semibold d-flex align-items-center gap-2" href="{% url 'core:app_dashboard' %}">
           <img src="{% static 'images/ez360pm_logo.png' %}" alt="EZ360PM" style="height: 90px;width:auto;">
         </a>
@@ -76,6 +36,11 @@
         </form>
 
         <div class="d-flex align-items-center gap-2">
+          <button id="topbarActionsToggleBtn" class="btn btn-outline-ez btn-sm d-lg-none" type="button" aria-label="Menu">
+            <i class="bi bi-three-dots-vertical"></i>
+          </button>
+
+          <div id="topbarActions">
           <!-- Timer (global per-user timer) -->
           <div class="dropdown">
             <div class="btn-group">
@@ -232,6 +197,7 @@
               <li><a class="dropdown-item" href="{% url 'accounts:logout' %}">Log out</a></li>
             </ul>
           </div>
+        </div>
         </div>
       </div>
     </nav>
@@ -446,6 +412,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script src="{% static 'js/ez360pm.js' %}"></script>
 
   <script>
     // Fallback dropdown behavior for environments where bootstrap.bundle isn't available/blocked.

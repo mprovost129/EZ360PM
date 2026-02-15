@@ -1,0 +1,26 @@
+{% extends "base_app.html" %}
+{% load formatting %}
+
+{% block title %}Delete Payment · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h1 class="h5">Delete payment?</h1>
+    <p class="text-secondary mb-0">This will soft-delete the payment record.</p>
+
+    <hr>
+    <div class="mb-3">
+      <div><strong>Client:</strong> {{ payment.client.display_label|default:"—" }}</div>
+      <div><strong>Invoice:</strong> {{ payment.invoice.number|default:"—" }}</div>
+      <div><strong>Amount:</strong> {{ payment.amount_cents|cents_to_dollars }}</div>
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+      <a class="btn btn-outline-secondary" href="{% url 'payments:payment_list' %}">Cancel</a>
+      <button class="btn btn-danger" type="submit">Delete</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
