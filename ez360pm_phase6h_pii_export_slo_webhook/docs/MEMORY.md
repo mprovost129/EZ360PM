@@ -482,3 +482,8 @@ Files touched (high level):
 - Updated **404/500** templates to link to the public home route (removed broken `dashboard:` namespace).
 - Fixed **verify-email resend routing** by placing `verify-email/resend/` before `verify-email/<token>/` to prevent “resend” being treated as a token.
 - Added `@login_required` + Ops alert on resend email failure (best-effort; never blocks user flow).
+
+
+## 2026-02-14 — Phase 6H (Ops: PII Export + SLO webhook freshness)
+- Added staff-only PII export: /ops/pii-export/ exports company data to CSV ZIP (clients/projects/documents/payments/expenses/time entries).
+- Enhanced SLO dashboard with Stripe webhook freshness (last received/last ok + failures last 24h).

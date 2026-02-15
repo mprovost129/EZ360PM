@@ -331,3 +331,8 @@ Rationale:
 - **Migration safety:** Any migration that renames DB objects (indexes/constraints) must be **idempotent** in production by checking existence before renaming/creating, because real prod schemas can diverge from local history.
 - **URL routing:** Reserve literal routes (e.g., `verify-email/resend/`) **before** parameterized routes (e.g., `verify-email/<token>/`) to avoid accidental matches.
 - **Error pages:** Error templates must not reference optional namespaces. Prefer stable root routes like `home`.
+
+
+## Ops PII Export scope
+- PII export is a portability/DSAR convenience tool that exports company-scoped business records as CSV inside a ZIP.
+- It is not a full backup system and does not include private file blobs (S3 objects); backups remain the authoritative archival mechanism.

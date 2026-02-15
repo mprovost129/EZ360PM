@@ -96,7 +96,7 @@ def ops_dashboard(request: HttpRequest) -> HttpResponse:
         ).distinct()
 
     # Prefetch subscription for display (best-effort)
-    subs = {s.company_id: s for s in CompanySubscription.objects.select_related("company")}
+    subs = {s.company.id: s for s in CompanySubscription.objects.select_related("company")}
     rows = []
     for c in companies[:200]:
         s = subs.get(c.id)
@@ -171,6 +171,13 @@ def ops_slo_dashboard(request: HttpRequest) -> HttpResponse:
     webhook_24h = OpsAlertEvent.objects.filter(source=OpsAlertSource.STRIPE_WEBHOOK, created_at__gte=window_24h).count()
     email_24h = OpsAlertEvent.objects.filter(source=OpsAlertSource.EMAIL, created_at__gte=window_24h).count()
 
+    # Stripe webhook freshness (best-effort global signal)
+    last_webhook = BillingWebhookEvent.objects.order_by("-received_at").first()
+    webhook_last_received_at = getattr(last_webhook, "received_at", None)
+    last_webhook_ok = BillingWebhookEvent.objects.filter(ok=True).order_by("-received_at").first()
+    webhook_last_ok_at = getattr(last_webhook_ok, "received_at", None)
+    webhook_fail_24h = BillingWebhookEvent.objects.filter(ok=False, received_at__gte=window_24h).count()
+
     recent_alerts = OpsAlertEvent.objects.filter(created_at__gte=window_24h).select_related("company").order_by("-created_at")[:50]
 
     active_by_company = (
@@ -191,6 +198,9 @@ def ops_slo_dashboard(request: HttpRequest) -> HttpResponse:
             "auth_open": auth_open,
             "webhook_24h": webhook_24h,
             "email_24h": email_24h,
+            "webhook_last_received_at": webhook_last_received_at,
+            "webhook_last_ok_at": webhook_last_ok_at,
+            "webhook_fail_24h": webhook_fail_24h,
             "recent_alerts": recent_alerts,
             "active_by_company": active_by_company,
         },
@@ -885,3 +895,84 @@ def ops_releases(request: HttpRequest) -> HttpResponse:
         },
     }
     return render(request, "ops/releases.html", ctx)
+
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_pii_export(request: HttpRequest) -> HttpResponse:
+    """Staff-only PII export tooling (DSAR / portability).
+
+    Exports company-scoped business records as CSVs inside a ZIP.
+    Best-effort: never intended to be a perfect archival backup (use backups for that).
+    """
+    company_id = request.GET.get("company_id") or request.POST.get("company_id")
+    company: Company | None
+    if company_id:
+        company = get_object_or_404(Company, id=int(company_id))
+    else:
+        company = get_active_company(request)
+
+    if not company:
+        messages.error(request, "No company selected.")
+        return redirect("ops:dashboard")
+
+    if request.method != "POST":
+        companies = Company.objects.all().order_by("name")[:200]
+        return render(
+            request,
+            "ops/pii_export.html",
+            {"company": company, "companies": companies},
+        )
+
+    # --- Build ZIP in memory ---
+    from crm.models import Client
+    from projects.models import Project
+    from documents.models import Document
+    from payments.models import Payment
+    from expenses.models import Expense
+    from timetracking.models import TimeEntry
+
+    def _rows_for_model(model, qs):
+        field_names = [f.name for f in model._meta.fields]
+        for obj in qs.values(*field_names):
+            yield field_names, obj
+
+    def _write_csv(zf: zipfile.ZipFile, name: str, model, qs):
+        # Stream to string buffer then write
+        field_names = [f.name for f in model._meta.fields]
+        buf = io.StringIO()
+        w = csv.DictWriter(buf, fieldnames=field_names)
+        w.writeheader()
+        for row in qs.values(*field_names).iterator():
+            w.writerow({k: ("" if row.get(k) is None else row.get(k)) for k in field_names})
+        zf.writestr(name, buf.getvalue())
+
+    buf = io.BytesIO()
+    timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
+    zip_name = f"ez360pm_pii_export_company_{company.id}_{timestamp}.zip"
+
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        # Metadata
+        zf.writestr(
+            "README.txt",
+            (
+                "EZ360PM PII/Portability Export\n"
+                f"Company: {company.name} (id={company.id})\n"
+                f"Generated: {timezone.now().isoformat()}\n\n"
+                "Contains business records as CSV. This is not a full media backup.\n"
+            ),
+        )
+
+        _write_csv(zf, "company.csv", Company, Company.objects.filter(id=company.id))
+        _write_csv(zf, "employees.csv", EmployeeProfile, EmployeeProfile.objects.filter(company=company))
+        _write_csv(zf, "clients.csv", Client, Client.objects.filter(company=company))
+        _write_csv(zf, "projects.csv", Project, Project.objects.filter(company=company))
+        _write_csv(zf, "documents.csv", Document, Document.objects.filter(company=company))
+        _write_csv(zf, "payments.csv", Payment, Payment.objects.filter(company=company))
+        _write_csv(zf, "expenses.csv", Expense, Expense.objects.filter(company=company))
+        _write_csv(zf, "time_entries.csv", TimeEntry, TimeEntry.objects.filter(company=company))
+
+    buf.seek(0)
+    resp = HttpResponse(buf.getvalue(), content_type="application/zip")
+    resp["Content-Disposition"] = f'attachment; filename="{zip_name}"'
+    return resp

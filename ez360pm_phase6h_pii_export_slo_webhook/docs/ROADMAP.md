@@ -31,6 +31,7 @@
 - **6E** UI polish (state dropdown styling, project label display), currency input UX for Project rates, and timer dropdown in navbar
 - **6G** Ops SLO dashboard (active users via presence pings) + optional external ops alert webhook notifications
 - **6G1** Render migration hotfix (billing index rename idempotent + create-if-missing)
+- **6H** Ops: PII export (company CSV ZIP) + SLO webhook freshness metrics
 
 ### Next (Planned)
 - SLO dashboards (active users, webhook health, email health) + optional Slack/Webhook

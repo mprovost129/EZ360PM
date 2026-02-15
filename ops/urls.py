@@ -8,6 +8,7 @@ urlpatterns = [
     path("healthz/", views.healthz, name="healthz"),
     path("", views.ops_dashboard, name="dashboard"),
     path("slo/", views.ops_slo_dashboard, name="slo_dashboard"),
+    path("pii-export/", views.ops_pii_export, name="pii_export"),
     path("alerts/", views.ops_alerts, name="alerts"),
     path("alerts/<int:alert_id>/resolve/", views.ops_alert_resolve, name="alert_resolve"),
     path("security/", views.ops_security, name="security"),
