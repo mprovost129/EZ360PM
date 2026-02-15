@@ -41,6 +41,7 @@ class Client(SyncModel):
         indexes = [
             models.Index(fields=["company", "company_name", "last_name", "first_name"]),
             models.Index(fields=["company", "updated_at"]),
+            models.Index(fields=["company", "email"]),
         ]
 
     def display_label(self) -> str:

@@ -35,6 +35,8 @@
 - **6I** Security: enforce 2FA for Admin/Owner roles (step-up confirmation on company-scoped pages + login flow supports 2FA)
 - **6J** Production staticfiles hardening (WhiteNoise + hashed/compressed static; fixes Render admin/app CSS)
 - **6K1** Mobile topbar fix + Sentry init (responsive logo sizing, safe-area insets; Sentry init enabled when DSN set)
+- **6O2** Clients pagination hotfix (guarded previous/next page evaluation)
+- **6P** Monitoring gate: Ops Probes (Sentry test error + test alert) + launch check evidence
 
 ### Next (Planned)
 - **Backup & Recovery Gate**: automated DB backups on Render, retention policy verified, and a documented restore test.
@@ -329,3 +331,13 @@ Next (Phase 4C):
 - Make sidebar + topbar interactions consistent across iOS/Android/desktop (offcanvas + dropdowns + safe areas).
 - Audit all navbar dropdowns for Bootstrap-JS independence (match the timer’s deterministic toggle).
 - Apply EZ360PM theme tokens to remaining forms/buttons for a more cohesive look.
+
+
+## 2026-02-15 — Pack: Optional 2FA enforcement + Client email index
+- Completed: 2FA enforcement policy change (admin-configurable only).
+- Completed: CRM client email index + migration for import/search performance.
+
+
+## Completed (2026-02-15)
+
+- Phase 6N+ Hotfix: Added `documents:numbering` URL alias to prevent NoReverseMatch on Getting Started.

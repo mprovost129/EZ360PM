@@ -58,7 +58,8 @@ def company_context_required(view_func: F) -> F:
         # -----------------------------
         try:
             role = getattr(employee, "role", None)
-            require_admin_owner = role in {EmployeeRole.ADMIN, EmployeeRole.OWNER}
+            # Role-based forcing removed: enforcement is admin-configurable only.
+            require_admin_owner = False
             require_company_all = bool(getattr(company, "require_2fa_for_all", False))
             require_company_admin_mgr = bool(getattr(company, "require_2fa_for_admins_managers", False)) and role in {
                 EmployeeRole.MANAGER,
@@ -67,7 +68,7 @@ def company_context_required(view_func: F) -> F:
             }
             require_employee = bool(getattr(employee, "force_2fa", False))
 
-            requires_2fa = bool(require_admin_owner or require_company_all or require_company_admin_mgr or require_employee)
+            requires_2fa = bool(require_company_all or require_company_admin_mgr or require_employee)
 
             if requires_2fa and not is_session_2fa_verified(request):
                 tf = getattr(getattr(request, "user", None), "two_factor", None)

@@ -571,3 +571,24 @@ Files: templates/base_app.html, templates/base_public.html, static/ui/ez360pm.cs
 - Fixed `404.html` and `500.html` to avoid invalid URL namespaces and link to the stable `home` route.
 - Added request correlation to error pages (shows Request ID when available).
 - Hardened `core/error_views.py` so error templates never recurse (fallback to minimal HTML if template rendering fails).
+
+### 2026-02-15 — Phase 6O2 (Clients Pagination Hotfix)
+- Fixed a production 500 on `/clients/` caused by templates calling `page_obj.previous_page_number` / `next_page_number` when on the first/last page.
+- Updated the clients list template to guard prev/next rendering via `has_previous/has_next`.
+
+### 2026-02-15 — Phase 6P (Monitoring Gate: Ops Probes)
+- Added **Ops → Probes** page with staff-only tools to validate monitoring in each environment.
+  - **Test error**: intentionally raises a 500 and records an `OpsProbeEvent` (used to confirm Sentry captures exceptions).
+  - **Create test alert**: creates an INFO Ops alert (source=PROBE) and records an `OpsProbeEvent`.
+- Launch Checks now require evidence of a Sentry test error within the last 30 days when `SENTRY_DSN` is configured.
+
+
+## 2026-02-15 — Pack: Optional 2FA enforcement + Client email index
+- Changed 2FA enforcement: no longer forced by role; enforced only via Company/Employee admin flags.
+- Company default 2FA enforcement now defaults to OFF unless env explicitly enables it.
+- Added DB index for Client(company, email) + migration (crm 0002) to improve search/import performance.
+
+
+## Hotfix (2026-02-15)
+
+- Fixed getting-started crash by adding back-compat URL name `documents:numbering` (aliases to Document settings).

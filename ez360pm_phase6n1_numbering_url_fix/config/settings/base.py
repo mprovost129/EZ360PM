@@ -553,7 +553,7 @@ def apply_runtime_defaults() -> None:
     if _default_company_2fa_env in {"0", "1"}:
         COMPANY_DEFAULT_REQUIRE_2FA_ADMINS_MANAGERS = _default_company_2fa_env == "1"
     else:
-        COMPANY_DEFAULT_REQUIRE_2FA_ADMINS_MANAGERS = not DEBUG
+        COMPANY_DEFAULT_REQUIRE_2FA_ADMINS_MANAGERS = False
 
     SLOW_REQUEST_THRESHOLD_MS = int(os.getenv("EZ360_SLOW_REQUEST_MS", "1500"))
 

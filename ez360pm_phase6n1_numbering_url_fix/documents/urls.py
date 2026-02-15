@@ -34,6 +34,9 @@ urlpatterns = [
     # Company document settings
     path("settings/documents/", views.document_settings, name="document_settings"),
 
+    # Back-compat alias: older templates used documents:numbering
+    path("settings/numbering/", views.document_settings, name="numbering"),
+
     # Recurring invoices
     path("invoices/recurring/", views_recurring.recurring_plan_list, name="recurring_plan_list"),
     path("invoices/recurring/new/", views_recurring.recurring_plan_create, name="recurring_plan_create"),

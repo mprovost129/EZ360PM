@@ -21,6 +21,7 @@ class OpsAlertSource(models.TextChoices):
     LAUNCH_GATE = "launch_gate", "Launch gate"
     BACKUP = "backup", "Backup"
     RESTORE_TEST = "restore_test", "Restore test"
+    PROBE = "probe", "Probe"
 
 
 class OpsAlertEvent(models.Model):
@@ -297,3 +298,36 @@ class OpsEmailTest(models.Model):
 
     def __str__(self) -> str:
         return f"{self.created_at:%Y-%m-%d %H:%M} {self.status} → {self.to_email}"
+
+
+class OpsProbeKind(models.TextChoices):
+    SENTRY_TEST_ERROR = "sentry_test_error", "Sentry test error"
+    ALERT_TEST = "alert_test", "Alert test"
+
+
+class OpsProbeStatus(models.TextChoices):
+    TRIGGERED = "triggered", "Triggered"
+    COMPLETED = "completed", "Completed"
+    FAILED = "failed", "Failed"
+
+
+class OpsProbeEvent(models.Model):
+    """Staff-triggered probes used to validate monitoring and alerts."""
+
+    id = models.BigAutoField(primary_key=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    kind = models.CharField(max_length=32, choices=OpsProbeKind.choices, db_index=True)
+    status = models.CharField(max_length=16, choices=OpsProbeStatus.choices, default=OpsProbeStatus.TRIGGERED, db_index=True)
+
+    initiated_by_email = models.EmailField(max_length=254, blank=True, default="")
+    details = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["kind", "status", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.created_at:%Y-%m-%d %H:%M} {self.kind} ({self.status})"

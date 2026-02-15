@@ -425,6 +425,25 @@ Rationale:
 - Django raises `EmptyPage` if those methods are called at the bounds (page 1 / last page).
 - “Disabled” pagination UI still evaluates template expressions; guarding prevents template-time exceptions.
 
+## 2026-02-15 — Monitoring evidence as a launch gate when Sentry is enabled
+
+Decision:
+- If `SENTRY_DSN` is configured in production, EZ360PM requires a **recent Ops probe** (“Test error”) within the last 30 days.
+
+Rationale:
+- Configuration alone is not enough; we need positive evidence the monitoring pipeline works end-to-end.
+- The Ops Probes screen provides a safe, staff-only workflow and records the evidence in-app.
+
 ### 2026-02-15 — Launch Check Philosophy
 - Launch checks must be safe to run in dev/staging/prod without elevated DB privileges.
 - Prefer settings/env validation + minimal existence queries over deep reconciliation (use Ops reconciliation/drift tools for that).
+
+
+## 2026-02-15 — Pack: Optional 2FA enforcement + Client email index
+- 2FA policy is opt-in by default; enforcement is controlled by admin-configurable Company flags and per-employee override.
+- Avoid role-based mandatory security in v1 to reduce friction; enable enforcement in production via Company settings.
+
+
+## Hotfix (2026-02-15)
+
+- Prefer URL-name back-compat aliases over template churn when a broken link is already deployed in production.

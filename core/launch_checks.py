@@ -215,6 +215,41 @@ def run_launch_checks() -> List[Dict[str, Any]]:
         )
     )
 
+    # If Sentry is configured in production, require evidence you tested it recently.
+    if sentry_dsn and not debug:
+        try:
+            from ops.models import OpsProbeEvent, OpsProbeKind  # type: ignore
+
+            recent_probe = (
+                OpsProbeEvent.objects.filter(kind=OpsProbeKind.SENTRY_TEST_ERROR)
+                .order_by("-created_at")
+                .first()
+            )
+            recent_ok = bool(recent_probe and (timezone.now() - recent_probe.created_at) <= timedelta(days=30))
+            out.append(
+                _result(
+                    check_id="sentry_test_error_recent",
+                    title="Sentry test error recorded (last 30 days)",
+                    ok=recent_ok,
+                    level="warn",
+                    message=(
+                        f"Last probe: {recent_probe.created_at:%Y-%m-%d %H:%M}" if recent_probe else "No probe recorded"
+                    ),
+                    hint="In Ops → Probes, click ‘Test error’ and confirm it appears in Sentry. This records evidence for launch readiness.",
+                )
+            )
+        except Exception:
+            out.append(
+                _result(
+                    check_id="sentry_test_error_recent",
+                    title="Sentry test error recorded (last 30 days)",
+                    ok=False,
+                    level="warn",
+                    message="Unable to load ops probe model",
+                    hint="Ensure migrations are applied and Ops app is installed.",
+                )
+            )
+
     # --- Build metadata (helps debugging prod incidents)
     build_sha = getattr(settings, "BUILD_SHA", "")
     build_ver = getattr(settings, "BUILD_VERSION", "")

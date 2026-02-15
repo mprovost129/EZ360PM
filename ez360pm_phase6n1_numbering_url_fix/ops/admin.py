@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from django.contrib import admin
 
-from .models import OpsAlertEvent, LaunchGateItem, BackupRun, BackupRestoreTest, ReleaseNote, UserPresence, OpsEmailTest
+from .models import (
+    OpsAlertEvent,
+    LaunchGateItem,
+    BackupRun,
+    BackupRestoreTest,
+    ReleaseNote,
+    UserPresence,
+    OpsEmailTest,
+    OpsProbeEvent,
+)
 
 
 @admin.register(OpsAlertEvent)
@@ -61,5 +70,14 @@ class OpsEmailTestAdmin(admin.ModelAdmin):
     list_display = ("created_at", "status", "to_email", "subject", "backend", "latency_ms")
     list_filter = ("status", "created_at")
     search_fields = ("to_email", "subject", "error", "initiated_by_email")
+    readonly_fields = ("created_at",)
+    ordering = ("-created_at",)
+
+
+@admin.register(OpsProbeEvent)
+class OpsProbeEventAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "kind", "status", "initiated_by_email")
+    list_filter = ("kind", "status", "created_at")
+    search_fields = ("initiated_by_email",)
     readonly_fields = ("created_at",)
     ordering = ("-created_at",)

@@ -44,7 +44,14 @@ from .models import (
     UserPresence,
     OpsEmailTest,
     OpsEmailTestStatus,
+    OpsProbeEvent,
+    OpsProbeKind,
+    OpsProbeStatus,
 )
+
+
+def _sentry_enabled() -> bool:
+    return bool(getattr(settings, "SENTRY_DSN", "") or "")
 
 
 def _is_staff(user) -> bool:
@@ -315,6 +322,75 @@ def ops_email_test(request: HttpRequest) -> HttpResponse:
             "diag": diag,
         },
     )
+
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_probes(request: HttpRequest) -> HttpResponse:
+    """Staff-only probes to validate monitoring/alerting in each environment."""
+
+    recent = OpsProbeEvent.objects.all()[:25]
+    context = {
+        "recent": recent,
+        "sentry_enabled": _sentry_enabled(),
+    }
+    return render(request, "ops/probes.html", context)
+
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_probe_test_error(request: HttpRequest) -> HttpResponse:
+    """Intentionally raise an exception so Sentry/500 handling can be verified."""
+
+    try:
+        OpsProbeEvent.objects.create(
+            kind=OpsProbeKind.SENTRY_TEST_ERROR,
+            status=OpsProbeStatus.TRIGGERED,
+            initiated_by_email=(getattr(request.user, "email", "") or "")[:254],
+            details={
+                "sentry_enabled": _sentry_enabled(),
+                "path": request.path,
+            },
+        )
+    except Exception:
+        pass
+
+    # This should be caught by Sentry middleware if enabled, and should render a 500.
+    raise RuntimeError("EZ360PM Ops probe: intentional test error (safe to ignore).")
+
+
+@login_required
+@user_passes_test(_is_staff)
+@require_POST
+def ops_probe_test_alert(request: HttpRequest) -> HttpResponse:
+    """Create a visible Ops alert so staff can verify alert routing."""
+
+    title = "Ops probe: test alert"
+    msg = "Staff-triggered probe alert. Safe to resolve."
+
+    try:
+        create_ops_alert(
+            title=title,
+            message=msg,
+            level=OpsAlertLevel.INFO,
+            source=OpsAlertSource.PROBE,
+            company=None,
+        )
+    except Exception:
+        pass
+
+    try:
+        OpsProbeEvent.objects.create(
+            kind=OpsProbeKind.ALERT_TEST,
+            status=OpsProbeStatus.COMPLETED,
+            initiated_by_email=(getattr(request.user, "email", "") or "")[:254],
+            details={"created_alert": True},
+        )
+    except Exception:
+        pass
+
+    messages.success(request, "Probe alert created. Check Ops → Alerts.")
+    return redirect("ops:probes")
 
 
 @login_required
