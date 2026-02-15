@@ -1,0 +1,48 @@
+{% extends "base_app.html" %}
+
+{% block title %}Time Settings · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">Time tracking settings</h1>
+    <div class="text-secondary small">These settings will sync to desktop later.</div>
+  </div>
+  <div>
+    <a class="btn btn-outline-secondary" href="{% url 'timetracking:entry_list' %}">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+  </div>
+</div>
+
+<form method="post" class="card">
+  {% csrf_token %}
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <label class="form-label">Entry mode</label>
+        {{ form.entry_mode }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Clock format</label>
+        {{ form.clock_format }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Rounding minutes</label>
+        {{ form.rounding_minutes }}
+        <div class="form-text">Set to 15 for quarter-hour rounding. Set to 0 for no rounding.</div>
+      </div>
+      <div class="col-12 col-md-6 d-flex align-items-center">
+        <div class="form-check mt-4">
+          {{ form.require_manager_approval }}
+          <label class="form-check-label">Require manager approval for submissions</label>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card-footer d-flex justify-content-between">
+    <a class="btn btn-outline-secondary" href="{% url 'timetracking:entry_list' %}">Cancel</a>
+    <button class="btn btn-dark" type="submit">Save</button>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends "base_app.html" %}
+{% block title %}Launch Gate · EZ360PM{% endblock %}
+{% block content %}
+<div class="container-fluid" style="max-width: 1100px;">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">Launch Readiness Gate</h1>
+      <div class="text-secondary small">Staff-managed checklist. Complements automated <a href="{% url 'ops:launch_checks' %}">launch checks</a>.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-dark" href="{% url 'ops:dashboard' %}"><i class="bi bi-arrow-left me-1"></i>Ops</a>
+      <a class="btn btn-outline-dark" href="{% url 'ops:launch_checks' %}">Launch checks</a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div>
+          <div class="fw-semibold">Progress</div>
+          <div class="text-secondary small">{{ summary.complete }} / {{ summary.total }} complete</div>
+        </div>
+        <div style="min-width: 260px; width: 360px;">
+          <div class="progress" role="progressbar" aria-valuenow="{{ summary.complete }}" aria-valuemin="0" aria-valuemax="{{ summary.total }}">
+            {% if summary.total %}
+              <div class="progress-bar" style="width: {% widthratio summary.complete summary.total 100 %}%"></div>
+            {% else %}
+              <div class="progress-bar" style="width: 0%"></div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table mb-0 align-middle">
+        <thead>
+          <tr class="text-secondary">
+            <th style="width: 120px;">Status</th>
+            <th>Gate</th>
+            <th style="width: 220px;">Completed</th>
+            <th style="width: 180px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+            <tr>
+              <td>
+                {% if item.is_complete %}
+                  <span class="badge text-bg-success">Complete</span>
+                {% else %}
+                  <span class="badge text-bg-warning">Pending</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="fw-semibold">{{ item.title }}</div>
+                {% if item.description %}
+                  <div class="text-secondary small">{{ item.description }}</div>
+                {% endif %}
+                {% if item.notes %}
+                  <div class="small mt-1"><span class="text-secondary">Notes:</span> {{ item.notes }}</div>
+                {% endif %}
+              </td>
+              <td class="small text-secondary">
+                {% if item.completed_at %}
+                  {{ item.completed_at }}{% if item.completed_by %}<div>by {{ item.completed_by.email }}</div>{% endif %}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <form method="post" action="{% url 'ops:launch_gate_toggle' item.id %}">
+                  {% csrf_token %}
+                  {% if item.is_complete %}
+                    <input type="hidden" name="action" value="reopen">
+                    <button class="btn btn-sm btn-outline-dark" type="submit">Reopen</button>
+                  {% else %}
+                    <input type="hidden" name="action" value="complete">
+                    <button class="btn btn-sm btn-dark" type="submit">Mark complete</button>
+                  {% endif %}
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="text-secondary p-3">No launch gate items found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="text-secondary small mt-3">
+    Tip: You can run a quick smoke test in dev/staging via <code>python manage.py ez360_smoke_test</code>.
+  </div>
+</div>
+{% endblock %}

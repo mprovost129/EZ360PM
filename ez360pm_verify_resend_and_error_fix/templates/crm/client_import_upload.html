@@ -1,0 +1,87 @@
+{% extends "base_app.html" %}
+
+{% load dict_extras %}
+
+{% block title %}Import Clients · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">Import clients</h1>
+    <div class="text-secondary small">Upload a CSV, preview it, then map columns before importing.</div>
+  </div>
+
+  <div>
+    <a class="btn btn-outline-secondary" href="{% url 'crm:client_list' %}">
+      <i class="bi bi-arrow-left me-1"></i>Back to clients
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h6">Step 1: Upload CSV</h2>
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label">CSV file</label>
+            {{ form.csv_file }}
+            {% if form.csv_file.help_text %}
+              <div class="form-text">{{ form.csv_file.help_text }}</div>
+            {% endif %}
+            {% for error in form.csv_file.errors %}
+              <div class="text-danger small">{{ error }}</div>
+            {% endfor %}
+          </div>
+
+          <button class="btn btn-dark" type="submit">
+            <i class="bi bi-eye me-1"></i>Preview & map
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="alert alert-info mt-3 mb-0">
+      <div class="fw-semibold mb-1">Tip</div>
+      <div class="small">If your CSV headers don’t match, no worries — the next step lets you map them.</div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h6">Preview</h2>
+
+        {% if preview and headers %}
+          <div class="mb-2 text-secondary small">Showing first {{ preview|length }} rows.</div>
+          <div class="table-responsive" style="max-height: 420px; overflow:auto;">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  {% for h in headers %}
+                    <th class="text-nowrap">{{ h }}</th>
+                  {% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in preview %}
+                  <tr>
+                    {% for h in headers %}
+                      <td class="text-nowrap">{{ row|get_item:h }}</td>
+                    {% endfor %}
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-secondary">Upload a CSV to see a preview here.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
