@@ -19,13 +19,13 @@
   <div id="sidebarOverlay"></div>
   <div class="app-shell">
     <!-- Top navbar (sitewide navigation + search/notifications/help/profile) -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom" style="height:56px;">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom ez-topbar">
       <div class="container-fluid">
         <button id="sidebarToggleBtn" class="btn btn-outline-ez btn-sm d-lg-none me-2" type="button" aria-label="Toggle sidebar">
           <i class="bi bi-list"></i>
         </button>
         <a class="navbar-brand fw-semibold d-flex align-items-center gap-2" href="{% url 'core:app_dashboard' %}">
-          <img src="{% static 'images/ez360pm_logo.png' %}" alt="EZ360PM" style="height: 90px;width:auto;">
+          <img class="ez-brand-logo" src="{% static 'images/ez360pm_logo.png' %}" alt="EZ360PM">
         </a>
 
         <form class="d-none d-lg-flex" role="search" style="width: 420px;">

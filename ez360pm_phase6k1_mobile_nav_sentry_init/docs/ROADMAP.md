@@ -34,11 +34,12 @@
 - **6H** Ops: PII export (company CSV ZIP) + SLO webhook freshness metrics
 - **6I** Security: enforce 2FA for Admin/Owner roles (step-up confirmation on company-scoped pages + login flow supports 2FA)
 - **6J** Production staticfiles hardening (WhiteNoise + hashed/compressed static; fixes Render admin/app CSS)
+- **6K1** Mobile topbar fix + Sentry init (responsive logo sizing, safe-area insets; Sentry init enabled when DSN set)
 
 ### Next (Planned)
-- SLO dashboards (active users, webhook health, email health) + optional Slack/Webhook
-- PII export tooling
-- Optional: enforce CSP (move from report-only to enforced) once validated
+- **Backup & Recovery Gate**: automated DB backups on Render, retention policy verified, and a documented restore test.
+- **Monitoring Gate**: confirm Sentry capture in production + add an ops “test error” button for staff.
+- Optional: move CSP from report-only to enforced after validating allowlist.
 
 ---
 

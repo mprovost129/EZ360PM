@@ -647,3 +647,7 @@ def init_sentry_if_configured() -> None:
 
 
 apply_runtime_defaults()
+
+# Monitoring/Observability: initialize Sentry only when configured.
+# Safe in dev/prod; no-op when SENTRY_DSN is unset.
+init_sentry_if_configured()

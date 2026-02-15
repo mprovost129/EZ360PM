@@ -39,6 +39,16 @@
   - `EZ360_ALERT_ON_WEBHOOK_FAILURE`
   - `EZ360_ALERT_ON_EMAIL_FAILURE`
 
+## 2026-02-15 — Topbar logo sizing is constrained
+
+- The EZ360PM brand mark must never exceed the topbar height (prevents iOS overlap/covering issues).
+- Use `.ez-topbar` + `.ez-brand-logo` classes for both public + app shells; logo height is responsive (smaller on phones).
+
+## 2026-02-15 — Sentry is opt-in via env
+
+- Sentry is initialized only when `SENTRY_DSN` is set.
+- Initialization happens after runtime defaults are applied so the environment/release metadata is correct.
+
 ## 2026-02-14 — Presence + SLO dashboards are lightweight and non-invasive (Phase 6G)
 
 - Presence tracking exists only to support staff SLO visibility (active users in the last N minutes).

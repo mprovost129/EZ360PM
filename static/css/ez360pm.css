@@ -52,6 +52,29 @@ a:hover{ color: var(--ez-link-hover); }
   border-bottom-color: var(--ez-border) !important;
 }
 
+/* Topbar sizing + iOS safe-area support */
+.ez-topbar{
+  min-height: var(--topbar-h);
+}
+@supports (padding-top: env(safe-area-inset-top)){
+  .ez-topbar{
+    padding-top: max(.25rem, env(safe-area-inset-top));
+    padding-left: max(.75rem, env(safe-area-inset-left));
+    padding-right: max(.75rem, env(safe-area-inset-right));
+  }
+}
+
+/* Brand logo must never exceed the topbar height (fixes iOS overlap) */
+.ez-brand-logo{
+  height: 44px;
+  width: auto;
+  max-height: 44px;
+  display: block;
+}
+@media (max-width: 575.98px){
+  .ez-brand-logo{ height: 34px; max-height: 34px; }
+}
+
 .app-shell{ min-height: 100vh; display:flex; flex-direction:column; }
 .app-body{ flex:1; display:flex; min-height:0; }
 

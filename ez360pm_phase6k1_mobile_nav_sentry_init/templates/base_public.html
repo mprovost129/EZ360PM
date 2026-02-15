@@ -15,10 +15,10 @@
   <link rel="stylesheet" href="{% static 'css/ez360pm.css' %}">
 </head>
 <body>
-  <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom">
+  <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom ez-topbar">
     <div class="container-fluid" style="max-width: 1200px;">
       <a class="navbar-brand fw-semibold d-flex align-items-center gap-2" href="{% url 'core:home' %}">
-        <img src="{% static 'images/ez360pm_logo.png' %}" alt="EZ360PM" style="height:90px;width:auto;">
+        <img class="ez-brand-logo" src="{% static 'images/ez360pm_logo.png' %}" alt="EZ360PM">
       </a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarPublic" aria-controls="navbarPublic" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>

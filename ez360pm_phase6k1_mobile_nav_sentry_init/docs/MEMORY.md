@@ -511,3 +511,12 @@ Files touched (high level):
 - Topbar actions collapse into a mobile menu (three-dots button) to prevent overflow.
 - Added Bootstrap JS bundle (CDN) and kept safe fallbacks where needed.
 Files: templates/base_app.html, templates/base_public.html, static/ui/ez360pm.css, static/ui/ez360pm.js
+
+## 2026-02-15 — Phase 6J (Render Staticfiles: WhiteNoise)
+- Enabled WhiteNoise middleware + compressed manifest static storage so `/static/` serves correctly on Render when `DEBUG=False`.
+- Added `whitenoise>=6.7.0` and documented the requirement that `collectstatic` must run during deploy.
+
+## 2026-02-15 — Phase 6K1 (Mobile Topbar Fix + Sentry Init)
+- Fixed iOS/mobile topbar overlap by enforcing responsive brand logo sizing (`.ez-brand-logo`) and consistent topbar sizing (`.ez-topbar`) with safe-area insets.
+- Public + app shells now use the same topbar classes and brand logo styling.
+- Enabled Sentry initialization when configured by calling `init_sentry_if_configured()` after `apply_runtime_defaults()`.
