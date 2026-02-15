@@ -1,4 +1,9 @@
 {% extends "base_public.html" %}
+{% load static %}
+
+{# This template is a compatibility shim for legacy templates that expect a "public_content" block. #}
+
+{% block title %}EZ360PM{% endblock %}
 
 {#
   Compatibility shim.
