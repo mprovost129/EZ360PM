@@ -59,5 +59,6 @@ urlpatterns = [
     # 2FA (Pack N)
     path("2fa/setup/", views.two_factor_setup, name="two_factor_setup"),
     path("2fa/verify/", views.two_factor_verify, name="two_factor_verify"),
+    path("2fa/confirm/", views.two_factor_confirm, name="two_factor_confirm"),
     path("2fa/disable/", views.two_factor_disable, name="two_factor_disable"),
 ]

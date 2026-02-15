@@ -27,6 +27,7 @@ from .forms import (
 from .models import TwoFactorSettings, LoginEvent
 from .security import log_login_success
 from .two_factor import build_otpauth_url, generate_base32_secret, verify_totp
+from .services_2fa import clear_session_2fa, is_session_2fa_verified, mark_session_2fa_verified
 
 
 User = get_user_model()
@@ -132,12 +133,25 @@ def login_view(request):
             except Exception:
                 pass
 
+            # If 2FA is enabled for this user, perform step-up verification before logging in.
+            tf = getattr(user, "two_factor", None)
+            if tf and tf.is_enabled and tf.secret:
+                request.session["two_factor_pending_user_id"] = str(user.pk)
+                request.session["two_factor_pending_at"] = timezone.now().isoformat()
+                messages.info(request, "Enter your 2FA code to finish signing in.")
+                return redirect("accounts:two_factor_verify")
+
             login(request, user)
+
             # Session rotation on successful auth (security hardening)
             try:
                 request.session.cycle_key()
             except Exception:
                 pass
+
+            # Ensure we don't carry any stale 2FA session markers.
+            clear_session_2fa(request)
+
             log_login_success(request, user, method=LoginEvent.METHOD_PASSWORD)
             messages.success(request, "Welcome back.")
             return _post_login_redirect(request, user)
@@ -203,6 +217,7 @@ def register_view(request):
 
 
 def logout_view(request):
+    clear_session_2fa(request)
     logout(request)
     return redirect("core:home")
 
@@ -295,6 +310,7 @@ def two_factor_setup(request):
                 tf.verified_at = timezone.now()
                 tf.last_used_at = timezone.now()
                 tf.save(update_fields=["is_enabled", "verified_at", "last_used_at"])
+                mark_session_2fa_verified(request)
                 messages.success(request, "Two-factor authentication enabled.")
                 return redirect("accounts:profile")
         messages.error(request, "Invalid code. Please try again.")
@@ -333,7 +349,8 @@ def two_factor_verify(request):
             code = form.cleaned_data["code"]
             if verify_totp(tf.secret, code):
                 login(request, user)
-                log_login_success(request, user, method="2fa")
+                mark_session_2fa_verified(request)
+                log_login_success(request, user, method=LoginEvent.METHOD_2FA)
                 tf.last_used_at = timezone.now()
                 tf.save(update_fields=["last_used_at"])
                 request.session.pop("two_factor_pending_user_id", None)
@@ -358,6 +375,7 @@ def two_factor_disable(request):
         tf.verified_at = None
         tf.last_used_at = None
         tf.save(update_fields=["is_enabled", "secret", "verified_at", "last_used_at"])
+        clear_session_2fa(request)
         messages.success(request, "Two-factor authentication disabled.")
         return redirect("accounts:profile")
 
@@ -389,3 +407,43 @@ def verify_required(request):
     if getattr(request.user, "email_verified", False):
         return redirect("core:app_dashboard")
     return render(request, "accounts/verify_required.html", {})
+
+
+@login_required
+def two_factor_confirm(request):
+    """Step-up 2FA for an already-authenticated user.
+
+    Used when company policy requires 2FA before accessing company-scoped pages.
+    """
+
+    if is_session_2fa_verified(request):
+        return redirect("core:app_dashboard")
+
+    tf = getattr(request.user, "two_factor", None)
+    if not tf or not tf.is_enabled or not tf.secret:
+        messages.info(request, "Enable two-factor authentication to continue.")
+        return redirect("accounts:two_factor_setup")
+
+    if request.method == "POST":
+        form = TwoFactorVerifyForm(request.POST)
+        if form.is_valid():
+            code = form.cleaned_data["code"]
+            if verify_totp(tf.secret, code):
+                mark_session_2fa_verified(request)
+                try:
+                    tf.last_used_at = timezone.now()
+                    tf.save(update_fields=["last_used_at"])
+                except Exception:
+                    pass
+                try:
+                    log_login_success(request, request.user, method=LoginEvent.METHOD_2FA)
+                except Exception:
+                    pass
+                messages.success(request, "Two-factor verification successful.")
+                return redirect("core:app_dashboard")
+
+        messages.error(request, "Invalid code. Please try again.")
+    else:
+        form = TwoFactorVerifyForm()
+
+    return render(request, "accounts/two_factor_confirm.html", {"form": form, "email": request.user.email})

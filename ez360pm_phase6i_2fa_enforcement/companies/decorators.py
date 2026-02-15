@@ -9,6 +9,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 
 from core.support_mode import get_support_mode
+from accounts.services_2fa import is_session_2fa_verified
 
 from .models import EmployeeRole
 from .permissions import has_min_role
@@ -44,6 +45,41 @@ def company_context_required(view_func: F) -> F:
 
         request.active_company = company
         request.active_employee = employee
+
+        # -----------------------------
+        # 2FA enforcement (Hardening Phase 1)
+        #
+        # Policy:
+        # - Always require 2FA for company Admin/Owner roles.
+        # - Additionally require 2FA if company flags indicate so.
+        # - Employee.force_2fa always wins.
+        #
+        # We enforce as a step-up challenge on company-scoped pages.
+        # -----------------------------
+        try:
+            role = getattr(employee, "role", None)
+            require_admin_owner = role in {EmployeeRole.ADMIN, EmployeeRole.OWNER}
+            require_company_all = bool(getattr(company, "require_2fa_for_all", False))
+            require_company_admin_mgr = bool(getattr(company, "require_2fa_for_admins_managers", False)) and role in {
+                EmployeeRole.MANAGER,
+                EmployeeRole.ADMIN,
+                EmployeeRole.OWNER,
+            }
+            require_employee = bool(getattr(employee, "force_2fa", False))
+
+            requires_2fa = bool(require_admin_owner or require_company_all or require_company_admin_mgr or require_employee)
+
+            if requires_2fa and not is_session_2fa_verified(request):
+                tf = getattr(getattr(request, "user", None), "two_factor", None)
+                if not tf or not getattr(tf, "is_enabled", False):
+                    messages.info(request, "Two-factor authentication is required. Please enable it to continue.")
+                    return redirect("accounts:two_factor_setup")
+                messages.info(request, "Two-factor authentication is required. Please confirm your code.")
+                return redirect("accounts:two_factor_confirm")
+        except Exception:
+            # Never break app access due to 2FA policy evaluation.
+            pass
+
         return view_func(request, *args, **kwargs)
 
     return _wrapped  # type: ignore[misc]

@@ -336,3 +336,16 @@ Rationale:
 ## Ops PII Export scope
 - PII export is a portability/DSAR convenience tool that exports company-scoped business records as CSV inside a ZIP.
 - It is not a full backup system and does not include private file blobs (S3 objects); backups remain the authoritative archival mechanism.
+
+## 2026-02-14 — 2FA enforcement model (Admin/Owner mandatory)
+
+Decision:
+- 2FA is **mandatory** for company **Admin** and **Owner** roles.
+- Enforcement is implemented as a **step-up** gate on company-scoped pages:
+  - If the user has not confirmed 2FA in the current session, they are redirected to confirm.
+  - If 2FA is not enabled, they are redirected to set it up.
+- Login flow supports 2FA-enabled accounts by requiring a TOTP code before completing sign-in.
+
+Rationale:
+- Keeps security high for privileged roles while remaining lightweight (no third-party deps).
+- Step-up flow avoids breaking the public/auth pages while still enforcing policy before sensitive access.

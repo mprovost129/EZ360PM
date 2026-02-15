@@ -46,6 +46,10 @@ or
 - `COMPANY_DEFAULT_REQUIRE_2FA_ADMINS_MANAGERS` ("1"/"0")
   - If not set, defaults to **ON in production (DEBUG=False)**.
 
+- `TWO_FACTOR_ISSUER` (default: EZ360PM)
+- `TWO_FACTOR_SESSION_TTL_SECONDS` (default: 43200 / 12 hours)
+  - How long a 2FA confirmation remains valid for the current session before another step-up is required.
+
 ## CSP (Content Security Policy)
 
 - `EZ360_CSP_ENABLED` ("1"/"0")

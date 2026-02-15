@@ -32,6 +32,7 @@
 - **6G** Ops SLO dashboard (active users via presence pings) + optional external ops alert webhook notifications
 - **6G1** Render migration hotfix (billing index rename idempotent + create-if-missing)
 - **6H** Ops: PII export (company CSV ZIP) + SLO webhook freshness metrics
+- **6I** Security: enforce 2FA for Admin/Owner roles (step-up confirmation on company-scoped pages + login flow supports 2FA)
 
 ### Next (Planned)
 - SLO dashboards (active users, webhook health, email health) + optional Slack/Webhook

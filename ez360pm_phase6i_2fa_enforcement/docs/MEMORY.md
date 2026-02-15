@@ -487,3 +487,11 @@ Files touched (high level):
 ## 2026-02-14 — Phase 6H (Ops: PII Export + SLO webhook freshness)
 - Added staff-only PII export: /ops/pii-export/ exports company data to CSV ZIP (clients/projects/documents/payments/expenses/time entries).
 - Enhanced SLO dashboard with Stripe webhook freshness (last received/last ok + failures last 24h).
+
+## 2026-02-14 — Phase 6I (Security: 2FA enforcement for Admin/Owner)
+- Login now supports 2FA-enabled accounts: password auth creates a pending 2FA challenge and redirects to `/accounts/2fa/verify/`.
+- Added session-scoped 2FA marker with TTL (`TWO_FACTOR_SESSION_TTL_SECONDS`, default 12h).
+- Company-scoped pages enforce 2FA as a step-up gate:
+  - Admin/Owner roles are always required to pass 2FA.
+  - Company policy flags (`require_2fa_for_all`, `require_2fa_for_admins_managers`) and `employee.force_2fa` also trigger enforcement.
+- Added `/accounts/2fa/confirm/` for already-authenticated step-up confirmation.

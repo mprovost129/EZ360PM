@@ -96,7 +96,7 @@ def ops_dashboard(request: HttpRequest) -> HttpResponse:
         ).distinct()
 
     # Prefetch subscription for display (best-effort)
-    subs = {s.company_id: s for s in CompanySubscription.objects.select_related("company")}
+    subs = {s.company.id: s for s in CompanySubscription.objects.select_related("company")}
     rows = []
     for c in companies[:200]:
         s = subs.get(c.id)
@@ -171,12 +171,12 @@ def ops_slo_dashboard(request: HttpRequest) -> HttpResponse:
     webhook_24h = OpsAlertEvent.objects.filter(source=OpsAlertSource.STRIPE_WEBHOOK, created_at__gte=window_24h).count()
     email_24h = OpsAlertEvent.objects.filter(source=OpsAlertSource.EMAIL, created_at__gte=window_24h).count()
 
-# Stripe webhook freshness (best-effort global signal)
-last_webhook = BillingWebhookEvent.objects.order_by("-received_at").first()
-webhook_last_received_at = getattr(last_webhook, "received_at", None)
-last_webhook_ok = BillingWebhookEvent.objects.filter(ok=True).order_by("-received_at").first()
-webhook_last_ok_at = getattr(last_webhook_ok, "received_at", None)
-webhook_fail_24h = BillingWebhookEvent.objects.filter(ok=False, received_at__gte=window_24h).count()
+    # Stripe webhook freshness (best-effort global signal)
+    last_webhook = BillingWebhookEvent.objects.order_by("-received_at").first()
+    webhook_last_received_at = getattr(last_webhook, "received_at", None)
+    last_webhook_ok = BillingWebhookEvent.objects.filter(ok=True).order_by("-received_at").first()
+    webhook_last_ok_at = getattr(last_webhook_ok, "received_at", None)
+    webhook_fail_24h = BillingWebhookEvent.objects.filter(ok=False, received_at__gte=window_24h).count()
 
     recent_alerts = OpsAlertEvent.objects.filter(created_at__gte=window_24h).select_related("company").order_by("-created_at")[:50]
 
