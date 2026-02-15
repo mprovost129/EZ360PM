@@ -273,6 +273,10 @@ Next (Phase 4C):
 - Project Services now use CatalogItem(Service) dropdowns with optional custom names.
 - Navbar timer displays project + live elapsed and supports pause/resume.
 
+## 2026-02-15 — Completed: Phase 6K2 (Timer dropdown fix + locked invoice UX)
+- Timer dropdown no longer relies on Bootstrap dropdown JS; uses deterministic local toggle logic.
+- Locked invoices render read-only (disabled fields/line-items + no Save) to match financial invariants.
+
 ## 2026-02-14 — Completed: Phase 6F.2 (Error page resiliency)
 - Added `templates/_public_shell.html` shim so 404/500 pages render in production.
 
@@ -291,6 +295,10 @@ Next (Phase 4C):
 
 - Phase 4 (Monitoring & Observability): verify Sentry wiring in production, validate Ops alerts for **email** + **webhooks**, and add a small “send test email” button in Ops to confirm provider config end-to-end.
 - Phase 5 (UX polish): standardize remaining form select styling + money widgets across invoices/estimates/expenses.
+
+## Next (immediate)
+- **Phase 6E (Storage visibility):** Ops → Storage health page + “test presign/upload/download” button.
+- **Phase 6L (Security headers):** confirm CSP + HSTS settings in production and add a Launch Check that validates static assets + admin CSS loads.
 
 ## Next UI shell items
 - Apply theme tokens to buttons/badges across all templates (replace hardcoded `btn-dark` where appropriate).

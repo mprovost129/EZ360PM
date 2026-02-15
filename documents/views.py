@@ -210,6 +210,17 @@ def document_edit(request, doc_type: str, pk):
         except Exception:
             pass
 
+    # UX: if an invoice is locked, render the edit screen in read-only mode.
+    is_locked = False
+    lock_reason = ""
+    if doc_type == DocumentType.INVOICE:
+        try:
+            is_locked = bool(doc.is_invoice_locked())
+            lock_reason = doc.invoice_lock_reason() or ""
+        except Exception:
+            is_locked = False
+            lock_reason = ""
+
     if request.method == "POST":
         # Email action: validate & save, then send to client.
         if request.POST.get("action") == "send_email":
@@ -283,6 +294,8 @@ def document_edit(request, doc_type: str, pk):
                 "client_credit_cents": client_credit_cents,
                 "can_apply_credit": can_apply_credit,
                 "apply_credit_form": apply_credit_form,
+                "is_locked": is_locked,
+                "lock_reason": lock_reason,
             }
 
             return render(request, "documents/document_edit.html", ctx)
@@ -397,6 +410,13 @@ def document_edit(request, doc_type: str, pk):
         form = DocumentForm(instance=doc, company=company, doc_type=doc_type)
         formset = DocumentLineItemFormSet(instance=doc, form_kwargs={'company_default_taxable': bool(getattr(company, 'default_line_items_taxable', False))})
 
+        if is_locked:
+            for f in form.fields.values():
+                f.disabled = True
+            for fform in formset.forms:
+                for f in fform.fields.values():
+                    f.disabled = True
+
     # Invoice extras: credit notes + client credit application UI
     credit_notes = []
     apply_credit_form = None
@@ -431,6 +451,8 @@ def document_edit(request, doc_type: str, pk):
         "client_credit_cents": client_credit_cents,
         "can_apply_credit": can_apply_credit,
         "apply_credit_form": apply_credit_form,
+        "is_locked": is_locked,
+        "lock_reason": lock_reason,
     }
 
     return render(request, "documents/document_edit.html", ctx)

@@ -374,3 +374,21 @@ Rationale:
 - Removes dependency on platform-specific static route configuration.
 - Ensures admin/app CSS works consistently with `DEBUG=False`.
 - Provides hashed + compressed static assets via `CompressedManifestStaticFilesStorage`.
+
+## 2026-02-15 — UI Reliability: timer dropdown is Bootstrap-independent
+
+Decision:
+- The **timer navbar dropdown** uses explicit, local JS toggling rather than Bootstrap’s dropdown plugin.
+
+Rationale:
+- The topbar has custom mobile/overlay behaviors and we’ve observed “click does nothing” cases on mobile/prod.
+- A small deterministic toggle avoids CDN/JS availability issues and eliminates event-order conflicts.
+
+## 2026-02-15 — Financial integrity UX: locked invoices render read-only
+
+Decision:
+- If an invoice is “locked” (sent/paid/credits applied), the edit UI renders in **read-only mode** (disabled fields + no Save).
+
+Rationale:
+- Prevents user confusion and reduces the chance of attempted mutations.
+- Server-side lock already blocks POST edits; UI lock aligns the UX with invariants.

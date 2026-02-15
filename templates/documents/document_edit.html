@@ -164,7 +164,13 @@
         </div>
 
         <div class="d-flex gap-2 justify-content-end">
-          <button class="btn btn-dark" type="submit"><i class="bi bi-save me-1"></i>Save</button>
+          {% if is_locked %}
+            <button class="btn btn-dark" type="button" disabled title="This invoice is locked and cannot be edited.">
+              <i class="bi bi-lock me-1"></i>Locked
+            </button>
+          {% else %}
+            <button class="btn btn-dark" type="submit"><i class="bi bi-save me-1"></i>Save</button>
+          {% endif %}
         </div>
       </div>
     </div>

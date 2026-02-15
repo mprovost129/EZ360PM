@@ -44,7 +44,7 @@
           <!-- Timer (global per-user timer) -->
           <div class="dropdown">
             <div class="btn-group">
-              <button id="timerDropdownToggle" data-fallback-dropdown="1" class="btn btn-outline-dark btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Timer">
+              <button id="timerDropdownToggle" data-fallback-dropdown="1" class="btn btn-outline-dark btn-sm dropdown-toggle" type="button" aria-expanded="false" title="Timer">
                 <i class="bi bi-stopwatch me-1"></i>
                 {% if timer_running and timer_state and timer_state.project %}
                   <span class="me-1">{{ timer_state.project }}</span>
@@ -416,20 +416,24 @@
   <script src="{% static 'js/ez360pm.js' %}"></script>
 
   <script>
-    // Fallback dropdown behavior for environments where bootstrap.bundle isn't available/blocked.
+    // Timer dropdown behavior.
+    // We intentionally do NOT rely on Bootstrap's dropdown JS here because the topbar
+    // uses custom mobile/overlay behaviors and we want the timer menu to be reliable
+    // in both dev and production, even when Bootstrap JS is unavailable.
     (function () {
       var toggle = document.getElementById('timerDropdownToggle');
       var menu = document.getElementById('timerDropdownMenu');
       if (!toggle || !menu) return;
 
-      // If Bootstrap's dropdown is available, let it handle everything.
-      if (window.bootstrap && typeof window.bootstrap.Dropdown === 'function') return;
+      var dropdown = toggle.closest('.dropdown');
 
       function closeMenu() {
+        if (dropdown) dropdown.classList.remove('show');
         menu.classList.remove('show');
         toggle.setAttribute('aria-expanded', 'false');
       }
       function openMenu() {
+        if (dropdown) dropdown.classList.add('show');
         menu.classList.add('show');
         toggle.setAttribute('aria-expanded', 'true');
       }

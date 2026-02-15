@@ -520,3 +520,12 @@ Files: templates/base_app.html, templates/base_public.html, static/ui/ez360pm.cs
 - Fixed iOS/mobile topbar overlap by enforcing responsive brand logo sizing (`.ez-brand-logo`) and consistent topbar sizing (`.ez-topbar`) with safe-area insets.
 - Public + app shells now use the same topbar classes and brand logo styling.
 - Enabled Sentry initialization when configured by calling `init_sentry_if_configured()` after `apply_runtime_defaults()`.
+
+## 2026-02-15 — Phase 6K2 (Timer Dropdown Reliability + Invoice Lock UX)
+- Timer navbar widget dropdown is now **JS-driven and Bootstrap-independent** (prevents “click does nothing” on mobile/prod).
+  - Removed `data-bs-toggle="dropdown"` from the timer button.
+  - Added explicit toggle logic that adds/removes `.show` and closes on outside click / Escape.
+- Locked invoices now render in **read-only mode** on the edit screen:
+  - All fields/line-items are disabled.
+  - The Save button becomes a disabled “Locked” button.
+  - Context now passes `is_locked` + `lock_reason` for consistent messaging.
