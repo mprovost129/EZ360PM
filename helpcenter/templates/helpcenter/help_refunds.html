@@ -1,0 +1,46 @@
+{% extends "helpcenter/_help_base.html" %}
+
+{% block help_h1 %}Refunds{% endblock %}
+
+{% block help_body %}
+<p class="text-secondary">Refunds reverse some or all of a payment. EZ360PM keeps invoice balances, client credit, and journals consistent when a refund is recorded.</p>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="fw-semibold mb-2">Who can issue refunds?</div>
+    <ul class="mb-0">
+      <li><span class="fw-semibold">Manager+</span>: can create refunds and post accounting entries.</li>
+      <li><span class="fw-semibold">Staff</span>: typically view-only.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="fw-semibold mb-2">Refund workflow (recommended)</div>
+    <ol class="mb-0">
+      <li>Open the invoice (or payment) you need to refund.</li>
+      <li>Click <span class="fw-semibold">Refund</span>.</li>
+      <li>Enter the refund amount in dollars (e.g. <span class="fw-semibold">$50.00</span>).</li>
+      <li>Save the refund.</li>
+      <li>Confirm the invoice updates (paid/partial/unpaid) and accounting journals remain balanced.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="fw-semibold mb-2">How accounting is handled</div>
+    <ul class="mb-0">
+      <li>Refund posting uses <span class="fw-semibold">integer-safe proration</span> to allocate between A/R and credit effects (no float drift).</li>
+      <li>Ops-grade invariants checks will warn if refund sums don’t match snapshots.</li>
+      <li>Refunds are tied to a Payment record for traceability.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="alert alert-warning mb-0">
+  <div class="fw-semibold">Important</div>
+  Always confirm the refund amount does not exceed the refundable remainder of the payment.
+</div>
+{% endblock %}
