@@ -37,7 +37,7 @@
       <tbody>
         {% for v in vendors %}
           <tr>
-            <td class="fw-semibold">{{ v.name }}</td>
+            <td class="fw-semibold"><a class="text-decoration-none" href="{% url 'payables:vendor_detail' v.pk %}">{{ v.name }}</a></td>
             <td>{{ v.email|default:"—" }}</td>
             <td>{{ v.phone|default:"—" }}</td>
             <td>

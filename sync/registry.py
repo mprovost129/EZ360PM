@@ -5,7 +5,8 @@ from typing import Dict, Type
 from django.db import models
 
 from companies.models import Company, EmployeeProfile
-from crm.models import Client, ClientPhone, Vendor
+from crm.models import Client, ClientPhone
+from payables.models import Vendor
 from catalog.models import CatalogItem
 from documents.models import Document, DocumentLineItem, DocumentTemplate, NumberingScheme
 from projects.models import Project, ProjectService
@@ -43,4 +44,8 @@ def sync_model_registry() -> Dict[str, Type[models.Model]]:
         AuditEvent,
     ]
 
-    return {f"{m._meta.app_label}.{m.__name__}": m for m in items}
+    registry = {f"{m._meta.app_label}.{m.__name__}": m for m in items}
+
+    # Back-compat: older clients may still request 'crm.Vendor'
+    registry.setdefault("crm.Vendor", Vendor)
+    return registry

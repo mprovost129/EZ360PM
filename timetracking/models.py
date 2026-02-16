@@ -72,6 +72,33 @@ class TimeEntry(SyncModel):
             ),
         ]
 
+    def clean(self):
+        """Enforce project-driven client linkage.
+
+        Policy:
+        - If project is set, client must match project.client.
+        - If client is set without project, we allow it for legacy/manual entries.
+        """
+        super().clean()
+        if self.project_id:
+            proj_client_id = getattr(self.project, "client_id", None)
+            if proj_client_id:
+                if self.client_id and self.client_id != proj_client_id:
+                    from django.core.exceptions import ValidationError
+                    raise ValidationError({"project": "Project client does not match selected client."})
+                self.client_id = proj_client_id
+
+    def save(self, *args, **kwargs):
+        # Keep client aligned to project.
+        if self.project_id:
+            try:
+                proj_client_id = getattr(self.project, "client_id", None)
+                if proj_client_id:
+                    self.client_id = proj_client_id
+            except Exception:
+                pass
+        return super().save(*args, **kwargs)
+
 
 class TimeEntryService(SyncModel):
     """
@@ -105,6 +132,26 @@ class TimerState(SyncModel):
     service_name = models.CharField(max_length=200, blank=True, default="")
 
     note = models.TextField(blank=True, default="")
+
+    def clean(self):
+        super().clean()
+        if self.project_id:
+            proj_client_id = getattr(self.project, "client_id", None)
+            if proj_client_id:
+                if self.client_id and self.client_id != proj_client_id:
+                    from django.core.exceptions import ValidationError
+                    raise ValidationError({"project": "Project client does not match selected client."})
+                self.client_id = proj_client_id
+
+    def save(self, *args, **kwargs):
+        if self.project_id:
+            try:
+                proj_client_id = getattr(self.project, "client_id", None)
+                if proj_client_id:
+                    self.client_id = proj_client_id
+            except Exception:
+                pass
+        return super().save(*args, **kwargs)
 
 
 class TimeEntryMode(models.TextChoices):

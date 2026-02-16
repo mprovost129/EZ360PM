@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from core.admin_mixins import IncludeSoftDeletedAdminMixin
 
-from .models import Client, ClientPhone, Vendor, ClientImportBatch, ClientImportMapping
+from .models import Client, ClientPhone, ClientImportBatch, ClientImportMapping
 
 
 class ClientPhoneInline(admin.TabularInline):
@@ -17,12 +17,6 @@ class ClientAdmin(IncludeSoftDeletedAdminMixin, admin.ModelAdmin):
     search_fields = ("company_name", "first_name", "last_name", "email")
     inlines = [ClientPhoneInline]
 
-
-@admin.register(Vendor)
-class VendorAdmin(IncludeSoftDeletedAdminMixin, admin.ModelAdmin):
-    list_display = ("name", "company", "email", "phone", "deleted_at")
-    list_filter = ("company",)
-    search_fields = ("name", "email", "phone")
 
 
 @admin.register(ClientImportBatch)

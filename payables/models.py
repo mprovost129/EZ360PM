@@ -199,3 +199,81 @@ class BillPayment(SyncModel):
         if self.bill_id and self.bill and not self.bill.is_posted:
             raise ValidationError("You can only record payments for a posted bill.")
         return super().save(*args, **kwargs)
+
+
+class BillAttachment(SyncModel):
+    """Private attachments for a Bill.
+
+    Storage is via private S3 media (direct upload) or local storage in dev.
+    We store the S3 object key (file_s3_key) instead of a FileField so we can
+    keep the bucket private and use presigned access later.
+    """
+
+    bill = models.ForeignKey(Bill, on_delete=models.CASCADE, related_name="attachments")
+    uploaded_by = models.ForeignKey(
+        EmployeeProfile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="bill_attachments_uploaded",
+    )
+
+    original_filename = models.CharField(max_length=240, blank=True, default="")
+    content_type = models.CharField(max_length=120, blank=True, default="")
+
+    # Private S3 key (e.g. private-media/bills/<company>/<bill>/<uuid>_file.pdf)
+    file_s3_key = models.CharField(max_length=512, blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["bill"]),
+        ]
+
+    def clean(self):
+        if not self.file_s3_key:
+            raise ValidationError("Missing file key.")
+
+
+class RecurringBillFrequency(models.TextChoices):
+    WEEKLY = "weekly", "Weekly"
+    MONTHLY = "monthly", "Monthly"
+    YEARLY = "yearly", "Yearly"
+
+
+class RecurringBillPlan(SyncModel):
+    """A recurring A/P bill template that generates Bills on a schedule.
+
+    NOTE: This is intentionally minimal (template + schedule). Each run generates a new draft Bill
+    (optionally auto-posted) with a single line item for the configured expense account + amount.
+    """
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="recurring_bill_plans")
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="recurring_bill_plans")
+
+    frequency = models.CharField(max_length=12, choices=RecurringBillFrequency.choices, default=RecurringBillFrequency.MONTHLY)
+
+    next_run = models.DateField(default=timezone.localdate)
+    is_active = models.BooleanField(default=True)
+    auto_post = models.BooleanField(default=False)
+
+    expense_account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="recurring_bill_plans")
+    amount_cents = models.IntegerField(default=0)
+
+    last_run_at = models.DateTimeField(null=True, blank=True)
+
+    created_by = models.ForeignKey(EmployeeProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name="recurring_bill_plans_created")
+
+    class Meta:
+        ordering = ["next_run", "vendor__name"]
+        indexes = [
+            models.Index(fields=["company", "is_active", "next_run"]),
+            models.Index(fields=["company", "vendor"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Recurring bill — {self.vendor} ({self.frequency})"
+
+    def clean(self):
+        if self.amount_cents < 0:
+            raise ValidationError("Amount cannot be negative.")

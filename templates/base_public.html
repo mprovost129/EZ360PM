@@ -57,6 +57,12 @@
   <footer class="border-top mt-5">
     <div class="container-fluid py-4" style="max-width: 1200px;">
       <div class="text-muted small">© {% now "Y" %} EZ360PM</div>
+      <div class="mt-2 small">
+        <a class="link-secondary text-decoration-none me-3" href="{% url 'helpcenter:terms' %}">Terms</a>
+        <a class="link-secondary text-decoration-none me-3" href="{% url 'helpcenter:privacy' %}">Privacy</a>
+        <a class="link-secondary text-decoration-none me-3" href="{% url 'helpcenter:cookies' %}">Cookies</a>
+        <a class="link-secondary text-decoration-none" href="{% url 'helpcenter:security' %}">Security</a>
+      </div>
     </div>
   </footer>
 

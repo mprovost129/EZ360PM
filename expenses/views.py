@@ -14,6 +14,7 @@ from .forms import ExpenseForm, MerchantForm
 from .models import Expense, ExpenseStatus, Merchant
 
 from core.pagination import paginate
+from core.services.private_media import build_private_access_url
 
 
 @require_min_role(EmployeeRole.MANAGER)
@@ -165,11 +166,9 @@ def expense_delete(request, pk):
 
 @require_min_role(EmployeeRole.MANAGER)
 def expense_receipt_open(request, pk):
-    """Open/download an expense receipt.
+    """Open/download an expense receipt (private media).
 
-    IMPORTANT:
-    - Receipts are stored in PrivateMediaStorage (S3 private bucket in production).
-    - We do NOT expose direct bucket URLs in templates; access is gated here.
+    Supports optional preview for PDFs/images via ?preview=1.
     """
 
     company = request.active_company
@@ -179,6 +178,17 @@ def expense_receipt_open(request, pk):
         messages.error(request, "No receipt is attached to that expense.")
         return redirect("expenses:expense_edit", pk=exp.id)
 
-    # For S3 private storage, exp.receipt.url will be a presigned URL.
-    # For local dev storage, it will be the MEDIA_URL path.
-    return redirect(exp.receipt.url)
+    preview = (request.GET.get("preview") or "").strip() in {"1", "true", "yes", "y", "on"}
+
+    url, err = build_private_access_url(
+        file_or_key=exp.receipt,
+        filename=None,
+        content_type=None,
+        preview=preview,
+    )
+    if not url:
+        messages.error(request, "Could not open that receipt.")
+        return redirect("expenses:expense_edit", pk=exp.id)
+
+    return redirect(url)
+

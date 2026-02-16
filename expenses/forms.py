@@ -3,7 +3,8 @@ from __future__ import annotations
 from django import forms
 from django.conf import settings
 
-from crm.models import Client, Vendor
+from crm.models import Client
+from payables.models import Vendor
 from projects.models import Project
 
 from .models import Expense, Merchant, ExpenseStatus

@@ -19,7 +19,6 @@ class TimeEntryForm(forms.ModelForm):
     class Meta:
         model = TimeEntry
         fields = [
-            "client",
             "project",
             "started_at",
             "ended_at",
@@ -33,7 +32,6 @@ class TimeEntryForm(forms.ModelForm):
             "duration_minutes": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
             "note": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "billable": forms.CheckboxInput(attrs={"class": "form-check-input"}),
-            "client": forms.Select(attrs={"class": "form-select"}),
             "project": forms.Select(attrs={"class": "form-select"}),
         }
 

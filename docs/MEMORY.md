@@ -1,3 +1,54 @@
+## 2026-02-15 — Phase 7G (Unified private media access + previews)
+**Done:**
+- Implemented shared private-media access helper: `core/services/private_media.py`
+  - Normalizes storage keys (handles storage.location prefixes).
+  - Generates presigned **download** URLs (attachment) and **preview** URLs (inline) for PDFs/images.
+  - Centralizes content-type guessing and previewability rules.
+- Added S3 presign helper for inline preview: `core.s3_presign.presign_private_view()`.
+- Updated private-media open endpoints to use shared helper (consistent behavior across modules):
+  - Expense receipts: `expenses:expense_receipt_open` supports `?preview=1`
+  - Project files: `projects:project_file_open` supports `?preview=1`
+  - Bill attachments: `payables:bill_attachment_download` supports `?preview=1`
+- Added template filter `previewable` (`core/templatetags/file_extras.py`) and UI links:
+  - Bills: Preview button shown for previewable attachments
+  - Project files: Preview button shown for previewable non-Dropbox files
+  - Expenses: Preview button shown for previewable receipts
+
+**Notes / Behavior:**
+- Preview is only enabled for PDFs and common image types; otherwise links fall back to download.
+- Authorization remains enforced by existing module views; we do not expose raw bucket URLs in templates.
+
+**Next:**
+- Phase 7H: expand A/P payments workflow (checks / vendor credits / payment batches) if pursuing QuickBooks parity, plus reconciliation UI updates.
+
+
+## 2026-02-15 — Phase 7F (Recurring Bills / A/P)
+**Done:**
+- Added `payables.RecurringBillPlan` with frequency (weekly/monthly/yearly), `next_run`, `is_active`, optional `auto_post`, vendor, expense account, and amount.
+- Manager UI under Payables:
+  - Recurring bills list
+  - Create / Edit / Delete
+  - **Run now** button to generate a bill immediately and advance the schedule.
+- Added recurring bill engine:
+  - `payables/services_recurring.py` with safe date math (month rollovers) and schedule advancement.
+  - Management command: `python manage.py run_recurring_bills [--company <uuid>]` to generate all due bills (next_run <= today).
+- Sidebar updated: “Recurring bills” under Payables.
+
+**Notes / Behavior:**
+- Each run generates a new Bill with a single line item (expense account + amount) and recalculates totals.
+- If `auto_post` is enabled, the generated bill is posted immediately.
+- Schedule advancement uses safe month/year rollover rules.
+
+**Next:**
+- Phase 7G: continue payables parity (expanded A/P payments workflow, credits/checks) and improve idempotency/traceability of recurring runs if needed.
+
+
+## 2026-02-15 — Phase 7E: Private media delete-on-remove + Project file open/delete
+- Added best-effort S3 object deletes when removing bill attachments and project files (configurable).
+- Implemented missing project file open/delete views and wired project files UI actions.
+- Added S3_DELETE_ON_REMOVE setting (default true) to control deletion behavior.
+
+
 # EZ360PM — Project Snapshot
 
 ## Snapshot 2026-02-13 — Phase 6D (S3 Direct Uploads + Project File Workflow)
@@ -620,3 +671,65 @@ Files: templates/base_app.html, templates/base_public.html, static/ui/ez360pm.cs
 - Recording a bill payment creates a Journal Entry (`source_type='bill_payment'`) that debits **Accounts Payable** and credits the selected cash/bank account.
 - Added sidebar nav entries: **Bills (A/P)** and **Vendors** (manager+).
 
+
+## 2026-02-15 — Phase 6T.1: Vendor unification + payables dashboard/ledger
+- Unified vendor concept: deprecated **crm.Vendor** and migrated data into **payables.Vendor** (UUIDs preserved).
+- Expenses now reference **payables.Vendor** so vendors are consistent across payables + expense tracking.
+- Added Vendor detail (ledger-style) page: open balance, recent payments, and bill history.
+- Added Dashboard Payables card: outstanding payables + due-soon count (7 days).
+- Sync registry now includes back-compat mapping for `crm.Vendor` → `payables.Vendor`.
+
+## Snapshot 2026-02-15 — Phase 7C (Payables: A/P Aging + Bill Attachments)
+
+### Shipped
+- Added **A/P Aging** report page + CSV export:
+  - `GET /payables/reports/ap-aging/`
+  - `GET /payables/reports/ap-aging.csv`
+- Bills list supports **Due soon** filter (next 7 days).
+- Vendor detail “New bill” button now preselects that vendor.
+- Added **BillAttachment** model + admin support (stores private `file_s3_key`).
+- Bill detail page supports **direct-to-S3 bill attachments** when `USE_S3=1` and `S3_DIRECT_UPLOADS=1`.
+- Storage presign supports new kind `bill_attachment` using keys:
+  - `private-media/bills/<company_id>/<bill_id>/<uuid>_<filename>`
+
+### Notes
+- This pack registers attachments after upload; secure download (presigned GET) is a follow-up pack.
+
+## 2026-02-15 — Phase 7D (Payables): secure bill attachment downloads
+- Added `core.s3_presign.presign_private_download()` for private-bucket presigned GET URLs.
+- Added `payables:bill_attachment_download` route and UI Download button on Bill detail attachments table.
+- Added `S3_PRESIGN_DOWNLOAD_EXPIRE_SECONDS` setting (default 120s).
+
+## 2026-02-15 — Phase 7G.1 Hotfix: Services admin link
+- Fixed a production 500 on **/projects/new/** caused by the admin reverse `admin:catalog_catalogitem_changelist` not resolving.
+- Root cause: **CatalogItem** existed but was **not registered in Django Admin**, so the admin URL name was missing.
+- Added `catalog/admin.py` registration for `CatalogItem` (list/search filters) so “Manage services” link works.
+
+## 2026-02-15 — Phase 7G1 (Help Center wiring + manual skeleton kickoff)
+**Done:**
+- Added Help Center + Legal routing into `config/urls.py` by including `helpcenter.urls`.
+- Updated top-nav Help button to route to `helpcenter:home`.
+- Confirmed 2FA policy is **optional** and controlled via company/employee settings (no role-forcing).
+
+**Found during static code check:**
+- Help Center existed but was unreachable (not included in root URLs) — now fixed.
+- Catalog/services exist (admin) but are not yet first-class UI for non-admin users.
+- TimeEntry model still contains both `client` and `project` fields; UX should remain project-driven with client derived.
+
+**Next focus:**
+- Expand Feature Inventory into full User Manual (role-by-role, feature-by-feature).
+- Add automated smoke/invariant checks beyond `ez360_smoke_test`.
+- Corporate polish pass (forms, dollars formatting, email templates, UX consistency, ops readiness).
+
+## 2026-02-15 — Phase 7G2 (Corporate polish: Catalog UI + project-driven time + money helpers)
+
+**Shipped:**
+- Added in-app **Catalog** UI (Manager+): list/search/filter + create/edit/delete.
+- Added `core.templatetags.money.money_cents` to standardize `$xx.xx` formatting for cent-based amounts.
+- Added `core.forms.money` helpers (parse dollars safely; cents conversion).
+- Payments: Decimal-safe dollars→cents conversion and $ placeholders.
+- Time tracking: enforce project-driven client alignment for `TimeEntry` and `TimerState` (auto-derive client; block mismatch).
+
+**Notes / Follow-ups:**
+- Still need to apply money formatting and $-input UX to invoices, expenses, bills, and accounting surfaces.
+- Still need to enforce TimeEntry state locks after Approved/Billed.

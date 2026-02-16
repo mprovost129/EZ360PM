@@ -1,3 +1,19 @@
+## 2026-02-15 — Private media deletion behavior
+- Private media (S3) deletions are **best-effort** and **configurable** via `S3_DELETE_ON_REMOVE`.
+- Records remain soft-deleted for audit/history even when the underlying object is removed.
+
+## 2026-02-15 — Unified private media access + preview
+
+- All private media access (receipts, project files, bill attachments) routes through a shared helper that:
+  - Generates **attachment** links by default.
+  - Generates **inline preview** links only for PDFs/images (via `?preview=1`).
+- Templates must not expose raw bucket URLs; they link to app routes which then redirect to presigned URLs.
+- When using S3, presigned preview uses `ResponseContentDisposition=inline`; downloads use `attachment`.
+
+
+
+
+
 # EZ360PM — Locked Decisions (Post Phase 3A)
 
 ## 2026-02-13 — Phase 6D: Direct-to-S3 uploads for private media
@@ -486,3 +502,64 @@ Rationale:
 - Posted bills are treated as **locked** (cannot edit header or lines); only payments can be added.
 - Overpayments are blocked at the service layer (payment amount cannot exceed current bill balance).
 
+
+## 2026-02-15 — Vendor model consolidation
+- There is a single Vendor model going forward: **payables.Vendor**.
+- `crm.Vendor` was removed to avoid duplicated concepts and reverse-relations collisions.
+- Vendor UUIDs are preserved during migration so existing FK values (e.g., expenses) remain valid after repointing.
+
+## 2026-02-15 — Payables attachments stored as private S3 keys
+- Bill attachments are stored as **private object keys** (`file_s3_key`) rather than public URLs or FileFields.
+- Uploads use the existing **presigned POST** mechanism; downloads will use presigned GET later.
+- Key convention: `private-media/bills/<company_id>/<bill_id>/<uuid>_<filename>`.
+
+## Payables
+- Vendors/Bills live in `payables` (A/P) and are company-scoped; posted bills are immutable.
+- Bill attachments are stored in the private S3 bucket and accessed via short-lived presigned GET URLs (no public bucket exposure).
+- Attachment removal is a soft-delete in the DB; S3 object deletion is optional and not required for correctness.
+
+
+## 2026-02-15 — Recurring Bills (A/P) scheduling
+- Recurring A/P bills are modeled as `payables.RecurringBillPlan` (weekly/monthly/yearly) with `next_run`, `is_active`, and optional `auto_post`.
+- Generating bills:
+  - Each run creates a new Bill with a single line item (expense account + configured amount).
+  - Default due_date is the run date; user may edit after generation.
+  - When `auto_post` is enabled, the bill is posted automatically.
+- Date math must be safe:
+  - Month rollovers clamp to the last day of the target month (e.g., Jan 31 → Feb 28/29).
+  - Year rollovers handle leap day safely (Feb 29 → Feb 28 on non-leap years).
+- Operations:
+  - `Run now` is a forced generation action available to Managers.
+  - `run_recurring_bills` management command generates all due bills (next_run <= today), with optional company filter.
+
+## 2026-02-15 — Admin URL reverses in templates
+- If a template uses an admin reverse like `admin:<app>_<model>_changelist`, the model **must** be registered in that app’s `admin.py`.
+- For the Service Catalog, we keep the “Manage services” link pointing to the Admin changelist for speed, so `catalog.CatalogItem` is registered.
+
+## 2026-02-15 — 2FA policy is optional and company-enforced
+- 2FA is **optional** platform-wide.
+- Enforcement is controlled by company settings and/or per-employee flags:
+  - `Company.require_2fa_for_all`
+  - `Company.require_2fa_for_admins_managers`
+  - `Employee.force_2fa`
+- When required, users are step-up challenged on company-scoped pages.
+
+## 2026-02-15 — 2FA is optional; enforced only via settings
+
+- 2FA is optional platform-wide.
+- Enforcement occurs only through:
+  - `Company.require_2fa_for_all`
+  - `Company.require_2fa_for_admins_managers`
+  - `EmployeeProfile.force_2fa`
+- There is no automatic role-based forcing outside of those settings.
+
+## 2026-02-15 — Time tracking is project-driven (client derived)
+
+- If a project is selected on a time entry (or timer state), the client is derived from `project.client`.
+- Mismatched project/client combinations are blocked.
+- Legacy/manual entries may set client without a project for backward compatibility.
+
+## 2026-02-15 — Catalog is first-class in-app (Manager+)
+
+- Catalog Items (Services/Products) are manageable in-app for Manager+.
+- Admin remains available, but day-to-day operations should not depend on Django admin.

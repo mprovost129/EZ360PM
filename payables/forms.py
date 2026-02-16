@@ -4,7 +4,7 @@ from django import forms
 
 from accounting.models import Account, AccountType
 
-from .models import Vendor, Bill, BillLineItem, BillPayment
+from .models import Vendor, Bill, BillLineItem, BillPayment, RecurringBillPlan
 
 
 class VendorForm(forms.ModelForm):
@@ -180,6 +180,57 @@ class BillPaymentForm(forms.ModelForm):
 
     def save(self, commit=True):
         obj: BillPayment = super().save(commit=False)
+        obj.amount_cents = int(self.cleaned_data.get("amount_cents") or 0)
+        if commit:
+            obj.save()
+        return obj
+
+
+
+class RecurringBillPlanForm(forms.ModelForm):
+    amount_dollars = forms.DecimalField(
+        required=True,
+        min_value=0,
+        decimal_places=2,
+        max_digits=12,
+        label="Amount",
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+    )
+
+    class Meta:
+        model = RecurringBillPlan
+        fields = ["vendor", "expense_account", "frequency", "next_run", "is_active", "auto_post"]
+        widgets = {
+            "vendor": forms.Select(attrs={"class": "form-select"}),
+            "expense_account": forms.Select(attrs={"class": "form-select"}),
+            "frequency": forms.Select(attrs={"class": "form-select"}),
+            "next_run": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "auto_post": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+
+    def __init__(self, *args, company=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if company is not None:
+            self.fields["vendor"].queryset = Vendor.objects.filter(company=company, is_active=True, deleted_at__isnull=True).order_by("name")
+            self.fields["expense_account"].queryset = Account.objects.filter(company=company, type=AccountType.EXPENSE, is_active=True, deleted_at__isnull=True).order_by("code", "name")
+
+        inst: RecurringBillPlan | None = kwargs.get("instance")
+        if inst is not None:
+            self.fields["amount_dollars"].initial = (inst.amount_cents or 0) / 100
+
+    def clean(self):
+        cleaned = super().clean()
+        amt = cleaned.get("amount_dollars")
+        try:
+            cents = int(round(float(amt) * 100)) if amt is not None else 0
+        except Exception:
+            cents = 0
+        cleaned["amount_cents"] = max(cents, 0)
+        return cleaned
+
+    def save(self, commit=True):
+        obj: RecurringBillPlan = super().save(commit=False)
         obj.amount_cents = int(self.cleaned_data.get("amount_cents") or 0)
         if commit:
             obj.save()

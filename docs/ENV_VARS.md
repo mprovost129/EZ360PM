@@ -162,7 +162,8 @@ Fallback (single bucket): `AWS_STORAGE_BUCKET_NAME`
 
 - `S3_DIRECT_UPLOADS` (0/1) — enable browser direct uploads to S3 using presigned POST.
 - `S3_PRESIGN_MAX_SIZE_MB` — max upload size enforced by the presigned policy.
-- `S3_PRESIGN_EXPIRE_SECONDS` — presigned policy expiry.
+- `S3_PRESIGN_EXPIRE_SECONDS
+S3_PRESIGN_DOWNLOAD_EXPIRE_SECONDS` — presigned policy expiry.
 
 See `docs/MEDIA_STORAGE.md` for required bucket CORS configuration.
 

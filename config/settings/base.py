@@ -343,7 +343,11 @@ S3_PRIVATE_MEDIA_EXPIRE_SECONDS = int(_getenv("S3_PRIVATE_MEDIA_EXPIRE_SECONDS",
 
 S3_DIRECT_UPLOADS = _getenv_bool("S3_DIRECT_UPLOADS", False)
 S3_PRESIGN_EXPIRE_SECONDS = int(_getenv("S3_PRESIGN_EXPIRE_SECONDS", "120") or "120")
+S3_PRESIGN_DOWNLOAD_EXPIRE_SECONDS = int(_getenv("S3_PRESIGN_DOWNLOAD_EXPIRE_SECONDS", "120") or "120")
 S3_PRESIGN_MAX_SIZE_MB = int(_getenv("S3_PRESIGN_MAX_SIZE_MB", "50") or "50")
+
+# Best-effort deletes when removing private media references (attachments/files).
+S3_DELETE_ON_REMOVE = _getenv_bool("S3_DELETE_ON_REMOVE", default=True)
 
 STORAGES: dict[str, dict[str, str] | dict[str, object]] = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},

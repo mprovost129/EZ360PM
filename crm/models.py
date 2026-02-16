@@ -62,19 +62,6 @@ class ClientPhone(SyncModel):
         indexes = [models.Index(fields=["client"])]
 
 
-class Vendor(SyncModel):
-    """
-    Contractors / vendors (distinct from employees).
-    """
-    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="vendors")
-    name = models.CharField(max_length=160)
-    email = models.EmailField(blank=True, default="")
-    phone = models.CharField(max_length=40, blank=True, default="")
-    notes = models.TextField(blank=True, default="")
-
-    class Meta:
-        indexes = [models.Index(fields=["company", "name"])]
-
 
 class ClientImportBatch(models.Model):
     """Temporary storage for client CSV imports.

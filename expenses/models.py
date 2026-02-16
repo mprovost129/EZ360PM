@@ -7,7 +7,8 @@ from core.storages import PrivateMediaStorage
 
 from core.models import SyncModel
 from companies.models import Company, EmployeeProfile
-from crm.models import Client, Vendor
+from crm.models import Client
+from payables.models import Vendor
 from projects.models import Project
 
 

@@ -181,7 +181,7 @@
             <i class="bi bi-shield-lock"></i>
           </a>
           {% endif %}
-          <a class="btn btn-outline-secondary btn-sm" href="{% url 'accounting:home' %}" title="Help (coming soon)">
+          <a class="btn btn-outline-secondary btn-sm" href="{% url 'helpcenter:home' %}" title="Help Center">
             <i class="bi bi-question-circle"></i>
           </a>
 
@@ -316,9 +316,17 @@
               <span class="nav-icon"><i class="bi bi-building"></i></span>
               Vendors
             </a>
+            <a class="sidebar-link" href="{% if is_manager %}{% url 'payables:recurring_bill_plan_list' %}{% else %}#{% endif %}" {% if not is_manager %}title="Manager access required"{% endif %}>
+              <span class="nav-icon"><i class="bi bi-arrow-repeat"></i></span>
+              Recurring bills
+            </a>
             <a class="sidebar-link" href="{% url 'projects:project_list' %}">
               <span class="nav-icon"><i class="bi bi-kanban"></i></span>
               Projects
+            </a>
+            <a class="sidebar-link" href="{% if is_manager %}{% url 'catalog:item_list' %}{% else %}#{% endif %}" {% if not is_manager %}title="Manager access required"{% endif %}>
+              <span class="nav-icon"><i class="bi bi-box-seam"></i></span>
+              Catalog
             </a>
             <a class="sidebar-link" href="{% url 'timetracking:entry_list' %}">
               <span class="nav-icon"><i class="bi bi-stopwatch"></i></span>

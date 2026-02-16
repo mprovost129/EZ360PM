@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal, ROUND_HALF_UP
 
 from django import forms
 
@@ -36,7 +37,11 @@ class PaymentForm(forms.ModelForm):
                 self.fields[name].widget.attrs.setdefault("class", "form-control")
 
         if self.instance and self.instance.pk:
-            self.fields["amount_dollars"].initial = (self.instance.amount_cents or 0) / 100
+            self.fields["amount_dollars"].initial = (Decimal(int(self.instance.amount_cents or 0)) / Decimal('100')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+        self.fields["amount_dollars"].widget.attrs.setdefault("class", "form-control")
+        self.fields["amount_dollars"].widget.attrs.setdefault("placeholder", "$0.00")
+        self.fields["amount_dollars"].widget.attrs.setdefault("step", "0.01")
 
     def clean(self):
         data = super().clean()
@@ -48,7 +53,8 @@ class PaymentForm(forms.ModelForm):
     def save(self, commit=True):
         inst: Payment = super().save(commit=False)
         dollars = self.cleaned_data.get("amount_dollars")
-        inst.amount_cents = int(round(float(dollars or 0) * 100))
+        amt = Decimal(dollars or 0).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        inst.amount_cents = int((amt * Decimal('100')).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
         if commit:
             inst.save()
         return inst
@@ -79,7 +85,7 @@ class PaymentRefundForm(forms.Form):
         amt = cleaned.get("amount_dollars")
         if amt is None:
             return cleaned
-        cents = int(round(float(amt) * 100))
+        cents = int((Decimal(amt).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) * Decimal('100')).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
         refundable = max(0, int(self.payment.amount_cents or 0) - int(self.payment.refunded_cents or 0))
         if cents <= 0:
             raise forms.ValidationError("Refund amount must be greater than $0.00.")

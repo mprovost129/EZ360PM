@@ -1,3 +1,14 @@
+## 2026-02-15 — Phase 7G complete
+**Done:**
+- Unified private download/open link behavior across receipts, project files, and bill attachments via shared helper (`core/services/private_media.py`).
+- Added optional inline preview for PDFs/images using presigned S3 URLs (`?preview=1`), plus UI Preview buttons where applicable.
+
+**Next:**
+- Phase 7H: A/P payments workflow expansion (checks / vendor credits) if matching QuickBooks parity.
+- Phase 7I: tighten financial audit trails around payables (payment posting, void/reversal workflows) and reporting parity.
+
+
+
 # EZ360PM Roadmap (Locked After Phase 3A Layer 2)
 
 
@@ -39,6 +50,10 @@
 - **6P** Monitoring gate: Ops Probes (Sentry test error + test alert) + launch check evidence
 - **6R1** UI/Perf hardening: invoice reconciliation CTA + staff clients subquery optimization
 - **6S** 2FA policy optional (admin-configurable only) + Projects performance indexes (assignee/client/updated)
+- **7A** Accounts Payable foundation (new payables app: Vendors, Bills, Bill Payments, auto-posting)
+- **7B** Vendor unification + vendor ledger + dashboard payables widget
+- **7C** A/P Aging report (UI+CSV) + Bill attachments (direct-to-S3 private keys)
+- **7D** Secure bill attachment downloads (presigned GET) + UI download action
 
 ### Next (Planned)
 - **Backup & Recovery Gate**: automated DB backups on Render, retention policy verified, and a documented restore test.
@@ -367,3 +382,65 @@ Next (Phase 4C):
 - Payment batching: "Pay bills" screen (select multiple bills), check printing export.
 - Aging report for A/P (by vendor, due buckets).
 
+
+## 2026-02-15 — Next: Payables Phase 7B/7C
+- Add A/P Aging report page + export (CSV) and link from Reports.
+- Add Bills 'due soon' quick filter and status chips.
+- Add Vendor → New Bill shortcut + vendor filter on Bills list.
+- Add bill attachment support (S3 private) if required (optional).
+
+### Payables (Accounts Payable) — Next
+- Add **Bill attachment downloads** (presigned GET) + optional in-app preview for PDFs/images.
+- Add **Vendor 1099 tracking** (vendor type, tax ID storage w/ PII guardrails).
+- Add **Recurring bills** (templates + schedule) and bulk posting.
+- Expand reporting: cashflow view, spend by vendor/category.
+
+### 2026-02-15 — Phase 7G.1 (Done)
+- [x] Fix `/projects/new/` 500: register `catalog.CatalogItem` in Django Admin so `admin:catalog_catalogitem_changelist` resolves.
+
+## 2026-02-15 — Phase 7G1 (Manual skeleton + Help Center routing fix)
+**Done:**
+- Wired Help Center + Legal URLs into root routing (`helpcenter.urls` now included).
+- Updated app top-nav Help icon to open the Help Center.
+
+**Next (corporate-grade hardening & polish):**
+1) **Manual + QA**
+   - Expand `docs/FEATURE_INVENTORY.md` into full “User Manual + QA Plan”.
+   - Add acceptance checks per feature and role.
+2) **UX consistency**
+   - Enforce `$xx.xx` formatting for all money inputs (forms + templates + admin displays).
+   - Normalize select inputs (state dropdown, service selectors) to match Bootstrap styling.
+   - Ensure timer dropdown supports project→service→notes and removes redundant client selection.
+3) **Catalog as first-class**
+   - Add in-app CRUD UI for Catalog Items (Manager/Admin), plus safe search and “add service on the fly”.
+4) **Time tracking correctness**
+   - Make TimeEntry project-driven (derive client from project; prevent mismatched client/project).
+   - Expand approval workflow checks (who can approve, editing rules after approval/billing).
+5) **Email deliverability + templates**
+   - Standardize transactional email templates (brand header/footer, accessibility, plain-text fallback).
+   - Verify SMTP/provider config and bounce handling.
+6) **Ops readiness**
+   - Add a “production readiness” checklist command (static checks, migrations sanity, required env vars).
+   - Add structured logging for request_id across modules.
+   - Add backup/restore drill doc + automated DB dump hooks (if not already).
+7) **Security posture**
+   - Confirm 2FA is optional but fully enforceable via company settings.
+   - Ensure rate-limits on login, password reset, and public endpoints.
+   - Confirm CSRF/secure cookie flags per environment.
+
+## 2026-02-15 — Phase 7G2 (Corporate polish: Catalog UI + TimeEntry project-driven + money formatting)
+**Done:**
+- Added in-app **Catalog** (Manager+) with list/search/filter + create/edit/delete.
+- Added global money formatting helper (`money_cents` template filter) and money parsing helpers.
+- Payment forms now use Decimal-safe dollars→cents conversion and show $ placeholders.
+- Time tracking now enforces **project-driven client** (client is derived from project; mismatch blocked).
+
+**Next (Phase 7G3 candidates):**
+1) Apply money formatting + $ input UX to **all** money surfaces:
+   - Project hourly/flat rates, invoice line items, expenses, bills, COA/journals readouts.
+2) Tighten TimeEntry state rules:
+   - Lock edits after Approved/Billed; enforce approve/bill permissions; add manager approval UI.
+3) Catalog “add on the fly”:
+   - From timer + from invoice line item picker.
+4) Smoke test expansion:
+   - Add invariants for posting idempotency, A/R aging math, partial payments/credits.

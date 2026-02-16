@@ -24,7 +24,7 @@ def presign_upload(request):
     - Manager+ only
 
     POST JSON:
-      {"kind": "expense_receipt"|"project_file", "filename": "...", "content_type": "...", "project_id": "..."}
+      {"kind": "expense_receipt"|"project_file"|"bill_attachment", "filename": "...", "content_type": "...", "project_id": "...", "bill_id": "..."}
 
     Response JSON:
       {"url": "...", "fields": {...}, "key": "..."}
@@ -42,8 +42,9 @@ def presign_upload(request):
     filename = (payload.get("filename") or "").strip()
     content_type = (payload.get("content_type") or "").strip()
     project_id = (payload.get("project_id") or "").strip() or None
+    bill_id = (payload.get("bill_id") or "").strip() or None
 
-    if kind not in {"expense_receipt", "project_file"}:
+    if kind not in {"expense_receipt", "project_file", "bill_attachment"}:
         return JsonResponse({"error": "invalid_kind"}, status=400)
     if not filename:
         return JsonResponse({"error": "missing_filename"}, status=400)
@@ -51,7 +52,7 @@ def presign_upload(request):
     company = request.active_company
 
     try:
-        key = build_private_key(kind, company_id=str(company.id), project_id=project_id, filename=filename)
+        key = build_private_key(kind, company_id=str(company.id), project_id=project_id, bill_id=bill_id, filename=filename)
         res = presign_private_upload(key=key, filename=filename, content_type=content_type or None)
     except Exception as e:
         return JsonResponse({"error": "presign_failed", "detail": str(e)}, status=400)

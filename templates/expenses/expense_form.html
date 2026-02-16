@@ -1,5 +1,5 @@
 {% extends "base_app.html" %}
-{% load static %}
+{% load static %} file_extras
 
 {% block title %}{% if mode == 'edit' %}Edit Expense{% else %}New Expense{% endif %} · EZ360PM{% endblock %}
 
@@ -68,6 +68,9 @@
           {{ form.receipt }}
           {% if mode == 'edit' and expense.receipt %}
             <div class="mt-2">
+              {% if expense.receipt.name|previewable %}
+              <a class="btn btn-sm btn-outline-secondary me-2" href="{% url 'expenses:expense_receipt_open' expense.id %}?preview=1" target="_blank" rel="noopener"><i class="bi bi-eye me-1"></i>Preview</a>
+              {% endif %}
               <a class="btn btn-sm btn-outline-secondary" href="{% url 'expenses:expense_receipt_open' expense.id %}" target="_blank" rel="noopener">
                 <i class="bi bi-paperclip me-1"></i>Open current receipt
               </a>

@@ -8,6 +8,7 @@ from django.conf import settings
 from django.db.models import Q, Sum
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
+from django.http import FileResponse
 
 from audit.services import log_event
 from companies.decorators import company_context_required, require_min_role
@@ -15,6 +16,8 @@ from companies.models import EmployeeRole
 from timetracking.models import TimeEntry, TimeStatus
 
 from core.pagination import paginate
+from core.services.private_media import build_private_access_url
+from core.s3_presign import delete_private_object
 
 from integrations.models import DropboxConnection, IntegrationConfig
 from integrations.services import (
@@ -374,13 +377,25 @@ def project_file_open(request, pk, file_id):
         messages.error(request, "You do not have access to that project.")
         return redirect("projects:project_list")
 
+    preview = (request.GET.get("preview") or "").strip() in {"1", "true", "yes", "y", "on"}
+
     if pf.dropbox_shared_url:
-        # Force download/open via Dropbox by setting dl=1 when possible
+        # Force download/open via Dropbox by setting dl=1 when possible.
+        # NOTE: Dropbox decides whether it can inline-preview based on type and headers.
         url = pf.dropbox_shared_url
         if "dl=0" in url:
             url = url.replace("dl=0", "dl=1")
-        elif "?" not in url:
-            url = url + "?dl=1"
+        elif "dl=1" not in url:
+            if "?" in url:
+                url = url + "&dl=1"
+            else:
+                url = url + "?dl=1"
         return redirect(url)
 
-    return redirect(pf.file.url)
+    url, err = build_private_access_url(file_or_key=pf.file, preview=preview)
+    if not url:
+        messages.error(request, "Could not open that file.")
+        return redirect("projects:project_files", pk=project.pk)
+
+    return redirect(url)
+

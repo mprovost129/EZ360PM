@@ -28,7 +28,14 @@ class PresignResult:
     key: str
 
 
-def build_private_key(kind: str, *, company_id: str, filename: str, project_id: Optional[str] = None) -> str:
+def build_private_key(
+    kind: str,
+    *,
+    company_id: str,
+    filename: str,
+    project_id: Optional[str] = None,
+    bill_id: Optional[str] = None,
+) -> str:
     """Build an S3 object key inside the private media location.
 
     NOTE: We intentionally include a UUID to avoid collisions.
@@ -44,6 +51,11 @@ def build_private_key(kind: str, *, company_id: str, filename: str, project_id: 
         if not project_id:
             raise ValueError("project_id_required")
         return f"{loc}/projects/{company_id}/{project_id}/{uid}_{safe}"
+
+    if kind == "bill_attachment":
+        if not bill_id:
+            raise ValueError("bill_id_required")
+        return f"{loc}/bills/{company_id}/{bill_id}/{uid}_{safe}"
 
     raise ValueError("invalid_kind")
 
@@ -107,3 +119,95 @@ def presign_private_upload(*, key: str, filename: str, content_type: Optional[st
     )
 
     return PresignResult(url=res["url"], fields=res["fields"], key=key)
+
+
+
+def presign_private_download(*, key: str, filename: str | None = None, content_type: Optional[str] = None) -> str:
+    """Generate a presigned GET URL for downloading from the PRIVATE bucket.
+
+    We force an attachment disposition so browsers download with a friendly filename.
+    """
+
+    bucket = getattr(settings, "S3_PRIVATE_MEDIA_BUCKET", "") or getattr(settings, "AWS_STORAGE_BUCKET_NAME", "")
+    if not bucket:
+        raise RuntimeError("missing_private_bucket")
+
+    expires = int(getattr(settings, "S3_PRESIGN_DOWNLOAD_EXPIRE_SECONDS", 120) or 120)
+
+    safe = _safe_filename(filename or "file")
+    params: Dict[str, Any] = {
+        "Bucket": bucket,
+        "Key": key,
+        "ResponseContentDisposition": f'attachment; filename="{safe}"',
+    }
+    ct = (content_type or "").strip()
+    if ct:
+        params["ResponseContentType"] = ct
+
+    client = _boto3_client()
+    url = client.generate_presigned_url(
+        ClientMethod="get_object",
+        Params=params,
+        ExpiresIn=expires,
+    )
+    return url
+
+
+def presign_private_view(*, key: str, filename: str | None = None, content_type: Optional[str] = None) -> str:
+    """Generate a presigned GET URL for *previewing* an object from the PRIVATE bucket.
+
+    This uses an **inline** content disposition so browsers can render PDFs/images.
+    For non-previewable types, callers should prefer presign_private_download().
+    """
+
+    bucket = getattr(settings, "S3_PRIVATE_MEDIA_BUCKET", "") or getattr(settings, "AWS_STORAGE_BUCKET_NAME", "")
+    if not bucket:
+        raise RuntimeError("missing_private_bucket")
+
+    expires = int(getattr(settings, "S3_PRESIGN_DOWNLOAD_EXPIRE_SECONDS", 120) or 120)
+
+    safe = _safe_filename(filename or "file")
+    params: Dict[str, Any] = {
+        "Bucket": bucket,
+        "Key": key,
+        "ResponseContentDisposition": f'inline; filename="{safe}"',
+    }
+    ct = (content_type or "").strip()
+    if ct:
+        params["ResponseContentType"] = ct
+
+    client = _boto3_client()
+    url = client.generate_presigned_url(
+        ClientMethod="get_object",
+        Params=params,
+        ExpiresIn=expires,
+    )
+    return url
+
+
+def delete_private_object(*, key: str) -> bool:
+    """Best-effort delete of a private media object.
+
+    Returns True if a delete call was issued, False if it was skipped due to config.
+
+    We intentionally swallow S3 errors because deletes should not break core workflows.
+    """
+    key = (key or "").strip()
+    if not key:
+        return False
+
+    if not getattr(settings, "USE_S3", False):
+        return False
+    if not getattr(settings, "S3_DELETE_ON_REMOVE", False):
+        return False
+
+    bucket = getattr(settings, "S3_PRIVATE_MEDIA_BUCKET", "") or getattr(settings, "AWS_STORAGE_BUCKET_NAME", "")
+    if not bucket:
+        return False
+
+    try:
+        client = _boto3_client()
+        client.delete_object(Bucket=bucket, Key=key)
+        return True
+    except Exception:
+        return False

@@ -47,19 +47,21 @@ def company_context_required(view_func: F) -> F:
         request.active_employee = employee
 
         # -----------------------------
-        # 2FA enforcement (Hardening Phase 1)
+        # 2FA enforcement (Company-controlled)
         #
         # Policy:
-        # - Always require 2FA for company Admin/Owner roles.
-        # - Additionally require 2FA if company flags indicate so.
-        # - Employee.force_2fa always wins.
+        # - 2FA is OPTIONAL platform-wide.
+        # - Enforcement is controlled by company settings and/or per-employee flags.
+        # - If required, we enforce as a step-up challenge on company-scoped pages.
         #
-        # We enforce as a step-up challenge on company-scoped pages.
+        # Settings:
+        # - Company.require_2fa_for_all
+        # - Company.require_2fa_for_admins_managers
+        # - Employee.force_2fa
         # -----------------------------
         try:
             role = getattr(employee, "role", None)
-            # Role-based forcing removed: enforcement is admin-configurable only.
-            require_admin_owner = False
+            # Enforcement is controlled by company settings and/or per-employee flags.
             require_company_all = bool(getattr(company, "require_2fa_for_all", False))
             require_company_admin_mgr = bool(getattr(company, "require_2fa_for_admins_managers", False)) and role in {
                 EmployeeRole.MANAGER,
