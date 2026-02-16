@@ -16,7 +16,8 @@
 </head>
 
 <body>
-  <div id="sidebarOverlay"></div>
+  <a class="skip-link" href="#main">Skip to content</a>
+<div id="sidebarOverlay"></div>
   <div class="app-shell">
     <!-- Top navbar (sitewide navigation + search/notifications/help/profile) -->
     <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom ez-topbar">
@@ -228,7 +229,7 @@
         <div class="p-3">
           <!-- Company dropdown -->
           <div class="dropdown mb-3">
-            <button class="btn btn-outline-dark w-100 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <button id="companyDropdownToggle" class="btn btn-outline-ez w-100 text-start d-flex justify-content-between align-items-center" type="button" aria-expanded="false" aria-controls="companyDropdownMenu" data-ez-dropdown="1">
               <span class="text-truncate">
                 {% if active_company %}
                   <strong>{{ active_company.name }}</strong>
@@ -238,13 +239,13 @@
               </span>
               <i class="bi bi-chevron-down"></i>
             </button>
-            <ul class="dropdown-menu w-100">
+            <ul id="companyDropdownMenu" class="dropdown-menu w-100">
               {% for c in user_companies %}
                 <li>
                   <form method="post" action="{% url 'companies:set_active' %}" class="px-2 py-1">
                     {% csrf_token %}
                     <input type="hidden" name="company_id" value="{{ c.id }}">
-                    <button class="btn btn-sm w-100 text-start {% if active_company and c.id == active_company.id %}btn-dark{% else %}btn-outline-dark{% endif %}" type="submit">
+                    <button class="btn btn-sm w-100 text-start {% if active_company and c.id == active_company.id %}btn-ez{% else %}btn-outline-ez{% endif %}" type="submit">
                       {{ c.name }}
                     </button>
                   </form>
@@ -305,6 +306,15 @@
             <a class="sidebar-link" href="{% url 'expenses:expense_list' %}">
               <span class="nav-icon"><i class="bi bi-cash-coin"></i></span>
               Expenses
+            </a>
+
+            <a class="sidebar-link" href="{% if is_manager %}{% url 'payables:bill_list' %}{% else %}#{% endif %}" {% if not is_manager %}title="Manager access required"{% endif %}>
+              <span class="nav-icon"><i class="bi bi-receipt"></i></span>
+              Bills (A/P)
+            </a>
+            <a class="sidebar-link" href="{% if is_manager %}{% url 'payables:vendor_list' %}{% else %}#{% endif %}" {% if not is_manager %}title="Manager access required"{% endif %}>
+              <span class="nav-icon"><i class="bi bi-building"></i></span>
+              Vendors
             </a>
             <a class="sidebar-link" href="{% url 'projects:project_list' %}">
               <span class="nav-icon"><i class="bi bi-kanban"></i></span>
@@ -385,7 +395,7 @@
         </div>
       </aside>
 
-      <main class="app-main">
+      <main id="main" class="app-main" tabindex="-1">
         <div class="container-fluid py-3" style="max-width: 1200px;">
           {% if messages %}
             <div class="mb-3">

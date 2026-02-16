@@ -1,0 +1,242 @@
+/* EZ360PM UI theme + responsive shell
+   - Blue/Green brand tokens
+   - Light/Dark toggle via [data-theme]
+   - Sidebar collapses on mobile; scrolls when overflow
+*/
+
+:root{
+  --ez-blue: #1f5fbf;
+  --ez-blue-2: #184c9b;
+  --ez-green: #38b26f;
+  --ez-green-2: #2a8a55;
+
+  --ez-bg: #ffffff;
+  --ez-surface: #ffffff;
+  --ez-muted-bg: #f8fafc;
+  --ez-border: #e5e7eb;
+
+  --ez-text: #0f172a;
+  --ez-text-muted: #64748b;
+
+  --ez-link: var(--ez-blue);
+  --ez-link-hover: var(--ez-blue-2);
+
+  --topbar-h: 56px;
+  --sidebar-w: 270px;
+}
+
+/* Dark theme */
+html[data-theme="dark"]{
+  --ez-bg: #0b1220;
+  --ez-surface: #0f172a;
+  --ez-muted-bg: #0b1220;
+  --ez-border: #243244;
+
+  --ez-text: #e5e7eb;
+  --ez-text-muted: #9ca3af;
+
+  --ez-link: #7fb3ff;
+  --ez-link-hover: #a6c9ff;
+}
+
+body{
+  background: var(--ez-bg) !important;
+  color: var(--ez-text);
+}
+
+a{ color: var(--ez-link); }
+a:hover{ color: var(--ez-link-hover); }
+
+.navbar{
+  background: var(--ez-surface) !important;
+  border-bottom-color: var(--ez-border) !important;
+}
+
+/* Topbar sizing + iOS safe-area support */
+.ez-topbar{
+  min-height: var(--topbar-h);
+}
+@supports (padding-top: env(safe-area-inset-top)){
+  .ez-topbar{
+    padding-top: max(.25rem, env(safe-area-inset-top));
+    padding-left: max(.75rem, env(safe-area-inset-left));
+    padding-right: max(.75rem, env(safe-area-inset-right));
+  }
+}
+
+/* Brand logo must never exceed the topbar height (fixes iOS overlap) */
+.ez-brand-logo{
+  height: 44px;
+  width: auto;
+  max-height: 44px;
+  display: block;
+}
+@media (max-width: 575.98px){
+  .ez-brand-logo{ height: 34px; max-height: 34px; }
+}
+
+.app-shell{ min-height: 100vh; display:flex; flex-direction:column; }
+.app-body{ flex:1; display:flex; min-height:0; }
+
+.app-sidebar{
+  width: var(--sidebar-w);
+  border-right: 1px solid var(--ez-border);
+  background: var(--ez-surface);
+  height: calc(100vh - var(--topbar-h));
+  overflow-y: auto; /* allow scroll when too many items */
+  overflow-x: hidden;
+}
+
+.app-main{
+  flex:1;
+  min-width:0;
+  overflow:auto;
+  background: var(--ez-muted-bg);
+}
+
+.sidebar-link{
+  padding: .55rem .75rem;
+  border-radius: .6rem;
+  color: var(--ez-text);
+  text-decoration:none;
+  display:flex;
+  gap:.6rem;
+  align-items:center;
+}
+.sidebar-link:hover{ background: rgba(148,163,184,.18); }
+html[data-theme="dark"] .sidebar-link:hover{ background: rgba(148,163,184,.12); }
+
+.sidebar-link.active{
+  background: linear-gradient(90deg, rgba(31,95,191,.14), rgba(56,178,111,.12));
+  border: 1px solid rgba(31,95,191,.18);
+}
+
+.badge-soft{
+  background: rgba(31,95,191,.10);
+  color: var(--ez-blue);
+  border: 1px solid rgba(31,95,191,.18);
+}
+html[data-theme="dark"] .badge-soft{
+  background: rgba(127,179,255,.10);
+  color: #7fb3ff;
+  border-color: rgba(127,179,255,.18);
+}
+
+/* Topbar action group collapsing (JS toggles .is-open) */
+#topbarActions{
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+}
+@media (max-width: 991.98px){
+  #topbarActions{
+    display:none;
+    position:absolute;
+    right: .75rem;
+    top: calc(var(--topbar-h) + .5rem);
+    background: var(--ez-surface);
+    border: 1px solid var(--ez-border);
+    border-radius: .75rem;
+    padding: .5rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,.08);
+    z-index: 1050;
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 240px;
+  }
+  #topbarActions.is-open{ display:flex; }
+}
+
+/* Sidebar collapse on mobile */
+#sidebarOverlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease;
+  z-index: 1035;
+}
+body.sidebar-open #sidebarOverlay{
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (max-width: 991.98px){
+  .app-sidebar{
+    position: fixed;
+    left: calc(-1 * var(--sidebar-w));
+    top: var(--topbar-h);
+    z-index: 1040;
+    transition: left .2s ease;
+    box-shadow: 0 16px 40px rgba(0,0,0,.12);
+  }
+  body.sidebar-open .app-sidebar{ left: 0; }
+  /* main should not be blocked */
+  .app-body{ position:relative; }
+}
+
+/* Buttons */
+.btn-ez{
+  background: linear-gradient(90deg, var(--ez-blue), var(--ez-green));
+  border: none;
+  color: #fff !important;
+}
+.btn-ez:hover{ filter: brightness(.95); }
+
+.btn-outline-ez{
+  border-color: rgba(31,95,191,.35);
+  color: var(--ez-text);
+}
+.btn-outline-ez:hover{
+  border-color: rgba(31,95,191,.55);
+  background: rgba(31,95,191,.08);
+}
+
+/* Form polish */
+.form-control, .form-select, .input-group-text{
+  border-color: var(--ez-border);
+}
+html[data-theme="dark"] .form-control,
+html[data-theme="dark"] .form-select,
+html[data-theme="dark"] .input-group-text{
+  background: rgba(15,23,42,.9);
+  color: var(--ez-text);
+  border-color: var(--ez-border);
+}
+
+
+/* Prevent background scroll when mobile sidebar is open */
+body.no-scroll{ overflow: hidden; }
+
+
+/* Accessibility */
+.skip-link{
+  position:absolute;
+  left:-9999px;
+  top:auto;
+  width:1px;
+  height:1px;
+  overflow:hidden;
+  z-index:9999;
+}
+.skip-link:focus{
+  left:12px;
+  top:12px;
+  width:auto;
+  height:auto;
+  padding:8px 12px;
+  border-radius:10px;
+  background: var(--ez-surface);
+  border:1px solid var(--ez-border);
+  box-shadow:0 6px 18px rgba(0,0,0,.15);
+}
+
+:focus-visible{
+  outline: 3px solid rgba(0, 132, 255, .45);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{ scroll-behavior: auto !important; }
+  .offcanvas, .collapse{ transition: none !important; }
+}

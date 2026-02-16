@@ -44,6 +44,9 @@ class Project(SyncModel):
         indexes = [
             models.Index(fields=["company", "is_active"]),
             models.Index(fields=["company", "project_number"]),
+            models.Index(fields=["company", "assigned_to"]),
+            models.Index(fields=["company", "client"]),
+            models.Index(fields=["company", "updated_at"]),
         ]
 
     def __str__(self) -> str:

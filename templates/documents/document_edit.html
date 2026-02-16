@@ -15,6 +15,11 @@
     <a class="btn btn-outline-secondary" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_list' %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_list' %}{% else %}{% url 'documents:proposal_list' %}{% endif %}">
       Back
     </a>
+    {% if doc_type == 'invoice' and is_manager %}
+      <a class="btn btn-outline-dark" href="{% url 'payments:invoice_reconcile' doc.id %}">
+        Reconcile
+      </a>
+    {% endif %}
     {% if is_manager %}
       <a class="btn btn-outline-danger" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_delete' doc.id %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_delete' doc.id %}{% else %}{% url 'documents:proposal_delete' doc.id %}{% endif %}">
         Delete

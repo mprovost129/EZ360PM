@@ -230,7 +230,7 @@ class EmailVerificationGateMiddleware(MiddlewareMixin):
 
 
 class TwoFactorEnforcementMiddleware(MiddlewareMixin):
-    """Enforce 2FA for privileged roles, with a one-session grace period."""
+    """Enforce 2FA only when company/employee policy requires it, with a one-session grace period."""
 
     ALLOW_PREFIXES = [
         _Allowlist("/accounts/2fa/"),
@@ -261,18 +261,16 @@ class TwoFactorEnforcementMiddleware(MiddlewareMixin):
             return None
 
         is_enabled = hasattr(user, "two_factor") and user.two_factor.is_enabled
-
         requires = False
-        if user.is_staff and emp.role in {EmployeeRole.MANAGER, EmployeeRole.ADMIN, EmployeeRole.OWNER}:
+        company = emp.company
+
+        # Admin-configurable enforcement only. No implicit role-based forcing.
+        if getattr(emp, "force_2fa", False):
             requires = True
-        else:
-            company = emp.company
-            if getattr(emp, "force_2fa", False):
-                requires = True
-            elif getattr(company, "require_2fa_for_admins_managers", False) and emp.role in {EmployeeRole.MANAGER, EmployeeRole.ADMIN, EmployeeRole.OWNER}:
-                requires = True
-            elif getattr(company, "require_2fa_for_all", False):
-                requires = True
+        elif getattr(company, "require_2fa_for_all", False):
+            requires = True
+        elif getattr(company, "require_2fa_for_admins_managers", False) and emp.role in {EmployeeRole.MANAGER, EmployeeRole.ADMIN, EmployeeRole.OWNER}:
+            requires = True
 
         if not requires:
             return None

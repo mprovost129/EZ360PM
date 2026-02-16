@@ -203,3 +203,40 @@ html[data-theme="dark"] .input-group-text{
   color: var(--ez-text);
   border-color: var(--ez-border);
 }
+
+
+/* Prevent background scroll when mobile sidebar is open */
+body.no-scroll{ overflow: hidden; }
+
+
+/* Accessibility */
+.skip-link{
+  position:absolute;
+  left:-9999px;
+  top:auto;
+  width:1px;
+  height:1px;
+  overflow:hidden;
+  z-index:9999;
+}
+.skip-link:focus{
+  left:12px;
+  top:12px;
+  width:auto;
+  height:auto;
+  padding:8px 12px;
+  border-radius:10px;
+  background: var(--ez-surface);
+  border:1px solid var(--ez-border);
+  box-shadow:0 6px 18px rgba(0,0,0,.15);
+}
+
+:focus-visible{
+  outline: 3px solid rgba(0, 132, 255, .45);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{ scroll-behavior: auto !important; }
+  .offcanvas, .collapse{ transition: none !important; }
+}

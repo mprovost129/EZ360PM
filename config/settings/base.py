@@ -115,6 +115,7 @@ INSTALLED_APPS = [
     "crm",
     "documents",
     "expenses",
+    "payables",
     "payments",
     "projects",
     "integrations",

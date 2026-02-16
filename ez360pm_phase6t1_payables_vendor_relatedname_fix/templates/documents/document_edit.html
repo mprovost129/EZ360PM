@@ -1,0 +1,302 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% load formatting %}
+{% block title %}{{ doc_label }} · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">
+      {{ doc_label }} {% if doc.number %}· {{ doc.number }}{% else %}<span class="text-secondary">· Draft</span>{% endif %}
+    </h1>
+    <div class="text-secondary small">Edit details and line items. A number is assigned on first save.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_list' %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_list' %}{% else %}{% url 'documents:proposal_list' %}{% endif %}">
+      Back
+    </a>
+    {% if doc_type == 'invoice' and is_manager %}
+      <a class="btn btn-outline-dark" href="{% url 'payments:invoice_reconcile' doc.id %}">
+        Reconcile
+      </a>
+    {% endif %}
+    {% if is_manager %}
+      <a class="btn btn-outline-danger" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_delete' doc.id %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_delete' doc.id %}{% else %}{% url 'documents:proposal_delete' doc.id %}{% endif %}">
+        Delete
+      </a>
+    {% endif %}
+  </div>
+</div>
+
+{% if doc.is_locked %}
+  <div class="alert alert-warning">
+    <strong>Invoice locked.</strong> This invoice can’t be edited because {{ doc.invoice_lock_reason|default:"it has been sent/paid or has credits applied" }}.
+  </div>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+  <div class="row g-3">
+    <div class="col-lg-4">
+      <div class="card card-body mb-3">
+        <h2 class="h6 mb-3">Details</h2>
+        <div class="mb-2">
+          <label class="form-label">Client</label>
+          {{ form.client }}
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Project</label>
+          {{ form.project }}
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Title</label>
+          {{ form.title }}
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Description</label>
+          {{ form.description }}
+        </div>
+
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label">Issue date</label>
+            {{ form.issue_date }}
+          </div>
+          <div class="col-6">
+            {% if doc_type == 'invoice' %}
+              <label class="form-label">Due date</label>
+              {{ form.due_date }}
+            {% else %}
+              <label class="form-label">Valid until</label>
+              {{ form.valid_until }}
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="mt-2">
+          <label class="form-label">Status</label>
+          {{ form.status }}
+        </div>
+
+        <div class="mt-2">
+          <label class="form-label">Notes</label>
+          {{ form.notes }}
+        </div>
+      </div>
+
+      <div class="card card-body">
+        <h2 class="h6 mb-3">Totals</h2>
+        <div class="d-flex justify-content-between"><span class="text-secondary">Subtotal</span><strong>{{ doc.subtotal_cents|cents_to_dollars }}</strong></div>
+        <div class="d-flex justify-content-between"><span class="text-secondary">Tax</span><strong>{{ doc.tax_cents|cents_to_dollars }}</strong></div>
+        <hr>
+        <div class="d-flex justify-content-between"><span class="text-secondary">Total</span><strong>{{ doc.total_cents|cents_to_dollars }}</strong></div>
+        {% if doc_type == 'invoice' %}
+          <div class="d-flex justify-content-between mt-2"><span class="text-secondary">Paid</span><strong>{{ doc.amount_paid_cents|cents_to_dollars }}</strong></div>
+          <div class="d-flex justify-content-between"><span class="text-secondary">Balance</span><strong>{{ doc.balance_due_cents|cents_to_dollars }}</strong></div>
+        {% endif %}
+      </div>
+
+      {% if doc_type == 'invoice' %}
+        <div class="card card-body mt-3">
+          <h2 class="h6 mb-2">Billing helpers</h2>
+          <div class="text-secondary small mb-3">Convert approved unbilled time into an invoice line item.</div>
+
+          {% if doc.project %}
+            <button class="btn btn-outline-dark" type="submit" name="action" value="add_unbilled_time">
+              <i class="bi bi-stopwatch me-1"></i>Add unbilled time
+            </button>
+          {% else %}
+            <div class="alert alert-warning mb-0">Select a project, Save, then you can add unbilled time.</div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <div class="card card-body mt-3">
+        <h2 class="h6 mb-2">Email</h2>
+        <div class="text-secondary small mb-3">Send this {{ doc_label|lower }} to the client using your configured email provider.</div>
+
+        {% if doc.client and doc.client.email %}
+          <button class="btn btn-outline-primary" type="submit" name="action" value="send_email">
+            <i class="bi bi-send me-1"></i>Send to {{ doc.client.email }}
+          </button>
+          <div class="text-secondary small mt-2">Tip: Save updates first if you’ve made changes.</div>
+        {% else %}
+          <div class="alert alert-warning mb-0">Select a client with an email address to enable sending.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card card-body">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h2 class="h6 mb-0">Line items</h2>
+          <div class="text-secondary small">Add rows and Save. Pricing is stored in cents internally.</div>
+        </div>
+
+        {{ formset.management_form }}
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead class="table-light">
+              <tr>
+                <th style="width:70px;">Order</th>
+                <th style="width:180px;">Catalog</th>
+                <th>Name</th>
+                <th style="width:90px;">Qty</th>
+                <th style="width:140px;">Unit $</th>
+                <th style="width:90px;">Taxable</th>
+                <th style="width:140px;">Tax $</th>
+                <th style="width:90px;">Delete</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for f in formset.forms %}
+                <tr>
+                  <td>{{ f.sort_order }}</td>
+                  <td>{{ f.catalog_item }}</td>
+                  <td>
+                    {{ f.name }}
+                    <div class="mt-1">{{ f.description }}</div>
+                  </td>
+                  <td>{{ f.qty }}</td>
+                  <td>{{ f.unit_price_dollars }}</td>
+                  <td class="text-center">{{ f.is_taxable }}</td>
+                  <td>{{ f.tax_dollars }}</td>
+                  <td class="text-center">{{ f.DELETE }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end">
+          {% if is_locked %}
+            <button class="btn btn-dark" type="button" disabled title="This invoice is locked and cannot be edited.">
+              <i class="bi bi-lock me-1"></i>Locked
+            </button>
+          {% else %}
+            <button class="btn btn-dark" type="submit"><i class="bi bi-save me-1"></i>Save</button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if doc_type == 'invoice' %}
+  {% if doc.client and client_credit_cents %}
+  <div class="card mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <strong>Client Credit</strong>
+      <span class="text-secondary small">Available: {{ client_credit_cents|cents_to_dollars }}</span>
+    </div>
+    <div class="card-body">
+      {% if can_apply_credit and apply_credit_form %}
+      <form method="post" action="{% url 'documents:invoice_apply_credit' doc.id %}" class="row g-2 align-items-end">
+        {% csrf_token %}
+        <div class="col-12 col-md-4">
+          <label class="form-label mb-1">Apply amount</label>
+          <input type="number" step="0.01" min="0.01" name="amount_dollars" class="form-control" placeholder="0.00" required>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label mb-1">Memo (optional)</label>
+          <input type="text" name="memo" class="form-control" maxlength="240" placeholder="e.g., Apply available credit">
+        </div>
+        <div class="col-12 col-md-2 d-grid">
+          <button class="btn btn-outline-primary" type="submit">
+            <i class="bi bi-check2-circle me-1"></i>Apply
+          </button>
+        </div>
+      </form>
+      <div class="text-secondary small mt-2">
+        Applying credit reduces A/R but does not record a payment.
+      </div>
+      {% else %}
+      <div class="text-secondary">No balance due to apply credit to.</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <strong>Credit Notes</strong>
+      <a class="btn btn-sm btn-outline-secondary ms-2" href="{{ reconciliation_url }}">Reconciliation</a>
+      {% if doc.status != "draft" and doc.status != "void" %}
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'documents:credit_note_create' doc.id %}">Create Credit Note</a>
+
+      {% else %}
+      <button class="btn btn-sm btn-outline-primary" type="button" disabled title="Send the invoice before creating a credit note.">Create Credit Note</button>
+      {% endif %}
+
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>Number</th>
+            <th>Status</th>
+            <th class="text-end">Total</th>
+            <th class="text-end">AR Applied</th>
+            <th class="text-end">Customer Credit</th>
+            <th>Posted</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cn in credit_notes %}
+          <tr>
+            <td>{% if cn.status == 'draft' %}<a href="{% url 'documents:credit_note_edit' cn.id %}">{{ cn.number }}</a>{% else %}{{ cn.number }}{% endif %}</td>
+            <td><span class="badge bg-secondary">{{ cn.status }}</span></td>
+            <td class="text-end">{{ cn.total_cents|cents_to_dollars }}</td>
+            <td class="text-end">{{ cn.ar_applied_cents|cents_to_dollars }}</td>
+            <td class="text-end">{{ cn.customer_credit_cents|cents_to_dollars }}</td>
+            <td class="text-secondary small">{% if cn.posted_at %}{{ cn.posted_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}</td>
+            <td class="text-end">
+              {% if cn.status == 'draft' and doc.status != 'draft' and doc.status != 'void' %}
+              <form method="post" action="{% url 'documents:credit_note_post' cn.id %}">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-danger" type="submit">Post</button>
+              </form>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="text-secondary">No credit notes.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer small text-secondary">
+      Credit notes do not change invoice status (status is payment-driven).<br>Effective Balance Due: {{ balance_due_effective_cents|cents_to_dollars }}
+    </div>
+  </div>
+  {% endif %}
+
+
+  <div class="card mt-3">
+    <div class="card-header"><strong>Activity Timeline</strong></div>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Event</th>
+            <th>Summary</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in timeline %}
+          <tr>
+            <td class="text-secondary small">{{ e.created_at|date:"Y-m-d H:i" }}</td>
+            <td><span class="badge bg-light text-dark border">{{ e.event_type }}</span></td>
+            <td class="small">{{ e.summary|default:"" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="text-secondary">No recent activity.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</form>
+{% endblock %}

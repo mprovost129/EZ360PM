@@ -56,7 +56,8 @@ def _visible_clients_qs(request: HttpRequest):
             .values_list("client_id", flat=True)
             .distinct()
         )
-        qs = qs.filter(id__in=list(project_client_ids))
+        # Avoid materializing IDs in Python (can be large). Let the DB handle IN (subquery).
+        qs = qs.filter(id__in=project_client_ids)
 
     return qs
 

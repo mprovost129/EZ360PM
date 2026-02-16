@@ -1,0 +1,55 @@
+{% extends "base_app.html" %}
+{% block title %}{% if mode == 'edit' %}Edit bill{% else %}New bill{% endif %} · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h4 mb-1">{% if mode == 'edit' %}Edit bill{% else %}New bill{% endif %}</h1>
+    <div class="text-secondary small">Create a vendor bill, add line items, then post to Accounts Payable.</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'payables:bill_list' %}"><i class="bi bi-arrow-left me-1"></i>Back</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Vendor</label>
+          {{ form.vendor }}
+          {% if form.vendor.errors %}<div class="text-danger small">{{ form.vendor.errors }}</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Bill number</label>
+          {{ form.bill_number }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Issue date</label>
+          {{ form.issue_date }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Due date</label>
+          {{ form.due_date }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Tax</label>
+          {{ form.tax_dollars }}
+          <div class="form-text">Enter dollars (e.g., 12.34).</div>
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <div class="d-flex justify-content-end gap-2">
+        <a class="btn btn-outline-secondary" href="{% url 'payables:bill_list' %}">Cancel</a>
+        <button class="btn btn-primary" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

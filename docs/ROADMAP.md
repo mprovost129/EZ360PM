@@ -37,6 +37,8 @@
 - **6K1** Mobile topbar fix + Sentry init (responsive logo sizing, safe-area insets; Sentry init enabled when DSN set)
 - **6O2** Clients pagination hotfix (guarded previous/next page evaluation)
 - **6P** Monitoring gate: Ops Probes (Sentry test error + test alert) + launch check evidence
+- **6R1** UI/Perf hardening: invoice reconciliation CTA + staff clients subquery optimization
+- **6S** 2FA policy optional (admin-configurable only) + Projects performance indexes (assignee/client/updated)
 
 ### Next (Planned)
 - **Backup & Recovery Gate**: automated DB backups on Render, retention policy verified, and a documented restore test.
@@ -341,3 +343,27 @@ Next (Phase 4C):
 ## Completed (2026-02-15)
 
 - Phase 6N+ Hotfix: Added `documents:numbering` URL alias to prevent NoReverseMatch on Getting Started.
+
+## 2026-02-15 — Completed: Phase 6O.3 (UI reliability polish — sidebar/company dropdown)
+
+- Sidebar now prevents body scroll when open on mobile (`body.no-scroll`) and closes automatically on nav click.
+- Added resize handler to close sidebar/actions when switching to desktop breakpoint.
+- Company switcher dropdown is now Bootstrap-independent (deterministic toggle) and themed (`btn-outline-ez`).
+
+
+## 2026-02-15 — Phase 6O.4: Accessibility polish
+- Added skip-to-content link and focus-visible styling.
+- Improved keyboard behavior for custom dropdown toggles.
+
+### Phase 6T — Accounts Payable (MVP) ✅
+**Goal:** Basic QuickBooks-like bills + vendor tracking with accounting postings.
+- Vendors: list/create/edit (company-scoped).
+- Bills: draft/create/edit, line items, post (locks), list + status filters.
+- Payments: record payments against posted bills.
+- Accounting integration: auto-post journal entries for bill posting + bill payments.
+
+### Next (proposed) — Phase 6U
+- A/P polish: vendor statements, bill attachments (receipts), recurring bills.
+- Payment batching: "Pay bills" screen (select multiple bills), check printing export.
+- Aging report for A/P (by vendor, due buckets).
+

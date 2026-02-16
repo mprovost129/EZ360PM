@@ -447,3 +447,42 @@ Rationale:
 ## Hotfix (2026-02-15)
 
 - Prefer URL-name back-compat aliases over template churn when a broken link is already deployed in production.
+
+## 2026-02-15 — Decision: Dropdown behavior must not depend on Bootstrap JS
+To avoid production/mobile issues where dropdowns fail to open due to event ordering or JS loading, key navigation dropdowns (timer, company switcher) use deterministic toggles rather than Bootstrap's dropdown plugin.
+
+
+## 2026-02-15 — Phase 6O.4: Accessibility polish
+- Added skip-to-content link and focus-visible styling.
+- Improved keyboard behavior for custom dropdown toggles.
+
+## 2026-02-15 — Reconciliation must be reachable from invoice detail/edit screens
+
+Decision:
+- Manager+ users must be able to reach invoice reconciliation tooling directly from the invoice screen via an explicit **Reconcile** CTA.
+
+Rationale:
+- Reconciliation is an operational workflow; hiding it in Reports/Ops creates dead ends during QA and production support.
+
+## 2026-02-15 — Prefer DB subqueries over Python materialization for staff scoping
+
+Decision:
+- When scoping list views by related objects (e.g., staff-visible clients via assigned projects), use DB-native `IN (subquery)` instead of converting IDs to Python lists.
+
+Rationale:
+- Reduces memory use and avoids request-time spikes on large datasets.
+
+
+## 2FA enforcement policy (Phase 6S)
+- 2FA is **optional by default**.
+- The app does **not** force 2FA based on role alone.
+- Enforcement is controlled by admin-configurable flags on Company and Employee: `require_2fa_for_admins_managers`, `require_2fa_for_all`, and `employee.force_2fa`.
+
+## Accounts Payable (Phase 6T)
+- A/P is implemented as a dedicated **payables** module (Vendor, Bill, BillLineItem, BillPayment).
+- Posting creates immutable accounting artifacts:
+  - `JournalEntry.source_type='bill'` for bill posting
+  - `JournalEntry.source_type='bill_payment'` for bill payment
+- Posted bills are treated as **locked** (cannot edit header or lines); only payments can be added.
+- Overpayments are blocked at the service layer (payment amount cannot exceed current bill balance).
+

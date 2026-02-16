@@ -1,0 +1,101 @@
+{% extends "base_app.html" %}
+{% load static %}
+
+{% block title %}Recurring invoices · EZ360PM{% endblock %}
+
+{% block app_content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">Recurring invoices</h1>
+    <div class="text-secondary small">Create invoices automatically on a schedule.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-dark" href="{% url 'documents:recurring_plan_create' %}">
+      <i class="bi bi-plus-lg me-1"></i>New recurring plan
+    </a>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    {% if plans %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>Plan</th>
+              <th>Client</th>
+              <th class="d-none d-lg-table-cell">Frequency</th>
+              <th>Next run</th>
+              <th class="d-none d-lg-table-cell">Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in plans %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ p.name }}</div>
+                  <div class="text-secondary small">
+                    Due in {{ p.due_days }} days · {{ p.line_items.count }} items
+                    {% if p.project %} · Project: {{ p.project.name }}{% endif %}
+                  </div>
+                </td>
+                <td>
+                  <div class="fw-semibold">{{ p.client.name }}</div>
+                </td>
+                <td class="d-none d-lg-table-cell">
+                  {% if p.frequency == 'weekly' %}
+                    Weekly (every {{ p.interval }} week{{ p.interval|pluralize }})
+                  {% else %}
+                    Monthly (every {{ p.interval }} month{{ p.interval|pluralize }}) on day {{ p.day_of_month }}
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="fw-semibold">{{ p.next_run_date }}</div>
+                  {% if p.last_run_date %}<div class="text-secondary small">Last: {{ p.last_run_date }}</div>{% endif %}
+                </td>
+                <td class="d-none d-lg-table-cell">
+                  {% if p.is_active %}
+                    <span class="badge text-bg-success">Active</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary">Paused</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <div class="d-flex justify-content-end gap-2">
+                    <a class="btn btn-outline-dark btn-sm" href="{% url 'documents:recurring_plan_edit' p.pk %}">
+                      Edit
+                    </a>
+                    <form method="post" action="{% url 'documents:recurring_plan_run_now' p.pk %}">
+                      {% csrf_token %}
+                      <button class="btn btn-dark btn-sm" type="submit">
+                        Run now
+                      </button>
+                    </form>
+                    <form method="post" action="{% url 'documents:recurring_plan_toggle' p.pk %}">
+                      {% csrf_token %}
+                      <button class="btn btn-outline-secondary btn-sm" type="submit">
+                        {% if p.is_active %}Pause{% else %}Resume{% endif %}
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-center py-5">
+        <div class="mb-2"><i class="bi bi-arrow-repeat" style="font-size: 2rem;"></i></div>
+        <div class="fw-semibold mb-1">No recurring plans yet</div>
+        <div class="text-secondary small mb-3">Create a plan to generate invoices automatically.</div>
+        <a class="btn btn-dark" href="{% url 'documents:recurring_plan_create' %}">
+          <i class="bi bi-plus-lg me-1"></i>New recurring plan
+        </a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

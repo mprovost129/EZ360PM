@@ -592,3 +592,31 @@ Files: templates/base_app.html, templates/base_public.html, static/ui/ez360pm.cs
 ## Hotfix (2026-02-15)
 
 - Fixed getting-started crash by adding back-compat URL name `documents:numbering` (aliases to Document settings).
+
+## 2026-02-15 — Phase 6O.3: UI reliability polish
+- Hardened mobile navigation UX:
+  - Sidebar now locks body scroll when open and auto-closes on link click (mobile/tablet).
+  - Switching to desktop breakpoint closes any open drawers automatically.
+- Sidebar Company switcher dropdown no longer depends on Bootstrap JS; uses deterministic dropdown toggle.
+
+
+## 2026-02-15 — Phase 6O.4: Accessibility polish
+- Added skip-to-content link and focus-visible styling.
+- Improved keyboard behavior for custom dropdown toggles.
+
+## 2026-02-15 — Phase 6R.1: Reconciliation affordance + perf micro-hardening
+- Added a **Reconcile** button on the invoice edit screen (Manager+) linking to `payments:invoice_reconcile`.
+- Reduced memory usage for staff-scoped Clients list by keeping `id__in` as a DB subquery (no Python `list()` materialization).
+
+
+### Phase 6S (2026-02-15)
+- Adjusted 2FA enforcement: no implicit role-based forcing; enforcement is only via Company policy flags (`require_2fa_for_all`, `require_2fa_for_admins_managers`) or `employee.force_2fa`.
+- Added Projects DB indexes for common filters/sorts: (company, assigned_to), (company, client), (company, updated_at).
+
+## 2026-02-15 — Phase 6T: Accounts Payable (MVP)
+- Added new **payables** app with Vendor + Bills + Bill line items + Bill payments.
+- Bills have a Draft → Posted lifecycle; posted bills are locked for edits.
+- Posting a bill creates an accounting Journal Entry (`source_type='bill'`) that debits expense accounts and credits **Accounts Payable**.
+- Recording a bill payment creates a Journal Entry (`source_type='bill_payment'`) that debits **Accounts Payable** and credits the selected cash/bank account.
+- Added sidebar nav entries: **Bills (A/P)** and **Vendors** (manager+).
+

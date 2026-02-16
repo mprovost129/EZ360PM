@@ -1,0 +1,61 @@
+{% extends "base_app.html" %}
+{% block title %}Vendors · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h4 mb-1">Vendors</h1>
+    <div class="text-secondary small">Manage vendors for Accounts Payable.</div>
+  </div>
+  <a class="btn btn-primary" href="{% url 'payables:vendor_create' %}"><i class="bi bi-plus-lg me-1"></i>New vendor</a>
+</div>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-sm-6 col-md-4">
+    <div class="input-group">
+      <span class="input-group-text"><i class="bi bi-search"></i></span>
+      <input class="form-control" name="q" value="{{ q }}" placeholder="Search vendors">
+    </div>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-secondary" type="submit">Filter</button>
+  </div>
+</form>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-striped mb-0">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in vendors %}
+          <tr>
+            <td class="fw-semibold">{{ v.name }}</td>
+            <td>{{ v.email|default:"—" }}</td>
+            <td>{{ v.phone|default:"—" }}</td>
+            <td>
+              {% if v.is_active %}
+                <span class="badge text-bg-success">Active</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{% url 'payables:vendor_edit' v.id %}">Edit</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="text-center text-secondary py-4">No vendors found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% include "includes/pagination.html" %}
+{% endblock %}
