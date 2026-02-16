@@ -1,0 +1,86 @@
+{% extends "base_app.html" %}
+{% load formatting %}
+{% block title %}Recurring bills · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h4 mb-1">Recurring bills</h1>
+    <div class="text-secondary small">Create scheduled bill plans that generate vendor bills automatically.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'payables:bill_list' %}"><i class="bi bi-receipt me-1"></i>Bills</a>
+    <a class="btn btn-outline-secondary" href="{% url 'payables:vendor_list' %}"><i class="bi bi-building me-1"></i>Vendors</a>
+    <a class="btn btn-primary" href="{% url 'payables:recurring_bill_plan_create' %}"><i class="bi bi-plus-lg me-1"></i>New plan</a>
+  </div>
+</div>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-sm-6 col-md-4">
+    <div class="input-group">
+      <span class="input-group-text"><i class="bi bi-search"></i></span>
+      <input class="form-control" name="q" value="{{ q }}" placeholder="Search vendor">
+    </div>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-secondary" type="submit">Filter</button>
+  </div>
+</form>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-striped mb-0">
+      <thead>
+        <tr>
+          <th>Vendor</th>
+          <th>Frequency</th>
+          <th>Next run</th>
+          <th class="text-end">Amount</th>
+          <th>Status</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in plans %}
+          <tr>
+            <td class="fw-semibold">{{ p.vendor.name }}</td>
+            <td>{{ p.get_frequency_display }}</td>
+            <td>{{ p.next_run }}</td>
+            <td class="text-end">{{ p.amount_cents|money }}</td>
+            <td>
+              {% if p.is_active %}
+                <span class="badge text-bg-success">Active</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Paused</span>
+              {% endif %}
+              {% if p.auto_post %}
+                <span class="badge text-bg-info">Auto-post</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <div class="d-flex gap-2 justify-content-end">
+                <form method="post" action="{% url 'payables:recurring_bill_plan_run_now' p.id %}">
+                  {% csrf_token %}
+                  <button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-play-fill me-1"></i>Run now</button>
+                </form>
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'payables:recurring_bill_plan_edit' p.id %}"><i class="bi bi-pencil me-1"></i>Edit</a>
+                <a class="btn btn-sm btn-outline-danger" href="{% url 'payables:recurring_bill_plan_delete' p.id %}"><i class="bi bi-trash me-1"></i>Delete</a>
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-secondary py-4">
+              <div class="mb-2"><i class="bi bi-inbox" style="font-size: 2rem;"></i></div>
+              <div class="fw-semibold text-dark">No recurring bill plans yet</div>
+              <div class="small mb-3">Create a plan to auto-generate vendor bills on a schedule.</div>
+              <a class="btn btn-primary" href="{% url 'payables:recurring_bill_plan_create' %}"><i class="bi bi-plus-lg me-1"></i>Create your first plan</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "includes/pagination.html" %}
+</div>
+{% endblock %}
