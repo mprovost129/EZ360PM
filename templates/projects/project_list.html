@@ -6,8 +6,8 @@
 {% block content %}
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
   <div>
-    <h1 class="h3 mb-1">Projects</h1>
-    <div class="text-secondary small">Track work, assign staff, and manage billable time.</div>
+    <h1 class="ez-page-title">Projects</h1>
+    <div class="ez-page-subtitle">Track work, assign staff, and manage billable time.</div>
   </div>
   {% if is_manager %}
     <a class="btn btn-dark" href="{% url 'projects:project_create' %}"><i class="bi bi-plus-lg me-1"></i>New project</a>
@@ -33,7 +33,7 @@
 
 <div class="card shadow-sm">
   <div class="table-responsive">
-    <table class="table table-sm align-middle mb-0">
+    <table class="table table-hover align-middle ez-table">
       <thead class="table-light">
         <tr>
           <th>Project #</th>

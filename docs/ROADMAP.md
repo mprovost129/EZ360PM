@@ -1,17 +1,43 @@
-## 2026-02-16 — Phase 7H44 (DONE)
-- Statements: added **Send now (filtered set)** bulk action (confirmation + safety cap) in Statement Reminders queue.
-- Statements: added per-client statement activity tracking (last viewed/last emailed) and surfaced on a new Client Detail page.
-- Ops: added `company_id` filter to Ops Alerts and updated Ops Dashboard deep links to preserve company scope.
-
 ## 2026-02-16 — Phase 7H45 (DONE)
-- Help Center: ensured screenshot assets are present and ready for swapping once UI is stable.
-- Statements: added contextual Help links on Statement page + Statement Reminders + Client Detail.
+- Help Center: added DB-managed screenshot uploads (HelpCenterScreenshot) with template tag fallback to static placeholders.
+- Statements: exposed last viewed / last sent summary on Client Statement page; added optional statement activity columns to Clients list.
+- Ops: added quick-pick snooze durations (30m/2h/1d/7d) and surfaced active snooze state on Ops Dashboard groupings.
 
-## Next (Phase 7H46)
-- Help Center: swap placeholder screenshots with final screenshots once UI is stable.
-- Statements: consider adding statement activity to Client list columns (optional) and exposing last sent/last viewed on Statement page.
-- Ops: add quick-pick snooze durations + show active snooze state on Ops Dashboard grouping.
+## 2026-02-16 — Phase 7H46 (DONE)
+- Help Center: added an admin-facing checklist page for required screenshot keys at:
+  - `/admin/helpcenter/helpcenterscreenshot/required-keys/`
+  - Keys are tracked in `helpcenter/required_screenshots.py`.
+- Ops: dashboards now show snooze “until” timestamps inline and provide a one-click **Clear** action.
+- Statements: added per-client **Collections notes** (with optional follow-up date) on the Client Statement page.
 
+## 2026-02-16 — Phase 7H47 (DONE)
+- Statements: added company-wide **Collections Follow-ups Due** queue (open notes where `follow_up_on <= today`) with search + “Mark done” flow.
+- Ops: added **Alert Snoozes** list/detail for audit visibility, plus delete/clear actions.
+- Ops: added expired snooze cleanup via `ez360_prune_ops_snoozes` and SiteConfig retention `ops_snooze_prune_after_days`.
+
+## 2026-02-16 — Phase 7H48 (DONE)
+- Ops: fixed missing `staff_only` decorator in `ops/views.py` (prevents import-time crash on alert views).
+- UX: added navigation links to Collections follow-ups and Snoozes from relevant pages.
+
+## Next (Phase 8A)
+
+## 2026-02-16 — Phase 8A (IN PROGRESS)
+
+UI foundation hardening (launch prep):
+
+- Global card standardization: all `card shadow-sm` now render as borderless, rounded cards.
+- Sidebar polish: active nav highlighting is now automatic (JS marks active link) and includes a subtle left indicator bar.
+- Page header typography helpers (`.ez-page-title`, `.ez-page-subtitle`) applied to key pages (Dashboard, Clients, Documents, Projects, Time, Payments, Expenses).
+- Table polish: key list pages use a consistent table style (`table-hover` + `align-middle` + `ez-table`).
+
+8B starter (dashboard):
+
+- Added a **Quick actions** card to the dashboard for faster navigation to core workflows.
+
+### Next (Phase 8B)
+- Dashboard redesign pass: KPI row + quick actions + better information density.
+- Forms polish pass: grouping, sticky actions, consistent money inputs.
+- Empty states: add intentional CTAs and first-run guidance where missing.
 
 ## 2026-02-16 — Phase 7H29 (DONE)
 - Daily ops checks now create Ops Alerts + optional admin emails on failures.

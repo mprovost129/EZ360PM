@@ -1,3 +1,12 @@
+## 2026-02-16 — Phase 7H46
+- **Help Center screenshot key governance:** required screenshot keys are tracked explicitly in `helpcenter/required_screenshots.py` and reviewed via an admin checklist view (`/admin/helpcenter/helpcenterscreenshot/required-keys/`).
+- **Ops snooze operability:** ops dashboards must show snooze end timestamps and allow a one-click clear to reduce “why is this hidden?” operator friction.
+- **Collections notes scope:** collections notes are stored per-client (company-scoped), support an optional follow-up date, and are completed via status (no hard delete).
+
+## 2026-02-16 — Phase 7H45
+- Help Center screenshots: implemented as DB uploads (admin-managed) with a stable `key` and template fallback to static placeholders to avoid code changes for screenshot swaps.
+- Ops snooze UX: standard quick-pick durations (30m/2h/1d/7d) and “Snoozed” badge derived from active snooze records, scoped by (source, company or platform).
+
 ## 2026-02-16 — Phase 7H29
 
 - **Daily ops checks alerting:** scheduled checks MAY emit OpsAlertEvent + webhook + mail_admins when failures occur; alerts must never break the request path.
@@ -906,6 +915,17 @@ Rationale:
 - Statement activity tracking is best-effort and must never block collections workflows.
 - Ops dashboard deep links prefer `company_id` filtering over company-name search to avoid ambiguity.
 
-## 2026-02-16 — Phase 7H45
-- Key workflow pages should include contextual Help Center links (e.g., Statements & reminder queues) to prevent user dead ends.
-- Help Center screenshots live under `static/images/helpcenter/` and can be swapped without changing URLs to keep docs stable.
+
+## 2026-02-16 — Phase 8A (UI Foundation)
+
+- **No framework switch.** We keep Bootstrap 5 and harden the existing design language.
+  Rationale: Phase 8 is launch prep; we want predictable CSS and minimal regressions.
+
+- **Global card standard:** pages use Bootstrap cards, and `card shadow-sm` is treated as the app-standard surface.
+  Rationale: consistent surfaces increase perceived quality without template-by-template rewrites.
+
+- **Sidebar active state is automatic (JS).** We compute the best matching link by URL prefix.
+  Rationale: avoids brittle per-view “active tab” context plumbing.
+
+- **Typography helpers are additive.** Use `.ez-page-title`/`.ez-page-subtitle` instead of inventing new heading scales per template.
+  Rationale: consistent hierarchy for accounting-heavy screens.

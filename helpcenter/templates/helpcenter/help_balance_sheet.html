@@ -1,5 +1,5 @@
 {% extends "helpcenter/_help_base.html" %}
-{% load static %}
+{% load static helpcenter_tags %}
 
 {% block help_h1 %}Balance Sheet{% endblock %}
 
@@ -24,7 +24,7 @@
 <div class="card shadow-sm mt-2">
   <div class="card-body">
     <div class="fw-semibold mb-2">Screenshot</div>
-    <img class="img-fluid border rounded" src="{% static 'images/helpcenter/balance_sheet.png' %}" alt="Help screenshot">
+    <img class="img-fluid border rounded" src="{% hc_screenshot 'balance_sheet' 'images/helpcenter/balance_sheet.png' %}" alt="Help screenshot">
     <div class="text-secondary small mt-2">Placeholder image — replace with a real screenshot in a launch polishing pass.</div>
   </div>
 </div>

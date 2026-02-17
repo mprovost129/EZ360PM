@@ -1,5 +1,5 @@
 {% extends "base_app.html" %}
-{% load static %}
+{% load static dict_extras %}
 {% block title %}Ops · EZ360PM<script>
 (function(){
   function copyText(text){
@@ -146,11 +146,42 @@
                   <td class="text-secondary small">{{ r.source }}</td>
                   <td class="text-end"><a class="text-decoration-none" href="{% url 'ops:alerts' %}?status=open&source={{ r.source }}">{{ r.total }}</a></td>
                   <td class="text-end">
+                    {% with snooze_key=r.source|add:":platform" %}
+                      {% with info=snooze_map|get_item:snooze_key %}
+                      {% if info %}
+                        <span class="badge text-bg-warning me-1">Snoozed</span>
+                        <span class="text-muted small">until {{ info.until|date:'M j, Y g:i A' }}</span>
+                        <form method="post" action="{% url 'ops:alert_snooze_clear' %}" class="d-inline ms-1">
+                          {% csrf_token %}
+                          <input type="hidden" name="source" value="{{ r.source }}">
+                          <button class="btn btn-xs btn-outline-danger" type="submit" title="Clear snooze">Clear</button>
+                        </form>
+                      {% endif %}
+                      {% endwith %}
+                    {% endwith %}
                     <form method="post" action="{% url 'ops:alert_snooze' %}" class="d-inline">
                       {% csrf_token %}
                       <input type="hidden" name="source" value="{{ r.source }}">
-                                            <input type="hidden" name="minutes" value="1440">
+                      <input type="hidden" name="minutes" value="30">
+                      <button class="btn btn-xs btn-outline-secondary" type="submit" title="Snooze 30 minutes">30m</button>
+                    </form>
+                    <form method="post" action="{% url 'ops:alert_snooze' %}" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="source" value="{{ r.source }}">
+                      <input type="hidden" name="minutes" value="120">
+                      <button class="btn btn-xs btn-outline-secondary" type="submit" title="Snooze 2 hours">2h</button>
+                    </form>
+                    <form method="post" action="{% url 'ops:alert_snooze' %}" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="source" value="{{ r.source }}">
+                      <input type="hidden" name="minutes" value="1440">
                       <button class="btn btn-xs btn-outline-secondary" type="submit" title="Snooze 1 day">1d</button>
+                    </form>
+                    <form method="post" action="{% url 'ops:alert_snooze' %}" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="source" value="{{ r.source }}">
+                      <input type="hidden" name="minutes" value="10080">
+                      <button class="btn btn-xs btn-outline-secondary" type="submit" title="Snooze 7 days">7d</button>
                     </form>
                   </td>
                 </tr>
@@ -182,12 +213,49 @@
                     <a class="text-decoration-none" href="{% url 'ops:alerts' %}?status=open&source={{ r.source }}{% if r.company_id %}&company_id={{ r.company_id }}{% endif %}">{{ r.total }}</a>
                   </td>
                   <td class="text-end">
+                    {% with scope=r.company_id|default:"platform" %}
+                      {% with snooze_key=r.source|add:":"|add:scope %}
+                      {% with info=snooze_map|get_item:snooze_key %}
+                      {% if info %}
+                        <span class="badge text-bg-warning me-1">Snoozed</span>
+                        <span class="text-muted small">until {{ info.until|date:'M j, Y g:i A' }}</span>
+                        <form method="post" action="{% url 'ops:alert_snooze_clear' %}" class="d-inline ms-1">
+                          {% csrf_token %}
+                          <input type="hidden" name="source" value="{{ r.source }}">
+                          {% if r.company_id %}<input type="hidden" name="company_id" value="{{ r.company_id }}">{% endif %}
+                          <button class="btn btn-xs btn-outline-danger" type="submit" title="Clear snooze">Clear</button>
+                        </form>
+                      {% endif %}
+                      {% endwith %}
+                    {% endwith %}
+                    {% endwith %}
+                    <form method="post" action="{% url 'ops:alert_snooze' %}" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="source" value="{{ r.source }}">
+                      {% if r.company_id %}<input type="hidden" name="company_id" value="{{ r.company_id }}">{% endif %}
+                      <input type="hidden" name="minutes" value="30">
+                      <button class="btn btn-xs btn-outline-secondary" type="submit" title="Snooze 30 minutes">30m</button>
+                    </form>
+                    <form method="post" action="{% url 'ops:alert_snooze' %}" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="source" value="{{ r.source }}">
+                      {% if r.company_id %}<input type="hidden" name="company_id" value="{{ r.company_id }}">{% endif %}
+                      <input type="hidden" name="minutes" value="120">
+                      <button class="btn btn-xs btn-outline-secondary" type="submit" title="Snooze 2 hours">2h</button>
+                    </form>
                     <form method="post" action="{% url 'ops:alert_snooze' %}" class="d-inline">
                       {% csrf_token %}
                       <input type="hidden" name="source" value="{{ r.source }}">
                       {% if r.company_id %}<input type="hidden" name="company_id" value="{{ r.company_id }}">{% endif %}
                       <input type="hidden" name="minutes" value="1440">
                       <button class="btn btn-xs btn-outline-secondary" type="submit" title="Snooze 1 day">1d</button>
+                    </form>
+                    <form method="post" action="{% url 'ops:alert_snooze' %}" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="source" value="{{ r.source }}">
+                      {% if r.company_id %}<input type="hidden" name="company_id" value="{{ r.company_id }}">{% endif %}
+                      <input type="hidden" name="minutes" value="10080">
+                      <button class="btn btn-xs btn-outline-secondary" type="submit" title="Snooze 7 days">7d</button>
                     </form>
                   </td>
                 </tr>

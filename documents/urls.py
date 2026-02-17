@@ -43,6 +43,7 @@ urlpatterns = [
     path("invoices/recurring/<uuid:pk>/", views_recurring.recurring_plan_edit, name="recurring_plan_edit"),
     path("invoices/recurring/<uuid:pk>/run/", views_recurring.recurring_plan_run_now, name="recurring_plan_run_now"),
     path("invoices/recurring/<uuid:pk>/toggle/", views_recurring.recurring_plan_toggle, name="recurring_plan_toggle"),
+    path("statements/collections/follow-ups/", views.collections_followups_due, name="collections_followups_due"),
     path("statements/client/<uuid:client_pk>/", views.client_statement, name="client_statement"),
     path("statements/client/<uuid:client_pk>/csv/", views.client_statement_csv, name="client_statement_csv"),
     path("statements/client/<uuid:client_pk>/pdf/", views.client_statement_pdf, name="client_statement_pdf"),
@@ -52,5 +53,7 @@ urlpatterns = [
     path("statements/client/<uuid:client_pk>/reminders/<uuid:reminder_pk>/cancel/", views.client_statement_reminder_cancel, name="client_statement_reminder_cancel"),
     path("statements/client/<uuid:client_pk>/reminders/<uuid:reminder_pk>/reschedule/", views.client_statement_reminder_reschedule, name="client_statement_reminder_reschedule"),
     path("statements/client/<uuid:client_pk>/reminders/<uuid:reminder_pk>/retry-now/", views.client_statement_reminder_retry_now, name="client_statement_reminder_retry_now"),
+    path("statements/client/<uuid:client_pk>/collections-notes/add/", views.client_statement_collections_note_add, name="client_statement_collections_note_add"),
+    path("statements/client/<uuid:client_pk>/collections-notes/<uuid:note_pk>/done/", views.client_statement_collections_note_done, name="client_statement_collections_note_done"),
     path("statements/reminders/", views.statement_reminders_list, name="statement_reminders"),
 ]

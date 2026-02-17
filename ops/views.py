@@ -36,9 +36,7 @@ from billing.stripe_service import fetch_and_sync_subscription_from_stripe
 from core.launch_checks import run_launch_checks
 from core.retention import get_retention_days, run_prune_jobs
 
-
 from .forms import ReleaseNoteForm, OpsChecksForm, OpsEmailTestForm, OpsAlertRoutingForm
-from .decorators import staff_only
 
 from .services_alerts import create_ops_alert
 
@@ -70,6 +68,21 @@ def _sentry_enabled() -> bool:
 
 def _is_staff(user) -> bool:
     return bool(user and user.is_authenticated and user.is_staff)
+
+from functools import wraps
+
+
+def staff_only(view_func):
+    """Decorator: staff-only view (login required)."""
+
+    @login_required
+    @user_passes_test(_is_staff)
+    @wraps(view_func)
+    def _wrapped(request: HttpRequest, *args, **kwargs):
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped
+
 
 
 def _recent_webhooks_for_company(company: Company, limit: int = 50):
@@ -268,6 +281,25 @@ def ops_dashboard(request: HttpRequest) -> HttpResponse:
         .order_by("-total", "source")
     )[:20]
 
+
+    # Phase 7H45/7H46: show active snoozes on the Ops Dashboard grouping tables.
+    # We store both the latest `snoozed_until` and the snooze row id so the UI can clear it.
+    snooze_map: dict[str, dict[str, object]] = {}
+    try:
+        from .models import OpsAlertSnooze
+
+        active_snoozes = (
+            OpsAlertSnooze.objects.filter(snoozed_until__gt=timezone.now())
+            .order_by("source", "company_id", "-snoozed_until")
+        )
+        for s in active_snoozes:
+            key = f"{s.source}:{s.company_id or 'platform'}"
+            # Keep the *latest* snooze per key.
+            if key not in snooze_map:
+                snooze_map[key] = {"until": s.snoozed_until, "id": s.id}
+    except Exception:
+        snooze_map = {}
+
     return render(
         request,
         "ops/dashboard.html",
@@ -284,8 +316,129 @@ def ops_dashboard(request: HttpRequest) -> HttpResponse:
             "scheduler_warnings": scheduler_warnings,
             "open_alert_groups": list(open_alert_groups),
             "open_alert_by_source": list(open_alert_by_source),
+            "snooze_map": snooze_map,
         },
     )
+
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_alert_snooze_clear(request: HttpRequest) -> HttpResponse:
+    """Clear active snoozes for a source and optional company.
+
+    Phase 7H46:
+    - Expose a one-click "clear snooze" action from dashboard groupings.
+
+    Input:
+      POST source=<OpsAlertSource>
+      POST company_id=<uuid> (optional; when omitted clears platform snoozes for the source)
+    """
+
+    if request.method != "POST":
+        return HttpResponse(status=405)
+
+    source = (request.POST.get("source") or "").strip()
+    company_id = (request.POST.get("company_id") or "").strip()
+    now = timezone.now()
+
+    if not source:
+        messages.error(request, "Missing source.")
+        return redirect("ops:dashboard")
+
+    try:
+        from .models import OpsAlertSnooze
+        qs = OpsAlertSnooze.objects.filter(source=source, snoozed_until__gt=now)
+        if company_id:
+            qs = qs.filter(company_id=company_id)
+        else:
+            qs = qs.filter(company__isnull=True)
+
+        deleted, _ = qs.delete()
+        if deleted:
+            messages.success(request, "Snooze cleared.")
+        else:
+            messages.info(request, "No active snooze to clear.")
+    except Exception:
+        messages.error(request, "Could not clear snooze.")
+
+    return redirect("ops:dashboard")
+
+@staff_only
+def ops_alert_snoozes(request: HttpRequest) -> HttpResponse:
+    """List alert snoozes (active + expired) for audit visibility.
+
+    Phase 7H47:
+    - Provide a dedicated snooze list/detail so staff can see what is suppressed and why.
+    """
+
+    from .models import OpsAlertSnooze
+
+    now = timezone.now()
+    status = (request.GET.get("status") or "active").strip().lower()
+    q = (request.GET.get("q") or "").strip()
+
+    qs = OpsAlertSnooze.objects.select_related("company").all()
+
+    if status == "expired":
+        qs = qs.filter(snoozed_until__lte=now)
+    elif status == "all":
+        pass
+    else:
+        status = "active"
+        qs = qs.filter(snoozed_until__gt=now)
+
+    if q:
+        qs = qs.filter(
+            Q(source__icontains=q)
+            | Q(reason__icontains=q)
+            | Q(created_by_email__icontains=q)
+            | Q(company__name__icontains=q)
+        )
+
+    qs = qs.order_by("-snoozed_until", "-created_at")
+
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get("page") or 1)
+
+    return render(
+        request,
+        "ops/alert_snoozes.html",
+        {
+            "status": status,
+            "q": q,
+            "page_obj": page_obj,
+            "now": now,
+        },
+    )
+
+
+@staff_only
+def ops_alert_snooze_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    """Snooze detail view (audit)."""
+    from .models import OpsAlertSnooze
+
+    snooze = get_object_or_404(OpsAlertSnooze.objects.select_related("company"), pk=pk)
+    now = timezone.now()
+    is_active = snooze.snoozed_until > now
+    return render(request, "ops/alert_snooze_detail.html", {"snooze": snooze, "now": now, "is_active": is_active})
+
+
+@staff_only
+@require_POST
+def ops_alert_snooze_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    """Delete a snooze record."""
+    from .models import OpsAlertSnooze
+
+    snooze = get_object_or_404(OpsAlertSnooze, pk=pk)
+    try:
+        snooze.delete()
+        messages.success(request, "Snooze deleted.")
+    except Exception:
+        messages.error(request, "Could not delete snooze.")
+
+    return redirect("ops:alert_snoozes")
+
+
 
 
 @login_required

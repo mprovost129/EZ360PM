@@ -166,4 +166,52 @@
 
   initEzDropdown('companyDropdownToggle', 'companyDropdownMenu');
 
+  // Sidebar active link highlighting (Phase 8 UI polish)
+  (function markActiveSidebarLink(){
+    const links = Array.from(document.querySelectorAll('.app-sidebar a.sidebar-link[href]'));
+    if (!links.length) return;
+
+    const path = window.location.pathname || '/';
+
+    function normalize(p){
+      if (!p) return '/';
+      // strip query/hash handled by browser for pathname already
+      if (p.length > 1 && p.endsWith('/')) return p.slice(0, -1);
+      return p;
+    }
+
+    const cur = normalize(path);
+
+    // Prefer the longest matching prefix link (most specific)
+    let best = null;
+    let bestLen = -1;
+
+    for (const a of links){
+      const href = a.getAttribute('href') || '';
+      if (!href || href === '#' || href.startsWith('javascript:')) continue;
+      if (a.hasAttribute('data-bs-toggle')) continue;
+      // ignore external links
+      if (href.startsWith('http://') || href.startsWith('https://')) continue;
+
+      const target = normalize(href);
+      if (target === '/') continue;
+
+      if (cur === target || cur.startsWith(target + '/')){
+        if (target.length > bestLen){
+          best = a;
+          bestLen = target.length;
+        }
+      }
+    }
+
+    if (!best) return;
+    best.classList.add('active');
+
+    // If link is inside a collapsed group, open it
+    const collapse = best.closest('.collapse');
+    if (collapse && !collapse.classList.contains('show')){
+      collapse.classList.add('show');
+    }
+  })();
+
 })();

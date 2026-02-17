@@ -1,0 +1,80 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+  <div style="max-width: 1100px;">
+    <h1>{{ title }}</h1>
+
+    <p>
+      Required: <strong>{{ required_count }}</strong>
+      &nbsp;|&nbsp;
+      Existing: <strong>{{ existing_count }}</strong>
+      &nbsp;|&nbsp;
+      Missing: <strong>{{ missing_count }}</strong>
+    </p>
+
+    <div class="module">
+      <h2>Missing required keys</h2>
+      {% if missing %}
+        <table class="adminlist" style="width:100%">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for k in missing %}
+              <tr>
+                <td><code>{{ k }}</code></td>
+                <td>
+                  <a class="button" href="../add/">Upload screenshot</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p style="margin-top: 10px; color: #666;">Tip: When uploading, set <code>key</code> exactly to the required value.</p>
+      {% else %}
+        <p>All required screenshot keys have uploads. ✅</p>
+      {% endif %}
+    </div>
+
+    <div class="module">
+      <h2>Required key list</h2>
+      <table class="adminlist" style="width:100%">
+        <thead><tr><th>Key</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for k in required %}
+            <tr>
+              <td><code>{{ k }}</code></td>
+              <td>
+                {% if k in missing %}
+                  <span style="color:#b00020; font-weight:600;">Missing</span>
+                {% else %}
+                  <span style="color:#1b5e20; font-weight:600;">OK</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if extra %}
+      <div class="module">
+        <h2>Uploads not in required list</h2>
+        <p style="color:#666;">These exist in the database but are not referenced by the current Help Center templates.</p>
+        <ul>
+          {% for k in extra %}
+            <li><code>{{ k }}</code></li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    <p style="margin-top: 14px;">
+      <a href="../" class="button">Back to screenshots</a>
+    </p>
+  </div>
+{% endblock %}

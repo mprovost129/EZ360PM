@@ -6,8 +6,8 @@
 {% block content %}
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
   <div>
-    <h1 class="h4 mb-1">{{ doc_label }}s</h1>
-    <div class="text-secondary small">Create, send, and track your {{ doc_label|lower }}s.</div>
+    <h1 class="ez-page-title">{{ doc_label }}s</h1>
+    <div class="ez-page-subtitle">Create, send, and track your {{ doc_label|lower }}s.</div>
   </div>
 
   {% if is_manager %}
@@ -39,9 +39,9 @@
   </div>
 </form>
 
-<div class="card">
+<div class="card shadow-sm">
   <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
+    <table class="table table-hover align-middle ez-table">
       <thead class="table-light">
         <tr>
           <th style="width: 140px;">Number</th>

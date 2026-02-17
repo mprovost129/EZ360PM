@@ -7,8 +7,8 @@
 {% block content %}
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
   <div>
-    <h1 class="h4 mb-1">Payments</h1>
-    <div class="text-secondary small">Record payments and keep invoices up to date.</div>
+    <h1 class="ez-page-title">Payments</h1>
+    <div class="ez-page-subtitle">Record payments and keep invoices up to date.</div>
   </div>
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="{% url 'payments:credit_summary' %}">
@@ -43,7 +43,7 @@
 
 <div class="card">
   <div class="table-responsive">
-    <table class="table table-sm align-middle mb-0">
+    <table class="table table-hover align-middle ez-table">
       <thead class="table-light">
         <tr>
           <th>Client</th>

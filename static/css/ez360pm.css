@@ -102,6 +102,7 @@ a:hover{ color: var(--ez-link-hover); }
   display:flex;
   gap:.6rem;
   align-items:center;
+  position: relative;
 }
 .sidebar-link:hover{ background: rgba(148,163,184,.18); }
 html[data-theme="dark"] .sidebar-link:hover{ background: rgba(148,163,184,.12); }
@@ -109,6 +110,58 @@ html[data-theme="dark"] .sidebar-link:hover{ background: rgba(148,163,184,.12); 
 .sidebar-link.active{
   background: linear-gradient(90deg, rgba(31,95,191,.14), rgba(56,178,111,.12));
   border: 1px solid rgba(31,95,191,.18);
+}
+
+/* Active indicator bar (keeps layout stable) */
+.sidebar-link.active::before{
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--ez-blue), var(--ez-green));
+}
+
+/* Phase 8 UI foundation: card standardization */
+.card.shadow-sm{
+  border: 0 !important;
+  border-radius: 1rem !important;
+}
+.card.shadow-sm .card-header{
+  background: transparent;
+  border-bottom-color: var(--ez-border);
+}
+
+/* Page headers */
+.ez-page-title{
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin-bottom: .25rem;
+}
+.ez-page-subtitle{
+  color: var(--ez-text-muted);
+  font-size: .9rem;
+}
+
+/* Tables inside cards */
+.ez-table{
+  margin-bottom: 0;
+}
+.ez-table thead th{
+  font-size: .85rem;
+  font-weight: 600;
+}
+
+/* Icon buttons (action columns) */
+.btn-icon{
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 
 .badge-soft{

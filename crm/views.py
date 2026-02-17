@@ -80,6 +80,16 @@ def client_list(request: HttpRequest) -> HttpResponse:
     paged = paginate(request, qs.order_by("company_name", "last_name", "first_name"))
     clients = paged.object_list
 
+    # Phase 7H45: attach statement activity (last viewed / last sent) for optional list columns.
+    activity_map = {}
+    try:
+        from documents.models import ClientStatementActivity
+
+        acts = ClientStatementActivity.objects.filter(company=company, client_id__in=[c.id for c in clients])
+        activity_map = {a.client_id: a for a in acts}
+    except Exception:
+        activity_map = {}
+
     # annotate display strings
     rows = []
     for c in clients:

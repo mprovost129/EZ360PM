@@ -6,8 +6,8 @@
 {% block content %}
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
   <div>
-    <h1 class="h4 mb-1">Clients</h1>
-    <div class="text-secondary small">All clients for your active company.</div>
+    <h1 class="ez-page-title">Clients</h1>
+    <div class="ez-page-subtitle">All clients for your active company.</div>
   </div>
 
   <div class="d-flex gap-2">
@@ -52,7 +52,7 @@
 
 <div class="card shadow-sm">
   <div class="table-responsive">
-    <table class="table table-sm mb-0 align-middle">
+    <table class="table table-hover align-middle ez-table">
       <thead class="table-light">
         <tr>
           <th>Client</th>
@@ -60,6 +60,8 @@
           <th>Internal note</th>
           <th class="text-end">Credit</th>
           <th class="text-end">Total outstanding</th>
+          <th class="text-end">Stmt viewed</th>
+          <th class="text-end">Stmt sent</th>
           {% if can_manage %}<th class="text-end">Actions</th>{% endif %}
         </tr>
       </thead>
@@ -78,6 +80,12 @@
             </td>
             <td class="text-end">${{ r.credit }}</td>
             <td class="text-end">${{ r.outstanding }}</td>
+            <td class="text-end text-secondary small">
+              {% if r.stmt_activity and r.stmt_activity.last_viewed_at %}{{ r.stmt_activity.last_viewed_at|date:"M j" }}{% else %}—{% endif %}
+            </td>
+            <td class="text-end text-secondary small">
+              {% if r.stmt_activity and r.stmt_activity.last_sent_at %}{{ r.stmt_activity.last_sent_at|date:"M j" }}{% else %}—{% endif %}
+            </td>
             {% if can_manage %}
               <td class="text-end">
                 <div class="btn-group btn-group-sm">
@@ -91,7 +99,7 @@
           </tr>
         {% empty %}
           <tr>
-            <td colspan="6">
+            <td colspan="8">
               {% include "includes/empty_state.html" with title="No clients yet" subtitle="Create a client to start tracking projects, invoices, and payments." %}
               {% if can_manage %}
                 <div class="text-center pb-4">

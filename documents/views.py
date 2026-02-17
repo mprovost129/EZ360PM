@@ -7,20 +7,18 @@ from datetime import date, timedelta
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Q, Count
 from django.db.models.functions import TruncDate
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-
 from django.utils import timezone
-from django.contrib.auth.decorators import login_required
 
 from audit.services import log_event
 from audit.models import AuditEvent
 from companies.decorators import company_context_required, require_min_role
-# Alias for compatibility with existing decorators
 require_active_company = company_context_required
 from companies.models import EmployeeRole
 from projects.models import Project
@@ -42,6 +40,8 @@ from .models import (
     CreditNote,
     CreditNoteStatus,
     CreditNoteNumberSequence,
+    ClientCollectionsNote,
+    CollectionsNoteStatus,
     StatementReminder,
     StatementReminderStatus,
 )
@@ -815,6 +815,44 @@ def _statement_rows(company, client, *, date_from=None, date_to=None):
 
 @company_context_required
 @require_min_role(EmployeeRole.MANAGER)
+
+
+@company_context_required
+def collections_followups_due(request):
+    """Company-wide queue of collections follow-ups due (open notes with follow_up_on <= today).
+
+    Phase 7H47:
+    - Provide a lightweight, actionable queue for collections follow-ups.
+    """
+
+    company = request.active_company
+    today = timezone.localdate()
+    q = (request.GET.get("q") or "").strip()
+
+    qs = (
+        ClientCollectionsNote.objects.filter(
+            company=company,
+            status=CollectionsNoteStatus.OPEN,
+            follow_up_on__isnull=False,
+            follow_up_on__lte=today,
+        )
+        .select_related("client", "created_by")
+        .order_by("follow_up_on", "client__name", "-created_at")
+    )
+
+    if q:
+        qs = qs.filter(Q(client__name__icontains=q) | Q(note__icontains=q))
+
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get("page") or 1)
+
+    return render(
+        request,
+        "documents/collections_followups_due.html",
+        {"page_obj": page_obj, "today": today, "q": q},
+    )
+
+
 def _weasyprint_is_installed() -> bool:
     try:
         import weasyprint  # type: ignore  # noqa: F401
@@ -827,6 +865,7 @@ def client_statement(request, client_pk):
     company = request.active_company
     client = get_object_or_404(Client, id=client_pk, company=company, deleted_at__isnull=True)
 
+    activity = None
     # Phase 7H44: record statement view history (best-effort; never blocks).
     try:
         activity, _ = ClientStatementActivity.objects.get_or_create(company=company, client=client)
@@ -890,14 +929,38 @@ def client_statement(request, client_pk):
         .order_by("-attempted_at", "-updated_at")[:10]
     )
 
+    # Phase 7H46: collections notes + follow-up tasks.
+    collections_notes = (
+        ClientCollectionsNote.objects
+        .filter(company=company, client=client, deleted_at__isnull=True)
+        .select_related("created_by", "completed_by")
+        .order_by("status", "-created_at")
+    )
+    collections_notes_recent = list(collections_notes[:15])
+    collections_open_followups = (
+        ClientCollectionsNote.objects
+        .filter(
+            company=company,
+            client=client,
+            status=CollectionsNoteStatus.OPEN,
+            follow_up_on__isnull=False,
+            deleted_at__isnull=True,
+            follow_up_on__lte=today,
+        )
+        .count()
+    )
+
     return render(
         request,
         "documents/client_statement.html",
         {
             "client": client,
+            "activity": activity,
             "scheduled_reminders": StatementReminder.objects.filter(company=company, client=client, status=StatementReminderStatus.SCHEDULED, deleted_at__isnull=True).order_by("scheduled_for")[:20],
             "sent_reminders": sent_reminders,
             "failed_reminders": failed_reminders,
+            "collections_notes": collections_notes_recent,
+            "collections_open_followups": collections_open_followups,
             "cadence_suggestions": suggestions,
             "default_recipient_email": initial_to_email,
             "rows": rows,
@@ -919,6 +982,7 @@ def client_statement_csv(request, client_pk):
     company = request.active_company
     client = get_object_or_404(Client, id=client_pk, company=company, deleted_at__isnull=True)
 
+    activity = None
     # Phase 7H44: record statement view history (best-effort; never blocks).
     try:
         activity, _ = ClientStatementActivity.objects.get_or_create(company=company, client=client)
@@ -987,6 +1051,7 @@ def client_statement_pdf(request, client_pk):
     company = request.active_company
     client = get_object_or_404(Client, id=client_pk, company=company, deleted_at__isnull=True)
 
+    activity = None
     # Phase 7H44: record statement view history (best-effort; never blocks).
     try:
         activity, _ = ClientStatementActivity.objects.get_or_create(company=company, client=client)
@@ -1019,6 +1084,7 @@ def client_statement_pdf(request, client_pk):
         "documents/client_statement_pdf.html",
         {
             "client": client,
+            "activity": activity,
             "scheduled_reminders": StatementReminder.objects.filter(company=company, client=client, status=StatementReminderStatus.SCHEDULED, deleted_at__isnull=True).order_by("scheduled_for")[:20],
             "default_recipient_email": initial_to_email,
             "company": company,
@@ -1062,6 +1128,7 @@ def client_statement_email(request, client_pk):
     employee = request.active_employee
     client = get_object_or_404(Client, id=client_pk, company=company, deleted_at__isnull=True)
 
+    activity = None
     # Phase 7H44: record statement view history (best-effort; never blocks).
     try:
         activity, _ = ClientStatementActivity.objects.get_or_create(company=company, client=client)
@@ -1163,6 +1230,7 @@ def client_statement_email_preview(request, client_pk):
     company = request.active_company
     client = get_object_or_404(Client, id=client_pk, company=company, deleted_at__isnull=True)
 
+    activity = None
     # Phase 7H44: record statement view history (best-effort; never blocks).
     try:
         activity, _ = ClientStatementActivity.objects.get_or_create(company=company, client=client)
@@ -1260,8 +1328,7 @@ def client_statement_reminder_create(request, client_pk):
     return redirect("documents:client_statement", client_pk=client.id)
 
 
-@login_required
-@require_active_company
+@company_context_required
 def client_statement_reminder_cancel(request, client_pk, reminder_pk):
     company = request.company
     client = get_object_or_404(Client, pk=client_pk, company=company, deleted_at__isnull=True)
@@ -1278,8 +1345,7 @@ def client_statement_reminder_cancel(request, client_pk, reminder_pk):
     return redirect("documents:client_statement", client_pk=client.id)
 
 
-@login_required
-@require_active_company
+@company_context_required
 def client_statement_reminder_reschedule(request, client_pk, reminder_pk):
     """One-click reschedule for FAILED reminders.
 
@@ -1313,8 +1379,7 @@ def client_statement_reminder_reschedule(request, client_pk, reminder_pk):
     return redirect("documents:client_statement", client_pk=client.id)
 
 
-@login_required
-@require_active_company
+@company_context_required
 def client_statement_reminder_retry_now(request, client_pk, reminder_pk):
     """Staff-only: retry sending a single reminder immediately.
 
@@ -1373,6 +1438,74 @@ def client_statement_reminder_retry_now(request, client_pk, reminder_pk):
         reminder.save(update_fields=["status", "last_error", "updated_at"])
         messages.error(request, f"Send failed: {exc}")
 
+    return redirect("documents:client_statement", client_pk=client.id)
+
+
+@company_context_required
+def client_statement_collections_note_add(request, client_pk):
+    """Add a collections note for a client.
+
+    Phase 7H46: lightweight collections notes + follow-up tasks.
+    """
+
+    company = request.company
+    client = get_object_or_404(Client, pk=client_pk, company=company, deleted_at__isnull=True)
+
+    if request.method != "POST":
+        return redirect("documents:client_statement", client_pk=client.id)
+
+    note = (request.POST.get("note") or "").strip()
+    follow_up_on_raw = (request.POST.get("follow_up_on") or "").strip()
+
+    if not note:
+        messages.error(request, "Note is required.")
+        return redirect("documents:client_statement", client_pk=client.id)
+
+    follow_up_on = None
+    if follow_up_on_raw:
+        try:
+            from django.utils.dateparse import parse_date
+
+            follow_up_on = parse_date(follow_up_on_raw)
+        except Exception:
+            follow_up_on = None
+
+    actor = getattr(request, "employee_profile", None)
+
+    ClientCollectionsNote.objects.create(
+        company=company,
+        client=client,
+        note=note,
+        follow_up_on=follow_up_on,
+        status=CollectionsNoteStatus.OPEN,
+        created_by=actor,
+        updated_by_user=request.user if getattr(request, "user", None) and getattr(request.user, "is_authenticated", False) else None,
+    )
+
+    messages.success(request, "Collections note added.")
+    return redirect("documents:client_statement", client_pk=client.id)
+
+
+@company_context_required
+def client_statement_collections_note_done(request, client_pk, note_pk):
+    """Mark a collections note as done."""
+
+    company = request.company
+    client = get_object_or_404(Client, pk=client_pk, company=company, deleted_at__isnull=True)
+    note = get_object_or_404(ClientCollectionsNote, pk=note_pk, company=company, client=client, deleted_at__isnull=True)
+
+    if request.method == "POST":
+        actor = getattr(request, "employee_profile", None)
+        note.status = CollectionsNoteStatus.DONE
+        note.completed_at = timezone.now()
+        note.completed_by = actor
+        note.updated_by_user = request.user if getattr(request, "user", None) and getattr(request.user, "is_authenticated", False) else None
+        note.save(update_fields=["status", "completed_at", "completed_by", "updated_by_user", "updated_at"])
+        messages.success(request, "Collections note marked done.")
+
+    next_url = (request.POST.get("next") or "").strip()
+    if next_url:
+        return redirect(next_url)
     return redirect("documents:client_statement", client_pk=client.id)
 
 

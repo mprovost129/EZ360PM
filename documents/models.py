@@ -567,6 +567,49 @@ class ClientStatementActivity(SyncModel):
     def __str__(self) -> str:
         return f"{self.company.name} · {self.client.display_label()}"
 
+
+class CollectionsNoteStatus(models.TextChoices):
+    OPEN = "open", "Open"
+    DONE = "done", "Done"
+
+
+class ClientCollectionsNote(SyncModel):
+    """Lightweight collections notes + follow-up tasks per client.
+
+    Phase 7H46:
+    - Allow staff to log collections notes directly from the Client Statement page.
+    - Support optional follow-up date to act as a simple task/reminder.
+    - Support completing (mark done) without deletion.
+    """
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="collections_notes")
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="collections_notes")
+
+    note = models.TextField(blank=False)
+    follow_up_on = models.DateField(null=True, blank=True, db_index=True)
+
+    status = models.CharField(max_length=12, choices=CollectionsNoteStatus.choices, default=CollectionsNoteStatus.OPEN, db_index=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    completed_by = models.ForeignKey(
+        EmployeeProfile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="completed_collections_notes",
+    )
+
+    created_by = models.ForeignKey(EmployeeProfile, null=True, blank=True, on_delete=models.SET_NULL, related_name="created_collections_notes")
+
+    class Meta:
+        ordering = ["status", "-created_at"]
+        indexes = [
+            models.Index(fields=["company", "client", "status"], name="doc_colnote_co_client_stat_idx"),
+            models.Index(fields=["company", "status", "follow_up_on"], name="doc_colnote_co_stat_due_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.company.name} · {self.client.display_label()} · {self.status}"
+
 class StatementReminderTone(models.TextChoices):
     FRIENDLY = "friendly", "Friendly nudge"
     PAST_DUE = "past_due", "Past due"

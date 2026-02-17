@@ -454,6 +454,11 @@ class SiteConfig(models.Model):
         help_text="Resolved alerts older than this many days may be pruned.",
     )
 
+    ops_snooze_prune_after_days = models.PositiveSmallIntegerField(
+        default=30,
+        help_text="Expired snoozes older than this many days may be pruned (for audit cleanliness).",
+    )
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

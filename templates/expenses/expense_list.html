@@ -7,8 +7,8 @@
 {% block content %}
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
   <div>
-    <h1 class="h4 mb-1">Expenses</h1>
-    <div class="text-secondary small">Track business expenses and link them to clients and projects.</div>
+    <h1 class="ez-page-title">Expenses</h1>
+    <div class="ez-page-subtitle">Track business expenses and link them to clients and projects.</div>
   </div>
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="{% url 'expenses:merchant_list' %}"><i class="bi bi-shop me-1"></i>Merchants</a>
@@ -41,7 +41,7 @@
 
 <div class="card shadow-sm">
   <div class="table-responsive">
-    <table class="table table-hover mb-0 align-middle">
+    <table class="table table-hover align-middle ez-table">
       <thead class="table-light">
         <tr>
           <th>Date</th>
