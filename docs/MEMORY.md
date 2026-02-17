@@ -1293,3 +1293,20 @@ Next:
   - Key list pages updated: Clients, Documents, Projects, Time entries, Payments, Expenses, Payables (Vendors/Bills).
 - Added `doc_status_badge_class` template filter to standardize document status badge colors.
 
+## 2026-02-16 — Phase 8D (DONE) — Forms UX Upgrade
+- UI: Implemented sticky form action footer pattern (Cancel + Save) via `templates/partials/form_footer.html`.
+- UI: Added `.ez-form` and `.ez-form-footer` styles to keep actions visible on long pages.
+- Updated forms to use card-based sections and consistent actions:
+  - Client form
+  - Project form (split into Details / Schedule / Billing / Services)
+  - Catalog item form
+  - Document edit now uses sticky footer; moved credit/credit-note actions outside the main edit form.
+
+## 2026-02-16 — Hotfix — Render DB missing TimeTrackingSettings columns
+
+- Fixed production error on `/time/` where Postgres lacked `timetracking_timetrackingsettings.last_project_id`.
+- Added migration `timetracking/migrations/0002_timetrackingsettings_timer_defaults.py` to add the missing fields:
+  - `last_project` (FK → Project, nullable)
+  - `last_service_catalog_item` (FK → CatalogItem, nullable)
+- Deploy note: after pulling this change, run `python manage.py migrate` (no `makemigrations` needed).
+

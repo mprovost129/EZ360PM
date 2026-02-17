@@ -16,7 +16,7 @@
   </div>
 </div>
 
-<form method="post" novalidate>
+<form method="post" novalidate class="ez-form">
   {% csrf_token %}
 
   <div class="card shadow-sm mb-3">
@@ -138,9 +138,7 @@
     </div>
   </div>
 
-  <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary" href="{% url 'crm:client_list' %}">Cancel</a>
-    <button class="btn btn-dark" type="submit">Save</button>
-  </div>
+  {% url 'crm:client_list' as cancel_url %}
+  {% include "partials/form_footer.html" with cancel_url=cancel_url primary_label="Save" %}
 </form>
 {% endblock %}

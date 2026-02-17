@@ -293,3 +293,22 @@ body.no-scroll{ overflow: hidden; }
   *{ scroll-behavior: auto !important; }
   .offcanvas, .collapse{ transition: none !important; }
 }
+
+/* Phase 8D: forms UX upgrade */
+.ez-form{
+  padding-bottom: 96px; /* space for sticky footer inside scrolling main */
+}
+.ez-form-footer{
+  position: sticky;
+  bottom: 0;
+  z-index: 1020;
+  background: rgba(255,255,255,.92);
+  border: 1px solid var(--ez-border);
+  border-radius: .9rem;
+  padding: .75rem .9rem;
+  box-shadow: 0 -10px 30px rgba(0,0,0,.05);
+  backdrop-filter: blur(6px);
+}
+html[data-theme="dark"] .ez-form-footer{
+  background: rgba(15,23,42,.88);
+}

@@ -37,7 +37,7 @@
   </div>
 {% endif %}
 
-<form method="post">
+<form method="post" novalidate class="ez-form">
   {% csrf_token %}
   <div class="row g-3">
     <div class="col-lg-4">
@@ -170,19 +170,16 @@
             </tbody>
           </table>
         </div>
-
-        <div class="d-flex gap-2 justify-content-end">
-          {% if is_locked %}
-            <button class="btn btn-dark" type="button" disabled title="This invoice is locked and cannot be edited.">
-              <i class="bi bi-lock me-1"></i>Locked
-            </button>
-          {% else %}
-            <button class="btn btn-dark" type="submit"><i class="bi bi-save me-1"></i>Save</button>
-          {% endif %}
-        </div>
       </div>
     </div>
   </div>
+
+  {# Sticky actions #}
+  {% if doc_type == 'invoice' %}{% url 'documents:invoice_list' as cancel_url %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_list' as cancel_url %}{% else %}{% url 'documents:proposal_list' as cancel_url %}{% endif %}
+  {% include "partials/form_footer.html" with cancel_url=cancel_url primary_label="Save" disabled=doc.is_locked disabled_title="This document is locked and cannot be edited." %}
+
+</form>
+
 
   {% if doc_type == 'invoice' %}
   {% if doc.client and client_credit_cents %}
@@ -301,5 +298,4 @@
     </div>
   </div>
 
-</form>
 {% endblock %}

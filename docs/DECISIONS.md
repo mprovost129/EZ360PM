@@ -957,3 +957,8 @@ Rationale:
 - Document status colors are centralized in a template filter (`doc_status_badge_class`).
   Rationale: prevents drift across templates and makes future tweaks a one-file change.
 
+## UI — Sticky form footer pattern (Phase 8D)
+- Long forms must include a **sticky footer** with primary actions (Save) and secondary (Cancel) using `templates/partials/form_footer.html`.
+- Forms should use `class="ez-form"` so the scroll container reserves room for the footer.
+- Avoid nested forms inside the main edit form; separate non-edit actions (e.g., credit notes posting) into standalone forms outside the primary edit form where possible.
+
