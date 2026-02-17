@@ -1309,4 +1309,7 @@ Next:
   - `last_project` (FK → Project, nullable)
   - `last_service_catalog_item` (FK → CatalogItem, nullable)
 - Deploy note: after pulling this change, run `python manage.py migrate` (no `makemigrations` needed).
+- Follow-up hotfix: added migration `timetracking/migrations/0003_timetrackingsettings_timer_text_defaults.py` to add missing text fields referenced by code:
+  - `last_service_name` (CharField)
+  - `last_note` (TextField)
 
