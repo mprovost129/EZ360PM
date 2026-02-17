@@ -21,6 +21,9 @@
       <div class="card shadow-sm">
         <div class="card-body">
           <div class="fw-semibold mb-2">Browse</div>
+          <div class="mb-2">
+            <input id="helpFilterInput" type="search" class="form-control form-control-sm" placeholder="Search help…" aria-label="Search help">
+          </div>
           <div class="list-group list-group-flush">
             <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:getting_started' %}">Getting started</a>
             <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:roles_permissions' %}">Roles & permissions</a>
@@ -70,4 +73,32 @@
     </div>
   </div>
 </div>
+
+<script>
+  (function () {
+    const input = document.getElementById('helpFilterInput');
+    if (!input) return;
+    const items = Array.from(document.querySelectorAll('.list-group a.list-group-item'));
+
+    function norm(s) {
+      return (s || '').toString().trim().toLowerCase();
+    }
+
+    function apply() {
+      const q = norm(input.value);
+      if (!q) {
+        items.forEach(a => a.classList.remove('d-none'));
+        return;
+      }
+      items.forEach(a => {
+        const text = norm(a.textContent);
+        const href = norm(a.getAttribute('href'));
+        const match = text.includes(q) || href.includes(q);
+        a.classList.toggle('d-none', !match);
+      });
+    }
+
+    input.addEventListener('input', apply);
+  })();
+</script>
 {% endblock %}

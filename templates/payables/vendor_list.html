@@ -71,7 +71,25 @@
             </td>
           </tr>
         {% empty %}
-          <tr><td colspan="5" class="text-center text-secondary py-4">No vendors found.</td></tr>
+          <tr>
+            <td colspan="5">
+              {% if q %}
+                {% include "includes/empty_state.html" with icon="bi-search" title="No vendors match your search" subtitle="Try a different name or clear the search." %}
+                <div class="text-center pb-4">
+                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'payables:vendor_list' %}">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Clear search
+                  </a>
+                </div>
+              {% else %}
+                {% include "includes/empty_state.html" with icon="bi-people" title="No vendors yet" subtitle="Create vendors to track bills and manage Accounts Payable." %}
+                <div class="text-center pb-4">
+                  <a class="btn btn-sm btn-primary" href="{% url 'payables:vendor_create' %}">
+                    <i class="bi bi-plus-lg me-1"></i>Create your first vendor
+                  </a>
+                </div>
+              {% endif %}
+            </td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>

@@ -23,6 +23,12 @@
             <span class="badge text-bg-secondary">
               {% if summary.billing_interval == "year" %}Annual{% else %}Monthly{% endif %}
             </span>
+            {% if summary.is_comped %}
+              <span class="badge text-bg-primary">Comped</span>
+            {% endif %}
+            {% if summary.discount_is_active and summary.discount_percent %}
+              <span class="badge text-bg-info">{{ summary.discount_percent }}% off</span>
+            {% endif %}
             {% if summary.is_trial %}
               <span class="badge text-bg-success">Trial</span>
             {% endif %}
@@ -37,6 +43,13 @@
             <div class="alert alert-danger mb-3">
               <div class="fw-semibold">Your subscription is inactive.</div>
               <div class="small">Only dashboard, profile, and billing are available until you reactivate.</div>
+            </div>
+          {% endif %}
+
+          {% if summary.is_comped and summary.comped_until %}
+            <div class="alert alert-primary mb-3">
+              <div class="fw-semibold">Comped access ends on {{ summary.comped_until|date:"M j, Y" }}.</div>
+              <div class="small">This company is exempt from billing lock while comped access is active.</div>
             </div>
           {% endif %}
 
@@ -192,6 +205,71 @@
           <div class="text-secondary small">Each company has its own subscription. Confirm your active company (top-left).</div>
         </div>
       </div>
+
+      {% if show_webhook_history %}
+        <div class="card shadow-sm mt-3">
+          <div class="card-body">
+            <h2 class="h6 fw-semibold mb-2">Staff overrides</h2>
+            <div class="text-secondary small mb-3">Grant free access (comped) or record a manual discount. These do not change Stripe billing.</div>
+
+            <div class="border rounded p-3 mb-3">
+              <form method="post" action="{% url 'billing:admin_overrides' %}" class="mb-2">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="comp_on">
+                <div class="row g-2">
+                  <div class="col-12">
+                    <label class="form-label">Comped reason</label>
+                    <input class="form-control" name="comped_reason" value="{{ sub.comped_reason }}" placeholder="e.g., Family / internal testing">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Comped until (optional)</label>
+                    <input class="form-control" type="date" name="comped_until" value="{% if sub.comped_until %}{{ sub.comped_until|date:'Y-m-d' }}{% endif %}">
+                  </div>
+                  <div class="col-md-6 d-flex align-items-end">
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-gift me-1"></i>Enable comped</button>
+                  </div>
+                </div>
+              </form>
+
+              <form method="post" action="{% url 'billing:admin_overrides' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="comp_off">
+                <button class="btn btn-outline-primary" type="submit">Disable comped</button>
+              </form>
+            </div>
+
+            <div class="border rounded p-3">
+              <form method="post" action="{% url 'billing:admin_overrides' %}" class="mb-2">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="discount_set">
+                <div class="row g-2">
+                  <div class="col-md-4">
+                    <label class="form-label">Discount %</label>
+                    <input class="form-control" name="discount_percent" value="{{ sub.discount_percent }}" inputmode="numeric" placeholder="0">
+                  </div>
+                  <div class="col-md-8">
+                    <label class="form-label">Discount note</label>
+                    <input class="form-control" name="discount_note" value="{{ sub.discount_note }}" placeholder="e.g., Launch promo, family discount">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Discount ends (optional)</label>
+                    <input class="form-control" type="date" name="discount_ends_at" value="{% if sub.discount_ends_at %}{{ sub.discount_ends_at|date:'Y-m-d' }}{% endif %}">
+                  </div>
+                  <div class="col-md-6 d-flex align-items-end">
+                    <button class="btn btn-info" type="submit"><i class="bi bi-tag me-1"></i>Save discount</button>
+                  </div>
+                </div>
+              </form>
+
+              <form method="post" action="{% url 'billing:admin_overrides' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="discount_clear">
+                <button class="btn btn-outline-secondary" type="submit">Clear discount</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      {% endif %}
     </div>
   </div>
 {% endblock %}

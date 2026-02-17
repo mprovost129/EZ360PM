@@ -64,6 +64,20 @@ class CompanySubscription(SyncModel):
     # license enforcement (desktop)
     last_license_check_at = models.DateTimeField(null=True, blank=True)
 
+    # ------------------------------------------------------------------
+    # Admin overrides (post-launch support)
+    # ------------------------------------------------------------------
+    # "Comped" = free instance granted by staff (e.g., friends/family, internal use).
+    is_comped = models.BooleanField(default=False)
+    comped_until = models.DateTimeField(null=True, blank=True)
+    comped_reason = models.CharField(max_length=255, blank=True, default="")
+
+    # Simple discount metadata (informational). Stripe promotion codes are supported
+    # in Checkout, but we keep these fields so staff can track manual discounts.
+    discount_percent = models.PositiveIntegerField(default=0)  # 0..100
+    discount_note = models.CharField(max_length=255, blank=True, default="")
+    discount_ends_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         indexes = [
             models.Index(fields=["plan", "billing_interval", "status"]),
@@ -77,7 +91,25 @@ class CompanySubscription(SyncModel):
             return True
         return timezone.now() < self.trial_ends_at
 
+    def is_comped_active(self) -> bool:
+        if not self.is_comped:
+            return False
+        if not self.comped_until:
+            return True
+        return timezone.now() < self.comped_until
+
+    def discount_is_active(self) -> bool:
+        pct = int(self.discount_percent or 0)
+        if pct <= 0:
+            return False
+        if not self.discount_ends_at:
+            return True
+        return timezone.now() < self.discount_ends_at
+
     def is_active_or_trial(self) -> bool:
+        # Comped access always bypasses billing lock.
+        if self.is_comped_active():
+            return True
         return self.status in {SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING} and (
             self.status == SubscriptionStatus.ACTIVE or self.is_in_trial()
         )

@@ -214,4 +214,115 @@
     }
   })();
 
+  // ---------------------------------------------------------------------------
+  // Phase 8F: Micro-interactions
+  // ---------------------------------------------------------------------------
+
+  // Auto-dismiss Django flash messages (Bootstrap alerts) after a short delay.
+  (function initAutoDismissAlerts(){
+    const alerts = Array.from(document.querySelectorAll('.alert.alert-dismissible'));
+    if (!alerts.length) return;
+
+    // Errors/warnings should stay until dismissed.
+    function isPersistent(el){
+      const cls = (el.className || '').toLowerCase();
+      if (el.hasAttribute('data-ez-persist')) return true;
+      return cls.includes('alert-danger') || cls.includes('alert-warning');
+    }
+
+    const delayMs = 4500;
+    alerts.forEach(function(el){
+      if (isPersistent(el)) return;
+      window.setTimeout(function(){
+        try{
+          if (window.bootstrap && bootstrap.Alert){
+            bootstrap.Alert.getOrCreateInstance(el).close();
+          }else{
+            el.remove();
+          }
+        }catch(e){
+          try{ el.remove(); }catch(_e){}
+        }
+      }, delayMs);
+    });
+  })();
+
+  // Confirmation helper for destructive actions.
+  // Usage:
+  //   <a data-ez-confirm="Delete this?" ...>
+  //   <form data-ez-confirm="Void invoice?" ...>
+  (function initConfirmations(){
+    function clickHandler(e){
+      const el = e.target.closest('[data-ez-confirm]');
+      if (!el) return;
+      // If it's a form, submit handler will catch it.
+      if (el.tagName && el.tagName.toLowerCase() === 'form') return;
+      const msg = el.getAttribute('data-ez-confirm') || 'Are you sure?';
+      if (!window.confirm(msg)){
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }
+
+    document.addEventListener('click', clickHandler, true);
+
+    document.addEventListener('submit', function(e){
+      const form = e.target;
+      if (!form || !form.matches || !form.matches('form[data-ez-confirm]')) return;
+      const msg = form.getAttribute('data-ez-confirm') || 'Are you sure?';
+      if (!window.confirm(msg)){
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+  })();
+
+  // Disable submit buttons on submit to prevent double-posts and show a spinner.
+  // Opt-out per form with: data-ez-no-disable
+  (function initSubmitGuards(){
+    function isGetForm(form){
+      const m = (form.getAttribute('method') || '').toLowerCase();
+      return !m || m === 'get';
+    }
+
+    function addSpinner(btn){
+      if (!btn) return;
+      if (btn.getAttribute('data-ez-loading') === '1') return;
+      btn.setAttribute('data-ez-loading', '1');
+      btn.setAttribute('data-ez-orig-html', btn.innerHTML);
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' + btn.innerHTML;
+    }
+
+    function disableButton(btn){
+      if (!btn) return;
+      btn.disabled = true;
+      btn.setAttribute('aria-disabled', 'true');
+    }
+
+    document.addEventListener('submit', function(e){
+      const form = e.target;
+      if (!form || !form.matches || !form.matches('form')) return;
+      if (form.hasAttribute('data-ez-no-disable')) return;
+      if (isGetForm(form)) return;
+
+      const submitter = e.submitter || null;
+      const buttons = Array.from(form.querySelectorAll('button[type="submit"], input[type="submit"]'));
+
+      // If we know the submitter, prefer spinning that button.
+      if (submitter && submitter.tagName && submitter.tagName.toLowerCase() === 'button'){
+        addSpinner(submitter);
+        disableButton(submitter);
+      }else{
+        const firstBtn = buttons.find(b => (b.tagName || '').toLowerCase() === 'button') || null;
+        if (firstBtn){
+          addSpinner(firstBtn);
+          disableButton(firstBtn);
+        }
+      }
+
+      // Always disable all submit buttons to prevent double-submits.
+      buttons.forEach(disableButton);
+    }, true);
+  })();
+
 })();

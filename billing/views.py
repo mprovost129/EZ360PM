@@ -4,6 +4,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from companies.services import get_active_company
@@ -172,3 +173,74 @@ def locked(request: HttpRequest) -> HttpResponse:
     company = get_active_company(request)
     summary = build_subscription_summary(company) if company else None
     return render(request, "billing/locked.html", {"company": company, "summary": summary})
+
+
+@require_staff
+@require_POST
+def admin_overrides(request: HttpRequest) -> HttpResponse:
+    """Staff-only: grant comped access or apply a manual discount note.
+
+    This does NOT modify Stripe billing. It affects EZ360PM gating only.
+    """
+    company = get_active_company(request)
+    if not company:
+        return redirect("companies:switch")
+
+    sub = ensure_company_subscription(company)
+    action = str(request.POST.get("action") or "").strip()
+
+    if action == "comp_on":
+        sub.is_comped = True
+        # comped_until optional
+        until_raw = str(request.POST.get("comped_until") or "").strip()
+        sub.comped_until = None
+        if until_raw:
+            try:
+                # Accept YYYY-MM-DD
+                sub.comped_until = timezone.datetime.fromisoformat(until_raw)
+                if timezone.is_naive(sub.comped_until):
+                    sub.comped_until = timezone.make_aware(sub.comped_until)
+            except Exception:
+                sub.comped_until = None
+        sub.comped_reason = str(request.POST.get("comped_reason") or "").strip()[:255]
+        sub.save(update_fields=["is_comped", "comped_until", "comped_reason", "updated_at"])
+        messages.success(request, "Comped access enabled for this company.")
+
+    elif action == "comp_off":
+        sub.is_comped = False
+        sub.comped_until = None
+        sub.comped_reason = ""
+        sub.save(update_fields=["is_comped", "comped_until", "comped_reason", "updated_at"])
+        messages.success(request, "Comped access disabled for this company.")
+
+    elif action == "discount_set":
+        try:
+            pct = int(str(request.POST.get("discount_percent") or "0").strip() or 0)
+        except Exception:
+            pct = 0
+        pct = max(0, min(100, pct))
+        sub.discount_percent = pct
+        sub.discount_note = str(request.POST.get("discount_note") or "").strip()[:255]
+        until_raw = str(request.POST.get("discount_ends_at") or "").strip()
+        sub.discount_ends_at = None
+        if until_raw:
+            try:
+                sub.discount_ends_at = timezone.datetime.fromisoformat(until_raw)
+                if timezone.is_naive(sub.discount_ends_at):
+                    sub.discount_ends_at = timezone.make_aware(sub.discount_ends_at)
+            except Exception:
+                sub.discount_ends_at = None
+        sub.save(update_fields=["discount_percent", "discount_note", "discount_ends_at", "updated_at"])
+        messages.success(request, "Discount metadata saved.")
+
+    elif action == "discount_clear":
+        sub.discount_percent = 0
+        sub.discount_note = ""
+        sub.discount_ends_at = None
+        sub.save(update_fields=["discount_percent", "discount_note", "discount_ends_at", "updated_at"])
+        messages.success(request, "Discount cleared.")
+
+    else:
+        messages.error(request, "Unknown action.")
+
+    return redirect("billing:overview")

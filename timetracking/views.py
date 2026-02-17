@@ -227,6 +227,7 @@ def time_entry_edit(request, pk):
     return render(request, "timetracking/time_form.html", {"form": form, "formset": formset, "mode": "edit", "entry": entry})
 
 
+@company_context_required
 @require_min_role(EmployeeRole.MANAGER)
 def time_entry_delete(request, pk):
     company = request.active_company

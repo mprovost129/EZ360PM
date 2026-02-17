@@ -98,7 +98,28 @@
           </td>
         </tr>
       {% empty %}
-        <tr><td colspan="10" class="text-center py-4 text-secondary">No expenses found.</td></tr>
+        <tr>
+          <td colspan="10">
+            {% if q or (status and status != 'all') %}
+              {% include "includes/empty_state.html" with icon="bi-funnel" title="No expenses match your filters" subtitle="Try adjusting your search or resetting the filters." %}
+              <div class="text-center pb-4">
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'expenses:expense_list' %}">
+                  <i class="bi bi-arrow-counterclockwise me-1"></i>Reset filters
+                </a>
+              </div>
+            {% else %}
+              {% include "includes/empty_state.html" with icon="bi-receipt" title="No expenses yet" subtitle="Add expenses to keep your books accurate and improve profit reporting." %}
+              <div class="text-center pb-4">
+                <a class="btn btn-sm btn-dark" href="{% url 'expenses:expense_create' %}">
+                  <i class="bi bi-plus-lg me-1"></i>Add your first expense
+                </a>
+                <a class="btn btn-sm btn-outline-secondary ms-1" href="{% url 'expenses:merchant_list' %}">
+                  <i class="bi bi-shop me-1"></i>Manage merchants
+                </a>
+              </div>
+            {% endif %}
+          </td>
+        </tr>
       {% endfor %}
       </tbody>
     </table>

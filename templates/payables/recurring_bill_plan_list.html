@@ -6,9 +6,9 @@
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
   <div>
-    <h1 class="h4 mb-1">Recurring bills</h1>
+    <h1 class="ez-page-title">Recurring bills</h1>
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'helpcenter:recurring_bills' %}"><i class="bi bi-question-circle me-1"></i>Help</a>
-    <div class="text-secondary small">Create scheduled bill plans that generate vendor bills automatically.</div>
+    <div class="ez-page-subtitle">Create scheduled bill plans that generate vendor bills automatically.</div>
   </div>
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="{% url 'payables:bill_list' %}"><i class="bi bi-receipt me-1"></i>Bills</a>
@@ -31,7 +31,7 @@
 
 <div class="card shadow-sm">
   <div class="table-responsive">
-    <table class="table table-striped mb-0">
+    <table class="table table-hover align-middle ez-table mb-0">
       <thead>
         <tr>
           <th>Vendor</th>
@@ -72,11 +72,22 @@
           </tr>
         {% empty %}
           <tr>
-            <td colspan="6" class="text-center text-secondary py-4">
-              <div class="mb-2"><i class="bi bi-inbox" style="font-size: 2rem;"></i></div>
-              <div class="fw-semibold text-dark">No recurring bill plans yet</div>
-              <div class="small mb-3">Create a plan to auto-generate vendor bills on a schedule.</div>
-              <a class="btn btn-primary" href="{% url 'payables:recurring_bill_plan_create' %}"><i class="bi bi-plus-lg me-1"></i>Create your first plan</a>
+            <td colspan="6">
+              {% if q %}
+                {% include "includes/empty_state.html" with icon="bi-search" title="No plans match your search" subtitle="Try a different vendor name or clear the search." %}
+                <div class="text-center pb-4">
+                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'payables:recurring_bill_plan_list' %}">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Clear search
+                  </a>
+                </div>
+              {% else %}
+                {% include "includes/empty_state.html" with icon="bi-arrow-repeat" title="No recurring bill plans yet" subtitle="Create a plan to auto-generate vendor bills on a schedule." %}
+                <div class="text-center pb-4">
+                  <a class="btn btn-sm btn-primary" href="{% url 'payables:recurring_bill_plan_create' %}">
+                    <i class="bi bi-plus-lg me-1"></i>Create your first plan
+                  </a>
+                </div>
+              {% endif %}
             </td>
           </tr>
         {% endfor %}

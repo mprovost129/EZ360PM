@@ -70,7 +70,12 @@
           <tr>
             <td>
               <div class="fw-semibold"><a class="text-decoration-none" href="{% url 'crm:client_detail' r.obj.id %}">{{ r.name }}</a></div>
-              <div class="text-secondary small">{{ r.obj.city }}{% if r.obj.city and r.obj.state %}, {% endif %}{{ r.obj.state }}</div>
+              <div class="text-secondary small">
+                {% if r.obj.company_name %}
+                  {{ r.obj.company_name }}{% if r.obj.city or r.obj.state %}<span class="mx-1">•</span>{% endif %}
+                {% endif %}
+                {{ r.obj.city }}{% if r.obj.city and r.obj.state %}, {% endif %}{{ r.obj.state }}
+              </div>
             </td>
             <td>
               <div>{{ r.primary_contact|default:"—" }}</div>

@@ -11,10 +11,28 @@ from core.onboarding import build_onboarding_checklist_fast, onboarding_progress
 
 
 def _timer_context(request, active_company, active_employee):
-    """Small, safe timer context used by the navbar dropdown."""
-    if not active_company or not active_employee:
-        return {"timer_state": None, "timer_running": False, "timer_elapsed": "", "timer_form": None}
+    """Small, safe timer context used by the navbar dropdown.
 
+    This must never hard-fail template rendering. If we can't load timer state
+    (migrations drifting, missing tables, etc.), we still render the form shell
+    so the UI doesn't look "broken" – and we surface a short reason.
+    """
+    if not active_company or not active_employee:
+        return {
+            "timer_state": None,
+            "timer_running": False,
+            "timer_elapsed": "",
+            "timer_total_seconds": 0,
+            "timer_form": None,
+            "can_manage_catalog": False,
+            "timer_unavailable_reason": "Timer unavailable (missing company/employee context).",
+        }
+
+    # Permissions (used for catalog helper link and optional "save service" checkbox).
+    # companies.permissions helpers operate on EmployeeProfile (role hierarchy)
+    can_manage_catalog = bool(is_owner(active_employee) or is_admin(active_employee) or is_manager(active_employee))
+
+    # Always try to render a valid form – even if state fetch fails.
     try:
         from django.utils import timezone
         from timetracking.models import TimerState
@@ -24,8 +42,9 @@ def _timer_context(request, active_company, active_employee):
         timer_running = bool(timer_state.is_running and (timer_state.started_at or timer_state.elapsed_seconds))
 
         now = timezone.now()
-        elapsed = ""
         total_seconds = 0
+        elapsed = ""
+
         if timer_running:
             total_seconds = int(timer_state.elapsed_seconds or 0)
             if timer_state.started_at and not getattr(timer_state, "is_paused", False):
@@ -35,12 +54,7 @@ def _timer_context(request, active_company, active_employee):
             mins = total_seconds // 60
             hrs = mins // 60
             rem = mins % 60
-            if hrs:
-                elapsed = f"{hrs}h {rem:02d}m"
-            else:
-                elapsed = f"{rem}m"
-
-        can_manage_catalog = bool(is_owner(request.user, active_company) or is_admin(request.user, active_company) or is_manager(request.user, active_company))
+            elapsed = f"{hrs}h {rem:02d}m" if hrs else f"{rem}m"
 
         timer_form = TimerStartForm(
             company=active_company,
@@ -60,9 +74,26 @@ def _timer_context(request, active_company, active_employee):
             "timer_total_seconds": total_seconds,
             "timer_form": timer_form,
             "can_manage_catalog": can_manage_catalog,
+            "timer_unavailable_reason": "",
         }
     except Exception:
-        return {"timer_state": None, "timer_running": False, "timer_elapsed": "", "timer_form": None}
+        # Fall back to a blank form shell so navbar still shows Project/Service/Notes.
+        try:
+            from timetracking.forms import TimerStartForm
+
+            timer_form = TimerStartForm(company=active_company, can_manage_catalog=can_manage_catalog)
+        except Exception:
+            timer_form = None
+
+        return {
+            "timer_state": None,
+            "timer_running": False,
+            "timer_elapsed": "",
+            "timer_total_seconds": 0,
+            "timer_form": timer_form,
+            "can_manage_catalog": can_manage_catalog,
+            "timer_unavailable_reason": "Timer unavailable (timer state not ready).",
+        }
 
 
 def app_context(request):

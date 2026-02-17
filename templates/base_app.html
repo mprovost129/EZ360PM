@@ -149,7 +149,7 @@
   {% endif %}
 {% endif %}
                 {% else %}
-                  <div class="text-secondary small">Timer unavailable (missing company context).</div>
+                  <div class="text-secondary small">{{ timer_unavailable_reason|default:'Timer unavailable.' }}</div>
                 {% endif %}
               {% endif %}
 
@@ -206,9 +206,19 @@
             <i class="bi bi-shield-lock"></i>
           </a>
           {% endif %}
-          <a class="btn btn-outline-secondary btn-sm" href="{% url 'helpcenter:home' %}" title="Help Center">
-            <i class="bi bi-question-circle"></i>
-          </a>
+          <div class="dropdown">
+            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Help">
+              <i class="bi bi-question-circle"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="{% url 'helpcenter:home' %}">Help Center</a></li>
+              <li><a class="dropdown-item" href="{% url 'helpcenter:getting_started' %}">Getting started</a></li>
+              <li><a class="dropdown-item" href="{% url 'helpcenter:faq' %}">FAQ</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{% url 'helpcenter:terms' %}">Terms</a></li>
+              <li><a class="dropdown-item" href="{% url 'helpcenter:privacy' %}">Privacy</a></li>
+            </ul>
+          </div>
 
           <div class="dropdown">
             <button class="btn btn-outline-dark btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">

@@ -1,7 +1,64 @@
-## 2026-02-16 — Phase 7H45 (DONE)
-- Help Center: added DB-managed screenshot uploads (HelpCenterScreenshot) with template tag fallback to static placeholders.
-- Statements: exposed last viewed / last sent summary on Client Statement page; added optional statement activity columns to Clients list.
-- Ops: added quick-pick snooze durations (30m/2h/1d/7d) and surfaced active snooze state on Ops Dashboard groupings.
+## 2026-02-16 — Phase 8C (DONE)
+Table modernization pass:
+- Standardized list tables to `table-hover` + `align-middle` + `ez-table`.
+- Standardized row action columns to **icon buttons + dropdown** (less noise, consistent placement).
+- Standardized document status badge styling via a shared template filter.
+
+
+## 2026-02-16 — Phase 8D (DONE)
+Forms UX upgrade:
+- Implemented sticky form footer pattern (Cancel + Save) via `templates/partials/form_footer.html`.
+- Added `.ez-form`/`.ez-form-footer` styling to keep primary actions visible.
+- Updated key forms (Client, Project, Catalog item, Document edit) to use consistent sectioning and actions.
+
+## 2026-02-16 — Phase 8E (DONE)
+Empty states + first-run guidance:
+- Replaced plain “No results” table rows with intentional empty states (icon + title + CTA) on:
+  - Expenses
+  - Payables (Vendors, Bills)
+  - Expenses → Merchants
+  - Payables → Recurring bill plans
+- Improved Dashboard empty panels with clear CTAs (Create invoice, Start timer/Add time).
+- Enhanced `includes/empty_state.html` to support custom icons.
+
+## 2026-02-16 — Phase 8F (DONE)
+Micro-interactions polish:
+- Auto-dismiss non-critical flash alerts after a short delay (success/info).
+- Added a global submit-guard: disables submit buttons on POST to prevent double-submits and shows an inline spinner.
+- Added a lightweight confirm helper via `data-ez-confirm` for destructive actions (opt-in per link/form).
+
+## 2026-02-16 — Phase 8G (DONE)
+Help Center UX + discoverability:
+- Added Help dropdown in the top-right app navbar (quick links to Help/Getting Started/FAQ/Terms/Privacy).
+- Updated the public navbar Help link to route to the in-app Help Center.
+- Added in-page Help sidebar search (client-side filter) to quickly find guides and legal pages.
+
+### Next (Phase 8H)
+Completed in Phase 8H.
+
+### Next (Phase 8I)
+- Mobile polish: long table overflow + action dropdown spacing.
+- Final UI consistency pass on high-traffic pages (Invoices, Payments, Time) once mobile fixes land.
+
+## 2026-02-17 — Phase 8H (DONE)
+## 2026-02-17 — Phase 8I (DONE)
+Mobile polish:
+- Made topbar actions popover fit small screens (no off-screen overflow).
+- Made Timer dropdown menu responsive on phones (full-width within viewport).
+- Ensured tables remain readable on mobile by enforcing a minimum scroll width within `.table-responsive`.
+- Improved sticky form footer behavior on iOS via safe-area padding.
+
+Brand pass (Bootstrap-aligned):
+- Introduced Bootstrap CSS variable overrides to align primary/success/link/border/body tokens with EZ360PM brand.
+- Added brand-aligned primary/outline button styling (subtle gradient) while remaining Bootstrap-compatible.
+- Standardized form control radius + focus ring for a “financial-grade” feel (light and dark themes).
+- Normalized card footer styling to match the new card system.
+
+## 2026-02-17 — Phase 8J (DONE)
+Launch Gate seeding + UX:
+- Added a default Launch Gate checklist seed list (`ops/launch_gate_defaults.py`).
+- Added a staff action to seed items from the Launch Gate page (safe/no-overwrite).
+- Added management command `python manage.py ez360_seed_launch_gate` for environments where staff UI isn’t ideal.
 
 ## 2026-02-16 — Phase 7H46 (DONE)
 - Help Center: added an admin-facing checklist page for required screenshot keys at:
@@ -41,11 +98,6 @@ Table modernization pass:
 - Standardized row action columns to **icon buttons + dropdown** (less noise, consistent placement).
 - Standardized document status badge styling via a shared template filter.
 
-### Next (Phase 8D)
-- Forms UX upgrade: grouping, sticky action footer, consistent money inputs (system sweep).
-- Empty states: add intentional CTAs and first-run guidance where missing.
-- Micro interactions: consistent toasts/loading states.
-- Help Center: ensure every module has in-app guidance and links.
 
 
 ## 2026-02-16 — Phase 7H29 (DONE)
@@ -897,3 +949,27 @@ Next (Phase 4C):
 - Help Center: deepen each article with role-based step-by-step instructions (time approvals, invoicing, credits/refunds, bills/recurring bills) + screenshots placeholders.
 - Ops Checks: add one-click “Run recommended” preset (launch evidence default set).
 - Template sanity: also warn on `{% url %}` without quotes, and missing `{% load humanize %}` where used.
+
+
+## 2026-02-17 — Phase 8K (DONE)
+Ops System Status:
+- Added Ops → System status (staff-only) to show environment/runtime details and **pending migrations**.
+- Linked from Ops dashboard.
+
+### Next (Phase 8L)
+Launch polish + verification:
+- Add "Release checklist" runbook page and export (PDF/CSV) for go-live.
+- Add post-deploy verification checklist (healthz/version, pending migrations=0, admin access, email, Stripe webhooks).
+- Review remaining rough edges (forms, empty-states, permissions) and close dead ends.
+
+- [x] **8L** Timer dropdown completion (project/service/notes) + Clients list shows company name (2026-02-17)
+- [x] **8M** Post-deploy smoke tests (Ops page + management command) + fixed context_processors syntax regression (2026-02-17)
+- [x] **8N** Comped subscriptions + discount metadata (staff overrides + admin fields) (2026-02-17)
+- [x] **8O** End-to-end go-live runbook export + final launch gate pass (PDF/CSV) + final UX punchlist (2026-02-17)
+
+## 2026-02-17 — Phase 8O (DONE)
+Go-live runbook export + launch verification bundle:
+- Added Ops → **Go-live runbook** page aggregating Launch Gate, pending migrations, and manual verification checklist.
+- Added CSV export (`/ops/runbook/export.csv`) for spreadsheet evidence.
+- Added PDF export (`/ops/runbook/export.pdf`) using **ReportLab** (no WeasyPrint system deps).
+- Linked from Ops dashboard for one-click access during launch.

@@ -45,6 +45,10 @@ class SubscriptionSummary:
     plan: str
     billing_interval: str
     status: str
+    is_comped: bool
+    comped_until: timezone.datetime | None
+    discount_percent: int
+    discount_is_active: bool
     is_trial: bool
     is_active_or_trial: bool
     trial_ends_at: timezone.datetime | None
@@ -117,6 +121,10 @@ def build_subscription_summary(company: Company) -> SubscriptionSummary:
         plan=sub.plan,
         billing_interval=sub.billing_interval,
         status=sub.status,
+        is_comped=sub.is_comped_active(),
+        comped_until=sub.comped_until,
+        discount_percent=int(sub.discount_percent or 0),
+        discount_is_active=sub.discount_is_active(),
         is_trial=sub.is_in_trial(),
         is_active_or_trial=sub.is_active_or_trial(),
         trial_ends_at=sub.trial_ends_at,

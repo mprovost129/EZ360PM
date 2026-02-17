@@ -23,6 +23,17 @@
 
   --topbar-h: 56px;
   --sidebar-w: 270px;
+
+  /* Bootstrap token overrides (Phase 8H brand pass)
+     Keep the project on Bootstrap while ensuring EZ360PM looks intentional.
+  */
+  --bs-primary: var(--ez-blue);
+  --bs-success: var(--ez-green);
+  --bs-link-color: var(--ez-link);
+  --bs-link-hover-color: var(--ez-link-hover);
+  --bs-border-color: var(--ez-border);
+  --bs-body-color: var(--ez-text);
+  --bs-body-bg: var(--ez-bg);
 }
 
 /* Dark theme */
@@ -37,6 +48,14 @@ html[data-theme="dark"]{
 
   --ez-link: #7fb3ff;
   --ez-link-hover: #a6c9ff;
+
+  --bs-primary: #7fb3ff;
+  --bs-success: #38b26f;
+  --bs-link-color: var(--ez-link);
+  --bs-link-hover-color: var(--ez-link-hover);
+  --bs-border-color: var(--ez-border);
+  --bs-body-color: var(--ez-text);
+  --bs-body-bg: var(--ez-bg);
 }
 
 body{
@@ -46,6 +65,49 @@ body{
 
 a{ color: var(--ez-link); }
 a:hover{ color: var(--ez-link-hover); }
+
+/* Buttons (brand-aligned without re-theming Bootstrap) */
+.btn-primary{
+  background: linear-gradient(180deg, var(--ez-blue), var(--ez-blue-2));
+  border-color: rgba(0,0,0,.02);
+}
+.btn-primary:hover,
+.btn-primary:focus{
+  background: linear-gradient(180deg, var(--ez-blue-2), #123a78);
+}
+.btn-outline-primary{
+  border-color: rgba(31,95,191,.35);
+  color: var(--ez-blue);
+}
+.btn-outline-primary:hover{
+  background: rgba(31,95,191,.10);
+  color: var(--ez-blue-2);
+}
+
+/* Form controls: consistent radius + focus ring */
+.form-control,
+.form-select,
+.input-group-text{
+  border-radius: .75rem;
+  border-color: var(--ez-border);
+}
+.form-control:focus,
+.form-select:focus{
+  border-color: rgba(31,95,191,.45);
+  box-shadow: 0 0 0 .2rem rgba(31,95,191,.15);
+}
+html[data-theme="dark"] .form-control,
+html[data-theme="dark"] .form-select,
+html[data-theme="dark"] .input-group-text{
+  background: rgba(255,255,255,.03);
+  color: var(--ez-text);
+}
+
+/* Subtle divider styling for headers/footers */
+.card .card-footer{
+  background: transparent;
+  border-top-color: var(--ez-border);
+}
 
 .navbar{
   background: var(--ez-surface) !important;
@@ -287,6 +349,30 @@ body.no-scroll{ overflow: hidden; }
 :focus-visible{
   outline: 3px solid rgba(0, 132, 255, .45);
   outline-offset: 2px;
+}
+
+
+/* Phase 8I: Mobile polish */
+@media (max-width: 575.98px){
+  /* make action popover fit viewport */
+  #topbarActions{
+    left: .75rem;
+    right: .75rem;
+    min-width: unset;
+  }
+  /* timer dropdown menu should not overflow on small screens */
+  #timerDropdownMenu{
+    min-width: calc(100vw - 2rem) !important;
+    max-width: calc(100vw - 2rem);
+  }
+  /* tables: allow horizontal scroll with a sensible minimum width */
+  .table-responsive > table{
+    min-width: 720px;
+  }
+  /* sticky form footer safe-area padding */
+  .ez-form-footer{
+    padding-bottom: calc(.75rem + env(safe-area-inset-bottom));
+  }
 }
 
 @media (prefers-reduced-motion: reduce){

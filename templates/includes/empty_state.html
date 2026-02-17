@@ -1,7 +1,7 @@
 {# templates/includes/empty_state.html #}
 <div class="text-center text-secondary py-4">
   <div class="mb-2">
-    <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+    <i class="bi {{ icon|default:'bi-inbox' }}" style="font-size: 2rem;"></i>
   </div>
   <div class="fw-semibold text-dark">{{ title|default:"Nothing here yet" }}</div>
   {% if subtitle %}

@@ -62,6 +62,45 @@ from .models import (
 )
 
 
+def _go_live_runbook_snapshot() -> dict:
+    """Collect a lightweight go-live snapshot for exports.
+
+    This intentionally avoids calling external services. It focuses on:
+    - Launch Gate checklist state
+    - Pending migrations (common drift failure)
+    - Core environment identifiers
+    """
+    from django.db import connections
+    from django.db.migrations.executor import MigrationExecutor
+
+    items = list(LaunchGateItem.objects.all())
+    total = len(items)
+    complete = sum(1 for i in items if i.is_complete)
+    remaining = max(0, total - complete)
+
+    # Pending migrations
+    conn = connections["default"]
+    pending: list[tuple[str, str]] = []
+    pending_error = ""
+    try:
+        executor = MigrationExecutor(conn)
+        targets = executor.loader.graph.leaf_nodes()
+        plan = executor.migration_plan(targets)
+        pending = [(m.app_label, m.name) for (m, backwards) in plan if not backwards]
+    except Exception as exc:  # pragma: no cover
+        pending_error = str(exc)
+
+    return {
+        "items": items,
+        "summary": {"total": total, "complete": complete, "remaining": remaining},
+        "pending_migrations": pending,
+        "pending_migrations_error": pending_error,
+        "environment": os.environ.get("ENVIRONMENT", os.environ.get("DJANGO_ENV", "")),
+        "version": os.environ.get("GIT_SHA") or os.environ.get("RENDER_GIT_COMMIT") or "",
+        "debug": settings.DEBUG,
+    }
+
+
 def _sentry_enabled() -> bool:
     return bool(getattr(settings, "SENTRY_DSN", "") or "")
 
@@ -516,6 +555,145 @@ def ops_alert_routing(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @user_passes_test(_is_staff)
+@staff_only
+def ops_system_status(request: HttpRequest) -> HttpResponse:
+    """Staff-only system status page: migrations + runtime info."""
+    from django.db import connections
+    from django.db.migrations.executor import MigrationExecutor
+
+    db_alias = "default"
+    conn = connections[db_alias]
+    pending = []
+    try:
+        executor = MigrationExecutor(conn)
+        targets = executor.loader.graph.leaf_nodes()
+        plan = executor.migration_plan(targets)
+        # plan is list of (Migration, backwards)
+        pending = [(m.app_label, m.name) for (m, backwards) in plan if not backwards]
+    except Exception as exc:
+        pending = [("error", str(exc))]
+
+    context = {
+        "pending_migrations": pending,
+        "db_vendor": getattr(conn, "vendor", ""),
+        "db_name": conn.settings_dict.get("NAME", ""),
+        "db_host": conn.settings_dict.get("HOST", ""),
+        "debug": settings.DEBUG,
+        "version": os.environ.get("GIT_SHA") or os.environ.get("RENDER_GIT_COMMIT") or "",
+        "environment": os.environ.get("ENVIRONMENT", os.environ.get("DJANGO_ENV", "")),
+    }
+    return render(request, "ops/system_status.html", context)
+@login_required
+@user_passes_test(_is_staff)
+@staff_only
+def ops_smoke_tests(request: HttpRequest) -> HttpResponse:
+    """Staff-only smoke test page.
+
+    Goal: one place to verify the environment is runnable after deploy/reset.
+    This intentionally avoids hitting external services; it's a local runtime + DB sanity check.
+    """
+    from django.db import connections
+    from django.db.migrations.executor import MigrationExecutor
+    from django.db.utils import ProgrammingError
+
+    checks = []
+
+    # 1) Pending migrations
+    db_alias = "default"
+    conn = connections[db_alias]
+    pending = []
+    pending_error = ""
+    try:
+        executor = MigrationExecutor(conn)
+        targets = executor.loader.graph.leaf_nodes()
+        plan = executor.migration_plan(targets)
+        pending = [(mig.app_label, mig.name) for (mig, backwards) in plan if not backwards]
+    except Exception as exc:  # pragma: no cover
+        pending_error = str(exc)
+
+    checks.append(
+        {
+            "name": "Database migrations applied",
+            "ok": (not pending) and (not pending_error),
+            "details": "No pending migrations."
+            if (not pending and not pending_error)
+            else (pending_error or f"Pending: {len(pending)}"),
+            "data": pending[:50],
+        }
+    )
+
+    # 2) Singleton tables exist (common post-reset failure)
+    singleton_ok = True
+    singleton_details = []
+    try:
+        # Ops SiteConfig is the most common missing-table failure surface.
+        SiteConfig.get_solo()
+        singleton_details.append("ops.SiteConfig OK")
+    except ProgrammingError as exc:
+        singleton_ok = False
+        singleton_details.append(f"ops.SiteConfig missing table: {exc.__class__.__name__}")
+    except Exception as exc:  # pragma: no cover
+        singleton_ok = False
+        singleton_details.append(f"ops.SiteConfig error: {exc}")
+
+    checks.append(
+        {
+            "name": "Singleton tables present",
+            "ok": singleton_ok,
+            "details": "; ".join(singleton_details) if singleton_details else "",
+            "data": [],
+        }
+    )
+
+    # 3) Basic auth sanity (can we read the user model)
+    auth_ok = True
+    auth_details = ""
+    try:
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        _ = User.objects.count()
+        auth_details = "User model OK."
+    except Exception as exc:  # pragma: no cover
+        auth_ok = False
+        auth_details = str(exc)
+
+    checks.append({"name": "Auth model readable", "ok": auth_ok, "details": auth_details, "data": []})
+
+    # 4) Active company context can resolve (session-based)
+    active_company = None
+    active_company_ok = True
+    active_company_details = ""
+    try:
+        from companies.services import get_active_company
+
+        active_company = get_active_company(request)
+        if not active_company:
+            active_company_details = "No active company selected (ok if new user)."
+    except Exception as exc:  # pragma: no cover
+        active_company_ok = False
+        active_company_details = str(exc)
+
+    checks.append(
+        {
+            "name": "Active company context",
+            "ok": active_company_ok,
+            "details": active_company_details,
+            "data": [],
+        }
+    )
+
+    return render(
+        request,
+        "ops/smoke_tests.html",
+        {
+            "checks": checks,
+            "active_company": active_company,
+        },
+    )
+
+
+
 def ops_slo_dashboard(request: HttpRequest) -> HttpResponse:
     """SLO-style dashboard (staff-only).
 
@@ -1450,6 +1628,211 @@ def ops_launch_gate(request: HttpRequest) -> HttpResponse:
             "support_mode": get_support_mode(request),
         },
     )
+
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_go_live_runbook(request: HttpRequest) -> HttpResponse:
+    """Go-live runbook view.
+
+    This is the final staff-facing launch prep page that aggregates:
+    - Launch Gate checklist
+    - Pending migrations
+    - Quick verification checklist (manual)
+    """
+    snap = _go_live_runbook_snapshot()
+    return render(
+        request,
+        "ops/go_live_runbook.html",
+        {
+            **snap,
+            "support_mode": get_support_mode(request),
+        },
+    )
+
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_go_live_runbook_export_csv(request: HttpRequest) -> HttpResponse:
+    import csv
+
+    snap = _go_live_runbook_snapshot()
+    items = snap["items"]
+
+    resp = HttpResponse(content_type="text/csv")
+    resp["Content-Disposition"] = 'attachment; filename="ez360pm_go_live_runbook.csv"'
+
+    w = csv.writer(resp)
+    w.writerow(["generated_at", timezone.now().isoformat()])
+    w.writerow(["environment", snap.get("environment", "")])
+    w.writerow(["version", snap.get("version", "")])
+    w.writerow(["debug", str(bool(snap.get("debug")))])
+    w.writerow([])
+
+    w.writerow(["launch_gate_total", snap["summary"]["total"]])
+    w.writerow(["launch_gate_complete", snap["summary"]["complete"]])
+    w.writerow(["launch_gate_remaining", snap["summary"]["remaining"]])
+    w.writerow([])
+
+    w.writerow(["pending_migrations", len(snap.get("pending_migrations") or [])])
+    if snap.get("pending_migrations_error"):
+        w.writerow(["pending_migrations_error", snap["pending_migrations_error"]])
+    else:
+        for app, name in (snap.get("pending_migrations") or [])[:500]:
+            w.writerow(["pending", app, name])
+    w.writerow([])
+
+    w.writerow(["Launch Gate Items"])
+    w.writerow(["key", "title", "is_complete", "completed_at", "completed_by", "notes"])
+    for it in items:
+        w.writerow(
+            [
+                it.key,
+                it.title,
+                "yes" if it.is_complete else "no",
+                it.completed_at.isoformat() if it.completed_at else "",
+                getattr(it.completed_by, "email", "") if it.completed_by else "",
+                (it.notes or "")[:500],
+            ]
+        )
+
+    return resp
+
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_go_live_runbook_export_pdf(request: HttpRequest) -> HttpResponse:
+    """PDF export of the go-live runbook.
+
+    Uses ReportLab (server-side) so we do not depend on WeasyPrint system deps.
+    """
+    from io import BytesIO
+
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.units import inch
+    from reportlab.pdfgen import canvas
+
+    snap = _go_live_runbook_snapshot()
+    items = snap["items"]
+
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=letter)
+    width, height = letter
+
+    def draw_line(y, text, *, bold=False):
+        c.setFont("Helvetica-Bold" if bold else "Helvetica", 10 if not bold else 11)
+        c.drawString(0.75 * inch, y, text)
+
+    y = height - 0.75 * inch
+    c.setTitle("EZ360PM Go-Live Runbook")
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(0.75 * inch, y, "EZ360PM — Go-Live Runbook")
+    y -= 0.35 * inch
+
+    draw_line(y, f"Generated: {timezone.now():%Y-%m-%d %H:%M %Z}")
+    y -= 0.22 * inch
+    draw_line(y, f"Environment: {snap.get('environment','') or '—'}")
+    y -= 0.22 * inch
+    draw_line(y, f"Version: {snap.get('version','') or '—'}")
+    y -= 0.22 * inch
+    draw_line(y, f"DEBUG: {'ON' if snap.get('debug') else 'OFF'}")
+    y -= 0.35 * inch
+
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(0.75 * inch, y, "Launch Gate Summary")
+    y -= 0.28 * inch
+    draw_line(y, f"Total: {snap['summary']['total']}   Complete: {snap['summary']['complete']}   Remaining: {snap['summary']['remaining']}")
+    y -= 0.30 * inch
+
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(0.75 * inch, y, "Database")
+    y -= 0.28 * inch
+    pending = snap.get("pending_migrations") or []
+    if snap.get("pending_migrations_error"):
+        draw_line(y, "Pending migrations: ERROR")
+        y -= 0.22 * inch
+        draw_line(y, (snap.get("pending_migrations_error") or "")[:120])
+        y -= 0.28 * inch
+    else:
+        draw_line(y, f"Pending migrations: {len(pending)}")
+        y -= 0.30 * inch
+
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(0.75 * inch, y, "Quick Verification Checklist")
+    y -= 0.26 * inch
+    c.setFont("Helvetica", 10)
+    checklist = [
+        "Health check loads (/ops/healthz/) and returns OK",
+        "Pending migrations = 0 (Ops → System status)",
+        "Can log in and reach Dashboard",
+        "Email test passes (Ops → Email test)",
+        "Stripe mode correct (test vs live) and webhooks configured",
+        "Static/media serving OK",
+    ]
+    for line in checklist:
+        c.drawString(0.85 * inch, y, f"□ {line}")
+        y -= 0.20 * inch
+        if y < 1.25 * inch:
+            c.showPage()
+            y = height - 0.75 * inch
+
+    y -= 0.15 * inch
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(0.75 * inch, y, "Launch Gate Items")
+    y -= 0.28 * inch
+    c.setFont("Helvetica", 9)
+    for it in items:
+        status = "✓" if it.is_complete else "□"
+        title = (it.title or "").strip()
+        c.drawString(0.80 * inch, y, f"{status} {it.key} — {title}")
+        y -= 0.18 * inch
+        if it.description:
+            desc = (it.description or "").strip().replace("\n", " ")
+            c.setFont("Helvetica", 8)
+            c.drawString(1.05 * inch, y, (desc[:140] + ("…" if len(desc) > 140 else "")))
+            y -= 0.16 * inch
+            c.setFont("Helvetica", 9)
+        if y < 1.0 * inch:
+            c.showPage()
+            y = height - 0.75 * inch
+            c.setFont("Helvetica", 9)
+
+    c.showPage()
+    c.save()
+    pdf = buf.getvalue()
+    buf.close()
+
+    resp = HttpResponse(content_type="application/pdf")
+    resp["Content-Disposition"] = 'attachment; filename="ez360pm_go_live_runbook.pdf"'
+    resp.write(pdf)
+    return resp
+
+
+@login_required
+@user_passes_test(_is_staff)
+@require_POST
+def ops_launch_gate_seed(request: HttpRequest) -> HttpResponse:
+    """Seed default Launch Gate items (safe/no-overwrite)."""
+    from .launch_gate_defaults import DEFAULT_LAUNCH_GATE_ITEMS
+
+    existing = set(LaunchGateItem.objects.values_list("key", flat=True))
+    created = 0
+    for item in DEFAULT_LAUNCH_GATE_ITEMS:
+        key = item["key"]
+        if key in existing:
+            continue
+        LaunchGateItem.objects.create(
+            key=key,
+            title=item.get("title", ""),
+            description=item.get("description", ""),
+        )
+        created += 1
+
+    if created:
+        messages.success(request, f"Seeded {created} launch gate items.")
+    else:
+        messages.info(request, "Launch gate already has items.")
+    return redirect("ops:launch_gate")
 
 
 @login_required

@@ -88,7 +88,28 @@
             </td>
           </tr>
         {% empty %}
-          <tr><td colspan="8" class="text-center text-secondary py-4">No bills found.</td></tr>
+          <tr>
+            <td colspan="8">
+              {% if q or (status and status != 'all') or due_soon %}
+                {% include "includes/empty_state.html" with icon="bi-funnel" title="No bills match your filters" subtitle="Try adjusting your search, status, or due-soon filter." %}
+                <div class="text-center pb-4">
+                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'payables:bill_list' %}">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Reset filters
+                  </a>
+                </div>
+              {% else %}
+                {% include "includes/empty_state.html" with icon="bi-receipt" title="No bills yet" subtitle="Add vendor bills to track what you owe and keep payables current." %}
+                <div class="text-center pb-4">
+                  <a class="btn btn-sm btn-primary" href="{% url 'payables:bill_create' %}">
+                    <i class="bi bi-plus-lg me-1"></i>Create your first bill
+                  </a>
+                  <a class="btn btn-sm btn-outline-secondary ms-1" href="{% url 'payables:vendor_create' %}">
+                    <i class="bi bi-building me-1"></i>Add a vendor
+                  </a>
+                </div>
+              {% endif %}
+            </td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>

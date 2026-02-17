@@ -1,4 +1,21 @@
+## UI — Mobile polish (Phase 8I)
+- On small screens, popovers/drawers must fit within the viewport (no off-screen menu clipping).
+- Timer dropdown should expand to a near full-width menu on phones to keep the form usable.
+- Data tables should remain horizontally scrollable with a sensible minimum width when wrapped in `.table-responsive`.
+- Sticky form footers must respect iOS safe-area insets.
+
+
 ## UI / Launch Prep
+
+### Micro-interactions policy (Phase 8F)
+- Non-critical flash messages (success/info) may auto-dismiss after a short delay; warnings/errors remain until dismissed.
+- All POST forms should be protected against double-submit by disabling submit buttons on submit; show an inline spinner on the submit button.
+- Destructive actions use an explicit confirmation hook (`data-ez-confirm`) rather than ad-hoc inline JS.
+
+### Help Center discoverability (Phase 8G)
+- Help must be reachable in 1 click from the app chrome (navbar) and 2 clicks from any page (Help → article).
+- Help navigation is intentionally lightweight: a navbar dropdown for common links + a sidebar search filter inside the Help Center.
+- No backend “search index” in v1; client-side filtering is sufficient for launch.
 
 ### Dashboard KPI definitions (Phase 8B)
 - Revenue: sum of succeeded payments in the current month net of refunded cents.
@@ -458,6 +475,16 @@ Rationale:
 - Theme is controlled client-side with `html[data-theme]` and persisted in `localStorage` key `ez360pm.theme`.
 - Brand palette is expressed as CSS variables (no SCSS build step required).
 - Mobile navigation uses a lightweight JS toggle + overlay (works even if Bootstrap JS fails).
+
+## 2026-02-17 — Brand pass stays Bootstrap-compatible
+
+Decision:
+- Keep Bootstrap as the primary UI framework.
+- Apply EZ360PM brand via **CSS variables** (including Bootstrap token overrides) rather than template-by-template rework.
+
+Implications:
+- Most “brand feel” improvements come from `static/css/ez360pm.css`.
+- We avoid fragile template churn and reduce merge conflicts during launch prep.
 
 ## 2026-02-15 — Serve static files with WhiteNoise in production
 
@@ -962,3 +989,45 @@ Rationale:
 - Forms should use `class="ez-form"` so the scroll container reserves room for the footer.
 - Avoid nested forms inside the main edit form; separate non-edit actions (e.g., credit notes posting) into standalone forms outside the primary edit form where possible.
 
+
+
+## UI — Empty states + first-run guidance (Phase 8E)
+- Empty states must be **actionable**: include an icon, a clear title, a short “why/what next” subtitle, and at least one CTA when the user can act.
+- For filtered/search views, empty states should prefer a **Reset/Clear** CTA over a “create” CTA.
+- Use `includes/empty_state.html` as the single shared empty-state component; pass `icon=` to match the module (receipt, stopwatch, people, etc.).
+
+
+## Ops — Launch Gate seeding (Phase 8J)
+- Launch readiness uses **two layers**:
+  1) Automated checks (`/ops/launch-checks/`, management commands).
+  2) Human checklist (“Launch Gate”) for process verification and sign-off.
+- Default Launch Gate items are **seeded** from code (`ops/launch_gate_defaults.py`) but are not forced/overwritten.
+  Rationale: keeps a consistent baseline while allowing staff to tailor items per release.
+
+
+## Ops: System status and migration visibility
+- Added a staff-only Ops “System status” page that computes pending migrations using Django’s MigrationExecutor. This is intentionally surfaced in-app to catch deploy drift (code ahead of DB schema) before it breaks runtime pages.
+
+
+## Phase 8L Decisions (2026-02-17)
+- **Navbar timer resilience:** The timer dropdown must render the Project/Service/Notes inputs whenever the user has an active company and employee profile. Timer-state lookups may fail (migration drift, empty tables), but the navbar should not appear “broken”; instead, show a short `timer_unavailable_reason`.
+- **Client list identity:** When `Client.company_name` is provided, it must be displayed in list rows to disambiguate B2B contacts.
+
+
+## 2026-02-17 — Post-deploy smoke tests
+- We surface migration drift and basic DB readiness in-app under **Ops → Smoke tests**.
+- Smoke tests intentionally avoid external calls (Stripe/email) and focus on: pending migrations, critical singleton tables, and auth-model readability.
+- A matching management command (`ez360_smokecheck`) exists for non-UI environments and CI.
+
+
+## Billing — Comped access + discounts (Phase 8N)
+- The platform must support **free instances** post-launch (e.g., family/friends/internal). This is implemented as a staff-only **Comped** override on `CompanySubscription`.
+  - Comped access bypasses billing lock and can be time-bounded via `comped_until`.
+  - Comped access is not a Stripe concept; it only affects EZ360PM gating.
+- Discounts are supported via **Stripe Promotion Codes** in Checkout (allow_promotion_codes enabled). We also store optional **discount metadata** on `CompanySubscription` for tracking manual deals and support scenarios.
+
+
+## Ops — Go-live runbook export (Phase 8O)
+- Go-live evidence must be exportable as **CSV + PDF**.
+- PDF export uses **ReportLab** (not WeasyPrint) to avoid system dependency failures (Cairo/Pango) during launch.
+- The runbook is intentionally **first-party** (no external calls) and aggregates Launch Gate + pending migrations + manual verification checklist.

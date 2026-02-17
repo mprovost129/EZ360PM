@@ -1,3 +1,25 @@
+## 2026-02-17 — Phase 8I (DONE) — Mobile polish
+- Topbar actions popover now fits on phones (uses left+right inset rather than fixed min-width).
+- Timer dropdown menu is responsive on small screens (prevents clipped menus).
+- Tables inside `.table-responsive` get a minimum width for reliable horizontal scrolling.
+- Sticky form footer includes iOS safe-area bottom padding.
+
+
+## 2026-02-17 — Phase 8H (Brand pass)
+- UI tokens: aligned Bootstrap primary/success/link/border/body CSS variables to EZ360PM brand tokens.
+- Buttons: brand-aligned `.btn-primary` and `.btn-outline-primary` styling (Bootstrap-compatible).
+- Forms: standardized form control radius + focus ring (light/dark), improving consistency across all CRUD flows.
+
+## 2026-02-16 — Phase 8G (Help Center UX)
+- Help: upgraded the navbar Help icon into a dropdown with quick links (Help Center, Getting started, FAQ, Terms, Privacy).
+- Help Center: added sidebar search input that filters guide/legal links (client-side; no backend changes).
+- Public site: navbar Help now routes to the Help Center.
+
+## 2026-02-16 — Phase 8F (Micro-interactions)
+- UI: auto-dismiss non-critical flash alerts (success/info) after a short delay.
+- UX: added POST submit-guard that disables submit buttons to prevent double-submits and shows a small spinner on the submit button.
+- UX: added a lightweight confirm helper for destructive actions via `data-ez-confirm` (opt-in per link/form).
+
 ## 2026-02-16 — Phase 8B (Dashboard redesign)
 - Dashboard: added KPI row (Revenue, Expenses, A/R, Unbilled hours) with month label.
 - Dashboard: added Recent Invoices + Recent Time panels and a Due-soon Projects panel.
@@ -1313,3 +1335,72 @@ Next:
   - `last_service_name` (CharField)
   - `last_note` (TextField)
 
+
+
+## 2026-02-16 — Phase 8E (DONE) — Empty States + First-run Guidance
+- UI: standardized empty states with clear CTAs across Expenses and Payables lists.
+- UI: improved Dashboard empty panels with actionable prompts (Create invoice; Start timer/Add time).
+- UI: enhanced `includes/empty_state.html` to accept an `icon` parameter for consistent visuals.
+
+## 2026-02-17 — Phase 8F (DONE) — Micro-interactions
+- UI: auto-dismiss non-critical flash alerts (success/info) after a short delay.
+- UX: global submit-guard on POST forms to prevent double submits and show inline spinner.
+- UX: opt-in confirm helper via `data-ez-confirm` for destructive actions.
+
+## 2026-02-17 — Phase 8G (DONE) — Help Center discoverability
+- Added Help dropdown in the top-right app navbar (Help / Getting started / FAQ / Terms / Privacy).
+- Public navbar Help link routes to the in-app Help Center.
+- Added in-page Help sidebar search (client-side filter).
+
+## 2026-02-17 — Phase 8H (DONE) — Brand pass
+- Bootstrap CSS variable overrides to align core tokens (primary/success/link/border/body) with EZ360PM brand.
+- Brand-aligned primary/outline button styling (subtle gradient) while remaining Bootstrap-compatible.
+- Standardized form control radius + focus ring for a "financial-grade" feel (light + dark themes).
+
+## 2026-02-17 — Phase 8I (DONE) — Mobile polish
+- Prevented topbar/actions overflow on small screens.
+- Made Timer dropdown responsive on phones.
+- Ensured tables remain readable on mobile with predictable horizontal scrolling.
+- Improved sticky form footer behavior on iOS via safe-area padding.
+
+## 2026-02-17 — Phase 8J (DONE) — Launch Gate seeding
+- Added default Launch Gate checklist definitions (`ops/launch_gate_defaults.py`).
+- Added staff action to seed defaults from the Launch Gate page.
+- Added management command: `python manage.py ez360_seed_launch_gate` (safe/no-overwrite).
+
+
+## 2026-02-17 — Phase 8K (DONE) — Ops System Status page
+- Added staff-only Ops → System status page to surface runtime info and **pending migrations** (helps catch deploy/migrate drift quickly).
+- Linked System status from Ops dashboard.
+
+
+## Phase 8L — Timer dropdown completion + Clients list company display (2026-02-17)
+- Fixed navbar timer dropdown “missing company context” false-negative by hardening `core.context_processors._timer_context`:
+  - Always renders the Project/Service/Notes form shell when company+employee context exists.
+  - Surfaces a short `timer_unavailable_reason` instead of misleading messaging.
+- Clients list now shows the client’s `company_name` (when present) under the client name for better B2B clarity.
+
+
+## 2026-02-17 — Phase 8M (DONE)
+- Fixed a syntax regression in `core/context_processors.py` that caused login to fail (IndentationError).
+- Added **Ops → Smoke tests** page (`/ops/smoke/`) to quickly validate post-deploy/post-reset health.
+- Added management command `python manage.py ez360_smokecheck` for CI/ops sanity checks (migrations + critical tables).
+- Linked Smoke tests from Ops dashboard.
+
+
+## 2026-02-17 — Phase 8N (DONE) — Comped access + discount tracking
+- Added staff-only subscription overrides:
+  - **Comped access** (free instance) with optional end date + reason
+  - **Discount metadata** (% off + note + optional end date)
+- Billing overview now displays **Comped** / **Discount** badges.
+- Staff can manage overrides from the Billing page (staff-only panel).
+- Admin lists now include comped/discount columns for quick auditing.
+
+
+## 2026-02-17 — Phase 8O (DONE) — Go-live runbook export
+- Added Ops → **Go-live runbook** page that aggregates Launch Gate readiness, pending migrations, and a manual verification checklist.
+- Added export endpoints:
+  - CSV: `/ops/runbook/export.csv`
+  - PDF: `/ops/runbook/export.pdf`
+- PDF generation uses **ReportLab** to avoid WeasyPrint system dependency issues during launch.
+- Linked Go-live runbook from Ops dashboard for one-click access on launch day.

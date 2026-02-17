@@ -52,11 +52,14 @@
           <span class="badge text-bg-danger ms-1">{{ metrics.open_alerts }}</span>
         {% endif %}
       </a>
+      <a class="btn btn-outline-dark" href="{% url 'ops:system_status' %}">System status</a>
+      <a class="btn btn-outline-dark" href="{% url 'ops:smoke_tests' %}">Smoke tests</a>
       <a class="btn btn-outline-dark" href="{% url 'ops:alert_routing' %}">Alert routing</a>
       <a class="btn btn-outline-dark" href="{% url 'ops:slo_dashboard' %}">SLO dashboard</a>
       <a class="btn btn-outline-dark" href="{% url 'ops:launch_checks' %}">Launch checks</a>
       <a class="btn btn-outline-dark" href="{% url 'ops:checks' %}">Ops checks</a>
       <a class="btn btn-outline-dark" href="{% url 'ops:launch_gate' %}">Launch gate</a>
+      <a class="btn btn-outline-dark" href="{% url 'ops:go_live_runbook' %}">Go-live runbook</a>
       <a class="btn btn-outline-dark" href="{% url 'ops:reconciliation' %}">Reconciliation</a>
       <a class="btn btn-outline-dark" href="{% url 'ops:drift_tools' %}">Drift toolkit</a>
       <a class="btn btn-outline-dark" href="{% url 'ops:security' %}">Security</a>
