@@ -19,25 +19,34 @@
 - Ops: fixed missing `staff_only` decorator in `ops/views.py` (prevents import-time crash on alert views).
 - UX: added navigation links to Collections follow-ups and Snoozes from relevant pages.
 
-## Next (Phase 8A)
+## Phase 8 — Launch Prep & UI Modernization
 
-## 2026-02-16 — Phase 8A (IN PROGRESS)
-
+## 2026-02-16 — Phase 8A (DONE)
 UI foundation hardening (launch prep):
-
 - Global card standardization: all `card shadow-sm` now render as borderless, rounded cards.
-- Sidebar polish: active nav highlighting is now automatic (JS marks active link) and includes a subtle left indicator bar.
-- Page header typography helpers (`.ez-page-title`, `.ez-page-subtitle`) applied to key pages (Dashboard, Clients, Documents, Projects, Time, Payments, Expenses).
-- Table polish: key list pages use a consistent table style (`table-hover` + `align-middle` + `ez-table`).
+- Sidebar polish: active nav highlighting is automatic (JS marks active link) with a subtle left indicator bar.
+- Page header typography helpers (`.ez-page-title`, `.ez-page-subtitle`) applied to key pages.
+- Table polish: key list pages use a consistent table style (`table-hover` + `align-middle`).
 
-8B starter (dashboard):
+## 2026-02-16 — Phase 8B (DONE)
+Dashboard redesign pass:
+- Added a KPI row (Revenue, Expenses, A/R, Unbilled hours) with current month label.
+- Added Recent Invoices + Recent Time panels.
+- Added Due-soon Projects panel.
+- Wired dashboard view metrics so the dashboard is context-complete (no missing variables).
 
-- Added a **Quick actions** card to the dashboard for faster navigation to core workflows.
+## 2026-02-16 — Phase 8C (DONE)
+Table modernization pass:
+- Standardized list tables to `table-hover` + `align-middle` + `ez-table`.
+- Standardized row action columns to **icon buttons + dropdown** (less noise, consistent placement).
+- Standardized document status badge styling via a shared template filter.
 
-### Next (Phase 8B)
-- Dashboard redesign pass: KPI row + quick actions + better information density.
-- Forms polish pass: grouping, sticky actions, consistent money inputs.
+### Next (Phase 8D)
+- Forms UX upgrade: grouping, sticky action footer, consistent money inputs (system sweep).
 - Empty states: add intentional CTAs and first-run guidance where missing.
+- Micro interactions: consistent toasts/loading states.
+- Help Center: ensure every module has in-app guidance and links.
+
 
 ## 2026-02-16 — Phase 7H29 (DONE)
 - Daily ops checks now create Ops Alerts + optional admin emails on failures.

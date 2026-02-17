@@ -1,3 +1,8 @@
+## 2026-02-16 — Phase 8B (Dashboard redesign)
+- Dashboard: added KPI row (Revenue, Expenses, A/R, Unbilled hours) with month label.
+- Dashboard: added Recent Invoices + Recent Time panels and a Due-soon Projects panel.
+- Dashboard: wired the dashboard view to compute KPI/payables metrics and avoid template context gaps.
+
 ## 2026-02-16 — Phase 7H48
 - Ops: fixed missing `staff_only` decorator in `ops/views.py` (prevents import-time crash on alert views).
 - UX: added navigation links to Collections follow-ups and Snoozes from relevant pages.
@@ -1268,3 +1273,23 @@ Next:
 
 **Phase 8B (started):**
 - Dashboard now includes a **Quick actions** card (Track time + manager shortcuts for invoice/expense/client/project).
+
+
+## 2026-02-16 — Phase 8B (Dashboard Redesign)
+
+**Shipped:**
+- Dashboard layout modernization:
+  - KPI row (Revenue, Expenses, A/R, Unbilled hours) with “current month” label.
+  - Recent Invoices + Recent Time panels.
+  - Due-soon Projects panel.
+  - Dashboard metrics are now context-complete (no missing template variables).
+
+
+## 2026-02-16 — Phase 8C (Table Modernization)
+
+**Shipped:**
+- Standardized table/action UX across core modules:
+  - Action columns now use **icon buttons + dropdown** (reduced clutter; consistent affordances).
+  - Key list pages updated: Clients, Documents, Projects, Time entries, Payments, Expenses, Payables (Vendors/Bills).
+- Added `doc_status_badge_class` template filter to standardize document status badge colors.
+

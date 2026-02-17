@@ -67,8 +67,27 @@
           <td class="text-end">{{ p.amount_cents|cents_to_dollars }}</td>
           <td><span class="badge text-bg-secondary">{{ p.get_status_display }}</span></td>
           <td class="text-end">
-            <a class="btn btn-sm btn-outline-dark" href="{% url 'payments:payment_edit' p.id %}">Edit</a>
-            <a class="btn btn-sm btn-outline-danger" href="{% url 'payments:payment_delete' p.id %}">Delete</a>
+            <div class="btn-group">
+              <a class="btn btn-sm btn-outline-dark btn-icon" title="Edit" href="{% url 'payments:payment_edit' p.id %}">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <button type="button" class="btn btn-sm btn-outline-dark btn-icon dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                <span class="visually-hidden">More</span>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                  <a class="dropdown-item" href="{% url 'payments:payment_edit' p.id %}">
+                    <i class="bi bi-pencil me-2"></i>Edit
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <a class="dropdown-item text-danger" href="{% url 'payments:payment_delete' p.id %}">
+                    <i class="bi bi-trash me-2"></i>Delete
+                  </a>
+                </li>
+              </ul>
+            </div>
           </td>
         </tr>
       {% empty %}

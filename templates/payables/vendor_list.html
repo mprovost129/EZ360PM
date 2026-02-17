@@ -2,30 +2,35 @@
 {% block title %}Vendors · EZ360PM{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center justify-content-between mb-3">
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
   <div>
-    <h1 class="h4 mb-1">Vendors</h1>
-    <div class="text-secondary small">Manage vendors for Accounts Payable.</div>
+    <h1 class="ez-page-title">Vendors</h1>
+    <div class="ez-page-subtitle">Manage vendors for Accounts Payable.</div>
   </div>
   <a class="btn btn-primary" href="{% url 'payables:vendor_create' %}"><i class="bi bi-plus-lg me-1"></i>New vendor</a>
 </div>
 
-<form class="row g-2 mb-3" method="get">
-  <div class="col-sm-6 col-md-4">
-    <div class="input-group">
-      <span class="input-group-text"><i class="bi bi-search"></i></span>
-      <input class="form-control" name="q" value="{{ q }}" placeholder="Search vendors">
-    </div>
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form class="row g-2 align-items-center" method="get">
+      <div class="col-12 col-md-6">
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input class="form-control" name="q" value="{{ q }}" placeholder="Search vendors">
+        </div>
+      </div>
+      <div class="col-12 col-md-auto">
+        <button class="btn btn-outline-dark" type="submit">Search</button>
+        <a class="btn btn-link" href="{% url 'payables:vendor_list' %}">Clear</a>
+      </div>
+    </form>
   </div>
-  <div class="col-auto">
-    <button class="btn btn-outline-secondary" type="submit">Filter</button>
-  </div>
-</form>
+</div>
 
 <div class="card shadow-sm">
   <div class="table-responsive">
-    <table class="table table-striped mb-0">
-      <thead>
+    <table class="table table-hover align-middle ez-table">
+      <thead class="table-light">
         <tr>
           <th>Name</th>
           <th>Email</th>
@@ -47,7 +52,23 @@
                 <span class="badge text-bg-secondary">Inactive</span>
               {% endif %}
             </td>
-            <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{% url 'payables:vendor_edit' v.id %}">Edit</a></td>
+            <td class="text-end">
+              <div class="btn-group">
+                <a class="btn btn-sm btn-outline-dark btn-icon" title="View" href="{% url 'payables:vendor_detail' v.pk %}">
+                  <i class="bi bi-eye"></i>
+                </a>
+                <button type="button" class="btn btn-sm btn-outline-dark btn-icon dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                  <span class="visually-hidden">More</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li>
+                    <a class="dropdown-item" href="{% url 'payables:vendor_edit' v.id %}">
+                      <i class="bi bi-pencil me-2"></i>Edit
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </td>
           </tr>
         {% empty %}
           <tr><td colspan="5" class="text-center text-secondary py-4">No vendors found.</td></tr>

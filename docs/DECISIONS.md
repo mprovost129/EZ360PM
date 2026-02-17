@@ -1,3 +1,11 @@
+## UI / Launch Prep
+
+### Dashboard KPI definitions (Phase 8B)
+- Revenue: sum of succeeded payments in the current month net of refunded cents.
+- Expenses: sum of approved/reimbursed expenses in the current month.
+- A/R: sum of invoice balance due for sent + partially paid invoices.
+- Unbilled time: approved billable time with no billed document (minutes → hours).
+
 ## 2026-02-16 — Phase 7H46
 - **Help Center screenshot key governance:** required screenshot keys are tracked explicitly in `helpcenter/required_screenshots.py` and reviewed via an admin checklist view (`/admin/helpcenter/helpcenterscreenshot/required-keys/`).
 - **Ops snooze operability:** ops dashboards must show snooze end timestamps and allow a one-click clear to reduce “why is this hidden?” operator friction.
@@ -929,3 +937,23 @@ Rationale:
 
 - **Typography helpers are additive.** Use `.ez-page-title`/`.ez-page-subtitle` instead of inventing new heading scales per template.
   Rationale: consistent hierarchy for accounting-heavy screens.
+
+
+## 2026-02-16 — Phase 8B (Dashboard)
+
+- Dashboard KPIs are “finance-first” and must be explainable:
+  - Revenue = succeeded payments within month (net of refunds when available).
+  - Expenses = expense totals by date range.
+  - A/R = sum of open invoice balances.
+  - Unbilled time = approved billable minutes not yet billed.
+  Rationale: numbers must align with accounting expectations; avoid vanity metrics.
+
+
+## 2026-02-16 — Phase 8C (Tables)
+
+- Action columns use **icon + dropdown** rather than multiple text buttons.
+  Rationale: increases information density without looking cluttered, and keeps tables readable on smaller screens.
+
+- Document status colors are centralized in a template filter (`doc_status_badge_class`).
+  Rationale: prevents drift across templates and makes future tweaks a one-file change.
+

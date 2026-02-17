@@ -114,12 +114,21 @@
               {% if e.status == "void" %}<span class="badge text-bg-dark">Void</span>{% endif %}
             </td>
             <td class="text-end">
-              <a class="btn btn-sm btn-outline-dark" href="{% url 'timetracking:entry_detail' e.id %}">
-                View
-              </a>
-              <a class="btn btn-sm btn-outline-secondary" href="{% url 'timetracking:entry_edit' e.id %}">
-                Edit
-              </a>
+              <div class="btn-group">
+                <a class="btn btn-sm btn-outline-dark btn-icon" title="View" href="{% url 'timetracking:entry_detail' e.id %}">
+                  <i class="bi bi-eye"></i>
+                </a>
+                <button type="button" class="btn btn-sm btn-outline-dark btn-icon dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                  <span class="visually-hidden">More</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li>
+                    <a class="dropdown-item" href="{% url 'timetracking:entry_edit' e.id %}">
+                      <i class="bi bi-pencil me-2"></i>Edit
+                    </a>
+                  </li>
+                </ul>
+              </div>
             </td>
           </tr>
         {% empty %}

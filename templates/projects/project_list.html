@@ -43,6 +43,7 @@
           <th class="text-end">Unbilled</th>
           <th>Assigned</th>
           <th>Due</th>
+          <th style="width: 80px;"></th>
         </tr>
       </thead>
       <tbody>
@@ -66,6 +67,25 @@
               {% if p.assigned_to %}{{ p.assigned_to.username_public }}{% else %}<span class="text-secondary">—</span>{% endif %}
             </td>
             <td class="text-nowrap">{% if p.due_date %}{{ p.due_date }}{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+            <td class="text-end">
+              <div class="btn-group">
+                <a class="btn btn-sm btn-outline-dark btn-icon" title="View" href="{% url 'projects:project_detail' p.id %}">
+                  <i class="bi bi-eye"></i>
+                </a>
+                {% if is_manager %}
+                  <button type="button" class="btn btn-sm btn-outline-dark btn-icon dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">More</span>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                      <a class="dropdown-item" href="{% url 'projects:project_edit' p.id %}">
+                        <i class="bi bi-pencil me-2"></i>Edit
+                      </a>
+                    </li>
+                  </ul>
+                {% endif %}
+              </div>
+            </td>
           </tr>
         {% empty %}
           <tr>

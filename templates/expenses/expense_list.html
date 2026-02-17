@@ -69,13 +69,32 @@
           <td class="text-end">{{ e.total_cents|cents_to_dollars }}</td>
           <td><span class="badge text-bg-secondary">{{ e.get_status_display }}</span></td>
           <td class="text-end">
-            {% if e.receipt %}
-              <a class="btn btn-sm btn-outline-secondary" href="{% url 'expenses:expense_receipt_open' e.id %}" target="_blank" rel="noopener" title="Open receipt">
-                <i class="bi bi-paperclip"></i>
+            <div class="btn-group">
+              {% if e.receipt %}
+                <a class="btn btn-sm btn-outline-secondary btn-icon" href="{% url 'expenses:expense_receipt_open' e.id %}" target="_blank" rel="noopener" title="Open receipt">
+                  <i class="bi bi-paperclip"></i>
+                </a>
+              {% endif %}
+              <a class="btn btn-sm btn-outline-dark btn-icon" title="Edit" href="{% url 'expenses:expense_edit' e.id %}">
+                <i class="bi bi-pencil"></i>
               </a>
-            {% endif %}
-            <a class="btn btn-sm btn-outline-dark" href="{% url 'expenses:expense_edit' e.id %}">Edit</a>
-            <a class="btn btn-sm btn-outline-danger" href="{% url 'expenses:expense_delete' e.id %}">Delete</a>
+              <button type="button" class="btn btn-sm btn-outline-dark btn-icon dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                <span class="visually-hidden">More</span>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                  <a class="dropdown-item" href="{% url 'expenses:expense_edit' e.id %}">
+                    <i class="bi bi-pencil me-2"></i>Edit
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <a class="dropdown-item text-danger" href="{% url 'expenses:expense_delete' e.id %}">
+                    <i class="bi bi-trash me-2"></i>Delete
+                  </a>
+                </li>
+              </ul>
+            </div>
           </td>
         </tr>
       {% empty %}

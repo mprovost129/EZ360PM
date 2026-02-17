@@ -3,10 +3,10 @@
 {% block title %}Bills · EZ360PM{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center justify-content-between mb-3">
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
   <div>
-    <h1 class="h4 mb-1">Bills</h1>
-    <div class="text-secondary small">Track vendor bills and payments (Accounts Payable).</div>
+    <h1 class="ez-page-title">Bills</h1>
+    <div class="ez-page-subtitle">Track vendor bills and payments (Accounts Payable).</div>
   </div>
   <div class="d-flex gap-2">
       <a class="btn btn-outline-secondary" href="{% url 'helpcenter:accounting' %}">
@@ -18,35 +18,43 @@
   </div>
 </div>
 
-<form class="row g-2 mb-3" method="get">
-  <div class="col-sm-6 col-md-4">
-    <div class="input-group">
-      <span class="input-group-text"><i class="bi bi-search"></i></span>
-      <input class="form-control" name="q" value="{{ q }}" placeholder="Vendor or bill #">
-    </div>
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form class="row g-2 align-items-end" method="get">
+      <div class="col-12 col-md-5">
+        <label class="form-label">Search</label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input class="form-control" name="q" value="{{ q }}" placeholder="Vendor or bill #">
+        </div>
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label">Status</label>
+        <select class="form-select" name="status">
+          {% for val,label in statuses %}
+            <option value="{{ val }}" {% if val == status %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-2">
+        <label class="form-label">Due</label>
+        <div class="form-check mt-1">
+          <input class="form-check-input" type="checkbox" value="1" id="dueSoon" name="due_soon" {% if due_soon %}checked{% endif %}>
+          <label class="form-check-label" for="dueSoon">Due soon</label>
+        </div>
+      </div>
+      <div class="col-12 col-md-2 d-flex gap-2">
+        <button class="btn btn-outline-dark w-100" type="submit"><i class="bi bi-funnel me-1"></i>Apply</button>
+        <a class="btn btn-outline-secondary w-100" href="{% url 'payables:bill_list' %}">Reset</a>
+      </div>
+    </form>
   </div>
-  <div class="col-sm-6 col-md-3">
-    <select class="form-select" name="status">
-      {% for val,label in statuses %}
-        <option value="{{ val }}" {% if val == status %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="col-sm-6 col-md-3">
-    <div class="form-check mt-2">
-      <input class="form-check-input" type="checkbox" value="1" id="dueSoon" name="due_soon" {% if due_soon %}checked{% endif %}>
-      <label class="form-check-label" for="dueSoon">Due soon (next 7 days)</label>
-    </div>
-  </div>
-  <div class="col-auto">
-    <button class="btn btn-outline-secondary" type="submit">Filter</button>
-  </div>
-</form>
+</div>
 
 <div class="card shadow-sm">
   <div class="table-responsive">
-    <table class="table table-striped mb-0">
-      <thead>
+    <table class="table table-hover align-middle ez-table">
+      <thead class="table-light">
         <tr>
           <th>Vendor</th>
           <th>Bill #</th>
@@ -74,7 +82,9 @@
             <td class="text-end">{{ b.total_cents|cents_to_dollars }}</td>
             <td class="text-end">{{ b.balance_cents|cents_to_dollars }}</td>
             <td class="text-end">
-              <a class="btn btn-sm btn-outline-secondary" href="{% url 'payables:bill_detail' b.id %}">Open</a>
+              <a class="btn btn-sm btn-outline-dark btn-icon" title="Open" href="{% url 'payables:bill_detail' b.id %}">
+                <i class="bi bi-box-arrow-up-right"></i>
+              </a>
             </td>
           </tr>
         {% empty %}

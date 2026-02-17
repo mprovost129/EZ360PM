@@ -88,11 +88,31 @@
             </td>
             {% if can_manage %}
               <td class="text-end">
-                <div class="btn-group btn-group-sm">
-                  <a class="btn btn-outline-dark" href="{% url 'crm:client_detail' r.obj.id %}">View</a>
-                  <a class="btn btn-outline-dark" href="{% url 'crm:client_edit' r.obj.id %}">Edit</a>
-                  <a class="btn btn-outline-dark" href="{% url 'documents:client_statement' r.obj.id %}">Statement</a>
-                  <a class="btn btn-outline-danger" href="{% url 'crm:client_delete' r.obj.id %}">Delete</a>
+                <div class="btn-group">
+                  <a class="btn btn-sm btn-outline-dark btn-icon" title="View" href="{% url 'crm:client_detail' r.obj.id %}">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  <button type="button" class="btn btn-sm btn-outline-dark btn-icon dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">More</span>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                      <a class="dropdown-item" href="{% url 'crm:client_edit' r.obj.id %}">
+                        <i class="bi bi-pencil me-2"></i>Edit
+                      </a>
+                    </li>
+                    <li>
+                      <a class="dropdown-item" href="{% url 'documents:client_statement' r.obj.id %}">
+                        <i class="bi bi-file-earmark-text me-2"></i>Statement
+                      </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                      <a class="dropdown-item text-danger" href="{% url 'crm:client_delete' r.obj.id %}">
+                        <i class="bi bi-trash me-2"></i>Delete
+                      </a>
+                    </li>
+                  </ul>
                 </div>
               </td>
             {% endif %}
