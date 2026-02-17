@@ -1,6 +1,53 @@
 {% extends "helpcenter/_help_base.html" %}
+{% load static %}
 
-{% block help_h1 %}Time tracking{% endblock %}
+{% block help_h1 %}Time tracking
+<hr class="my-4">
+<h2 class="h6">Workflow by role</h2>
+<ul class="small">
+  <li><strong>Staff</strong>: start/stop timer, create draft time entries, submit entries for approval.</li>
+  <li><strong>Manager+</strong>: approve/reject submitted entries, mark as billable, convert unbilled time into invoices.</li>
+</ul>
+
+<h3 class="h6 mt-3">Screenshot</h3>
+<div class="card shadow-sm mt-2">
+  <div class="card-body">
+    <div class="fw-semibold mb-2">Screenshot</div>
+    <img class="img-fluid border rounded" src="{% static 'images/helpcenter/time_tracking.png' %}" alt="Help screenshot">
+    <div class="text-secondary small mt-2">Placeholder image — replace with a real screenshot in a launch polishing pass.</div>
+  </div>
+</div>
+
+<div class="text-secondary small">
+  <div class="row g-3 mt-2">
+    <div class="col-lg-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2">Navbar timer dropdown</div>
+          <img class="img-fluid border rounded" src="{% static 'images/helpcenter/timer_navbar.png' %}" alt="Navbar timer dropdown">
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2">Time entries list</div>
+          <img class="img-fluid border rounded" src="{% static 'images/helpcenter/time_entries_list.png' %}" alt="Time entries list">
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2">Manager approval queue</div>
+          <img class="img-fluid border rounded" src="{% static 'images/helpcenter/time_approval_queue.png' %}" alt="Time approval queue">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
 
 {% block help_body %}
 <p>Time entries move through states:</p>
@@ -21,4 +68,50 @@
   <div class="fw-semibold">Approvals</div>
   <div class="small">If approvals are enabled, only managers+ can approve entries. If approvals are disabled, entries may be billed directly.</div>
 </div>
+
+<hr class="my-4">
+<h2 class="h6">Workflow by role</h2>
+<ul class="small">
+  <li><strong>Staff</strong>: start/stop timer, create draft time entries, submit entries for approval.</li>
+  <li><strong>Manager+</strong>: approve/reject submitted entries, mark as billable, convert unbilled time into invoices.</li>
+</ul>
+
+<h3 class="h6 mt-3">Screenshot</h3>
+<div class="card shadow-sm mt-2">
+  <div class="card-body">
+    <div class="fw-semibold mb-2">Screenshot</div>
+    <img class="img-fluid border rounded" src="{% static 'images/helpcenter/time_tracking.png' %}" alt="Help screenshot">
+    <div class="text-secondary small mt-2">Placeholder image — replace with a real screenshot in a launch polishing pass.</div>
+  </div>
+</div>
+
+<div class="text-secondary small">
+  <div class="row g-3 mt-2">
+    <div class="col-lg-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2">Navbar timer dropdown</div>
+          <img class="img-fluid border rounded" src="{% static 'images/helpcenter/timer_navbar.png' %}" alt="Navbar timer dropdown">
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2">Time entries list</div>
+          <img class="img-fluid border rounded" src="{% static 'images/helpcenter/time_entries_list.png' %}" alt="Time entries list">
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2">Manager approval queue</div>
+          <img class="img-fluid border rounded" src="{% static 'images/helpcenter/time_approval_queue.png' %}" alt="Time approval queue">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}

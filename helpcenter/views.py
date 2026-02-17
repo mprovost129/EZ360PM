@@ -35,6 +35,50 @@ def help_accounting(request):
     return render(request, "helpcenter/help_accounting.html", {"shell": _shell_template(request)})
 
 
+
+def help_accounts_receivable(request):
+    return render(request, "helpcenter/help_accounts_receivable.html", {"shell": _shell_template(request)})
+
+
+def help_client_credits(request):
+    return render(request, "helpcenter/help_client_credits.html", {"shell": _shell_template(request)})
+
+
+def help_ar_aging(request):
+    return render(request, "helpcenter/help_ar_aging.html", {"shell": _shell_template(request)})
+
+
+def help_collections(request):
+    return render(request, "helpcenter/help_collections.html", {"shell": _shell_template(request)})
+
+
+def help_statements(request):
+    return render(request, "helpcenter/help_statements.html", {"shell": _shell_template(request)})
+
+
+def help_report_interpretation(request):
+    return render(request, "helpcenter/help_report_interpretation.html", {"shell": _shell_template(request)})
+
+
+
+
+
+def help_bills(request):
+    return render(request, "helpcenter/help_bills.html", {"shell": _shell_template(request)})
+
+
+def help_vendor_credits(request):
+    return render(request, "helpcenter/help_vendor_credits.html", {"shell": _shell_template(request)})
+
+
+def help_ap_reconciliation(request):
+    return render(request, "helpcenter/help_ap_reconciliation.html", {"shell": _shell_template(request)})
+
+
+def help_ap_aging(request):
+    return render(request, "helpcenter/help_ap_aging.html", {"shell": _shell_template(request)})
+
+
 def help_storage_files(request):
     return render(request, "helpcenter/help_storage_files.html", {"shell": _shell_template(request)})
 
@@ -52,6 +96,10 @@ def help_ops_console(request):
     return render(request, "helpcenter/help_ops_console.html", {"shell": _shell_template(request)})
 
 
+def help_production_runbook(request):
+    return render(request, "helpcenter/help_production_runbook.html", {"shell": _shell_template(request)})
+
+
 def help_recurring_bills(request):
     return render(request, "helpcenter/help_recurring_bills.html", {"shell": _shell_template(request)})
 
@@ -62,6 +110,18 @@ def help_refunds(request):
 
 def help_faq(request):
     return render(request, "helpcenter/help_faq.html", {"shell": _shell_template(request)})
+
+
+def help_profit_loss(request):
+    return render(request, "helpcenter/help_profit_loss.html", {"shell": _shell_template(request)})
+
+
+def help_balance_sheet(request):
+    return render(request, "helpcenter/help_balance_sheet.html", {"shell": _shell_template(request)})
+
+
+def help_trial_balance(request):
+    return render(request, "helpcenter/help_trial_balance.html", {"shell": _shell_template(request)})
 
 
 def legal_terms(request):

@@ -67,7 +67,7 @@
         {% for r in rows %}
           <tr>
             <td>
-              <div class="fw-semibold">{{ r.name }}</div>
+              <div class="fw-semibold"><a class="text-decoration-none" href="{% url 'crm:client_detail' r.obj.id %}">{{ r.name }}</a></div>
               <div class="text-secondary small">{{ r.obj.city }}{% if r.obj.city and r.obj.state %}, {% endif %}{{ r.obj.state }}</div>
             </td>
             <td>
@@ -81,7 +81,9 @@
             {% if can_manage %}
               <td class="text-end">
                 <div class="btn-group btn-group-sm">
+                  <a class="btn btn-outline-dark" href="{% url 'crm:client_detail' r.obj.id %}">View</a>
                   <a class="btn btn-outline-dark" href="{% url 'crm:client_edit' r.obj.id %}">Edit</a>
+                  <a class="btn btn-outline-dark" href="{% url 'documents:client_statement' r.obj.id %}">Statement</a>
                   <a class="btn btn-outline-danger" href="{% url 'crm:client_delete' r.obj.id %}">Delete</a>
                 </div>
               </td>

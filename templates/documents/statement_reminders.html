@@ -1,0 +1,270 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% block title %}Statement Reminders · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="max-width: 1200px;">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">Statement Reminders</h1>
+      <div class="text-secondary small">Company-wide queue of scheduled, failed, sent, and canceled reminders.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{% url 'helpcenter:statements' %}" title="Help: Statements"><i class="bi bi-question-circle me-1"></i>Help</a>
+      <a class="btn btn-outline-dark" href="{% url 'documents:invoice_list' %}">Documents</a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <form class="row g-2 align-items-end" method="get">
+        <div class="col-md-3">
+          <label class="form-label small text-secondary">Status</label>
+          <select class="form-select" name="status">
+            <option value="scheduled" {% if status == 'scheduled' %}selected{% endif %}>Scheduled</option>
+            <option value="failed" {% if status == 'failed' %}selected{% endif %}>Failed</option>
+            <option value="sent" {% if status == 'sent' %}selected{% endif %}>Sent</option>
+            <option value="canceled" {% if status == 'canceled' %}selected{% endif %}>Canceled</option>
+            <option value="all" {% if status == 'all' %}selected{% endif %}>(all)</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small text-secondary">Search</label>
+          <input class="form-control" name="q" value="{{ q }}" placeholder="client name / email / recipient">
+        </div>
+        <div class="col-md-3 d-flex gap-2">
+          <button class="btn btn-dark w-100" type="submit">Apply</button>
+          <a class="btn btn-outline-secondary w-100" href="{% url 'documents:statement_reminders' %}">Reset</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div>
+          <div class="fw-semibold">Reminder delivery report</div>
+          <div class="text-secondary small">Last 30 days (based on reminder send attempts).</div>
+        </div>
+        <div class="text-secondary small">From {{ delivery_report_start|date:"Y-m-d" }} to today</div>
+      </div>
+      <div class="table-responsive mt-2">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Date</th>
+              <th class="text-end">Sent</th>
+              <th class="text-end">Failed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in delivery_report_days %}
+              <tr>
+                <td class="text-secondary small">{{ d.day|date:"Y-m-d" }}</td>
+                <td class="text-end">{{ d.sent }}</td>
+                <td class="text-end">{{ d.failed }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <form method="post" class="border-bottom p-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+        {% csrf_token %}
+        {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+        {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+        {% if page_obj.number %}<input type="hidden" name="page" value="{{ page_obj.number }}">{% endif %}
+
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" id="selectAllReminders">
+            <label class="form-check-label small" for="selectAllReminders">Select all on page</label>
+          </div>
+
+          <div class="vr"></div>
+
+          <select class="form-select form-select-sm" name="action" id="bulkActionSelect" style="max-width: 220px;">
+            <option value="">Bulk action…</option>
+            {% if user.is_staff %}
+              <option value="send_now_selected">Send now (selected)</option>
+              <option value="send_now_filtered">Send now (filtered)</option>
+            {% endif %}
+            <option value="cancel_selected">Cancel selected</option>
+            <option value="reschedule_selected">Reschedule selected</option>
+          </select>
+
+          <div class="d-flex align-items-center gap-2" id="bulkRescheduleControls" style="display:none;">
+            <input type="date" class="form-control form-control-sm" name="scheduled_for" id="bulkRescheduleDate" style="max-width: 180px;">
+            <span class="text-secondary small">New send date</span>
+          </div>
+
+          <div class="form-check mb-0" id="bulkFilteredConfirm" style="display:none;">
+            <input class="form-check-input" type="checkbox" name="confirm_send_now_filtered" value="1" id="confirmFilteredSend">
+            <label class="form-check-label small text-secondary" for="confirmFilteredSend">Confirm send for filtered set (cap 200)</label>
+          </div>
+
+          <button class="btn btn-sm btn-dark" type="submit" id="bulkApplyBtn" disabled>
+            <i class="bi bi-lightning-charge me-1"></i>Apply
+          </button>
+        </div>
+
+        <div class="text-secondary small">
+          Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        </div>
+      </form>
+
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th style="width:36px;"></th>
+              <th>Send on</th>
+              <th>Client</th>
+              <th>Recipient</th>
+              <th>Tone</th>
+              <th>Status</th>
+              <th>Attempts</th>
+              <th>Last error</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in items %}
+              <tr>
+                <td><input class="form-check-input reminder-check" type="checkbox" name="reminder_ids" value="{{ r.id }}"></td>
+                <td style="white-space:nowrap;" class="text-secondary small">{{ r.scheduled_for|date:"Y-m-d" }}</td>
+                <td>
+                  <div class="fw-semibold">{{ r.client.display_label }}</div>
+                  <div class="text-secondary small">{% if r.client.email %}{{ r.client.email }}{% endif %}</div>
+                </td>
+                <td class="text-secondary small">{{ r.recipient_email }}</td>
+                <td>
+                  {% if r.tone == 'past_due' %}
+                    <span class="badge text-bg-warning text-dark">past due</span>
+                  {% else %}
+                    <span class="badge text-bg-light border">friendly</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if r.status == 'scheduled' %}
+                    <span class="badge text-bg-primary">scheduled</span>
+                  {% elif r.status == 'failed' %}
+                    <span class="badge text-bg-danger">failed</span>
+                  {% elif r.status == 'sent' %}
+                    <span class="badge text-bg-success">sent</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary">canceled</span>
+                  {% endif %}
+                </td>
+                <td class="text-secondary small">{{ r.attempt_count|default:0 }}</td>
+                <td class="text-secondary small">{{ r.last_error|truncatechars:80 }}</td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-outline-dark" href="{% url 'documents:client_statement' r.client.id %}">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>Open
+                  </a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="9" class="p-3 text-secondary">No reminders found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if page_obj.paginator.num_pages > 1 %}
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 p-2 border-top">
+        <div class="text-secondary small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+        <nav aria-label="Reminders pagination">
+          <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+              <a class="page-link" href="{% url 'documents:statement_reminders' %}?{% if qs_no_page %}{{ qs_no_page }}&{% endif %}page=1">First</a>
+            </li>
+            <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+              <a class="page-link" href="{% url 'documents:statement_reminders' %}?{% if qs_no_page %}{{ qs_no_page }}&{% endif %}page={{ page_obj.previous_page_number }}">Prev</a>
+            </li>
+            <li class="page-item disabled"><span class="page-link">{{ page_obj.number }}</span></li>
+            <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+              <a class="page-link" href="{% url 'documents:statement_reminders' %}?{% if qs_no_page %}{{ qs_no_page }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+            </li>
+            <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+              <a class="page-link" href="{% url 'documents:statement_reminders' %}?{% if qs_no_page %}{{ qs_no_page }}&{% endif %}page={{ page_obj.paginator.num_pages }}">Last</a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+<script>
+  (function(){
+    var selectAll = document.getElementById('selectAllReminders');
+    var actionSel = document.getElementById('bulkActionSelect');
+    var applyBtn = document.getElementById('bulkApplyBtn');
+    var reschedBox = document.getElementById('bulkRescheduleControls');
+    var filteredConfirmBox = document.getElementById('bulkFilteredConfirm');
+    var filteredConfirmCheck = document.getElementById('confirmFilteredSend');
+
+    function getChecks(){
+      return Array.prototype.slice.call(document.querySelectorAll('.reminder-check'));
+    }
+
+    function anyChecked(){
+      return getChecks().some(function(c){ return c.checked; });
+    }
+
+    function syncApplyEnabled(){
+      var action = (actionSel && actionSel.value) || '';
+      var ok = (action && action !== 'send_now_filtered') ? anyChecked() : Boolean(action);
+      if (action === 'send_now_filtered') {
+        ok = ok && filteredConfirmCheck && filteredConfirmCheck.checked;
+      }
+      if (actionSel && actionSel.value === 'reschedule_selected') {
+        var d = document.getElementById('bulkRescheduleDate');
+        ok = ok && d && d.value;
+      }
+      applyBtn.disabled = !ok;
+    }
+
+    if (selectAll) {
+      selectAll.addEventListener('change', function(){
+        getChecks().forEach(function(c){ c.checked = selectAll.checked; });
+        syncApplyEnabled();
+      });
+    }
+
+    getChecks().forEach(function(c){
+      c.addEventListener('change', syncApplyEnabled);
+    });
+
+    if (actionSel) {
+      actionSel.addEventListener('change', function(){
+        if (reschedBox) {
+          reschedBox.style.display = (actionSel.value === 'reschedule_selected') ? '' : 'none';
+        }
+        if (filteredConfirmBox) {
+          filteredConfirmBox.style.display = (actionSel.value === 'send_now_filtered') ? '' : 'none';
+        }
+        syncApplyEnabled();
+      });
+    }
+
+    var reschedDate = document.getElementById('bulkRescheduleDate');
+    if (filteredConfirmCheck) {
+      filteredConfirmCheck.addEventListener('change', syncApplyEnabled);
+    }
+    if (reschedDate) {
+      reschedDate.addEventListener('change', syncApplyEnabled);
+    }
+
+    syncApplyEnabled();
+  })();
+</script>
+{% endblock %}

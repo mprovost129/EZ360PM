@@ -6,6 +6,7 @@ from .models import (
     OpsCheckRun,
     OpsCheckKind,
     OpsAlertEvent,
+    OpsAlertSnooze,
     LaunchGateItem,
     BackupRun,
     BackupRestoreTest,
@@ -13,6 +14,7 @@ from .models import (
     UserPresence,
     OpsEmailTest,
     OpsProbeEvent,
+    SiteConfig,
 )
 
 
@@ -23,6 +25,14 @@ class OpsAlertEventAdmin(admin.ModelAdmin):
     search_fields = ("title", "message", "company__name", "company__id", "resolved_by_email")
     readonly_fields = ("created_at",)
     ordering = ("-created_at",)
+
+
+@admin.register(OpsAlertSnooze)
+class OpsAlertSnoozeAdmin(admin.ModelAdmin):
+    list_display = ("source", "company", "snoozed_until", "created_by_email", "created_at")
+    list_filter = ("source", "company")
+    search_fields = ("created_by_email", "reason", "company__name")
+    ordering = ("-snoozed_until",)
 
 
 @admin.register(LaunchGateItem)
@@ -92,3 +102,14 @@ class OpsCheckRunAdmin(admin.ModelAdmin):
     search_fields = ("created_by_email", "output_text", "company__name", "company__owner__email")
     readonly_fields = ("created_at", "output_text", "args", "duration_ms", "created_by_email")
     ordering = ("-created_at",)
+
+@admin.register(SiteConfig)
+class SiteConfigAdmin(admin.ModelAdmin):
+    list_display = ("id", "updated_at", "ops_alert_webhook_enabled", "ops_alert_email_enabled", "ops_alert_email_min_level")
+    readonly_fields = ("updated_at",)
+
+    def has_add_permission(self, request):
+        # Singleton: prevent multiple rows
+        if SiteConfig.objects.exists():
+            return False
+        return super().has_add_permission(request)

@@ -1,26 +1,50 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from datetime import timedelta
+from django.core.paginator import Paginator
 
+from copy import deepcopy
+from datetime import date, timedelta
+
+from django.conf import settings
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Count
+from django.db.models.functions import TruncDate
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+
 from django.utils import timezone
+from django.contrib.auth.decorators import login_required
 
 from audit.services import log_event
 from audit.models import AuditEvent
 from companies.decorators import company_context_required, require_min_role
+# Alias for compatibility with existing decorators
+require_active_company = company_context_required
 from companies.models import EmployeeRole
 from projects.models import Project
+from crm.models import Client
+from documents.models import ClientStatementActivity
+from documents.models import ClientStatementRecipientPreference
 from timetracking.models import TimeEntry, TimeStatus
 
 from decimal import Decimal
 
 from .forms import DocumentForm, DocumentLineItemFormSet, DocumentWizardForm, NumberingSchemeForm, CreditNoteForm
-from .models import Document, DocumentLineItem, DocumentStatus, DocumentTemplate, DocumentType, NumberingScheme, CreditNote, CreditNoteStatus, CreditNoteNumberSequence
+from .models import (
+    Document,
+    DocumentLineItem,
+    DocumentStatus,
+    DocumentTemplate,
+    DocumentType,
+    NumberingScheme,
+    CreditNote,
+    CreditNoteStatus,
+    CreditNoteNumberSequence,
+    StatementReminder,
+    StatementReminderStatus,
+)
 from .services import allocate_document_number, ensure_numbering_scheme, recalc_document_totals
 from .services_email import send_document_to_client_from_request
 
@@ -712,5 +736,903 @@ def credit_note_edit(request, pk):
             "form": form,
             "credit_note": cn,
             "is_edit": True,
+        },
+    )
+
+# --------------------------------------------------------------------------------------
+# Client Statements (Phase 7H30)
+# --------------------------------------------------------------------------------------
+
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+
+
+def _money(cents: int) -> str:
+    try:
+        return f"{(int(cents or 0) / 100):,.2f}"
+    except Exception:
+        return "0.00"
+
+
+def _parse_iso_date(val: str | None):
+    if not val:
+        return None
+    v = str(val).strip()
+    if not v:
+        return None
+    try:
+        from datetime import date as _date
+        y, m, d = v.split('-')
+        return _date(int(y), int(m), int(d))
+    except Exception:
+        return None
+
+
+def _statement_rows(company, client, *, date_from=None, date_to=None):
+    qs = (
+        Document.objects.filter(
+            company=company,
+            doc_type=DocumentType.INVOICE,
+            client=client,
+            deleted_at__isnull=True,
+        )
+        .exclude(status__in=[DocumentStatus.PAID, DocumentStatus.VOID])
+        .order_by("issue_date", "created_at")
+    )
+
+    # Optional date-range filtering (applies to issue_date when present; falls back to created_at date)
+    if date_from:
+        qs = qs.filter(
+            Q(issue_date__gte=date_from) | Q(issue_date__isnull=True, created_at__date__gte=date_from)
+        )
+    if date_to:
+        qs = qs.filter(
+            Q(issue_date__lte=date_to) | Q(issue_date__isnull=True, created_at__date__lte=date_to)
+        )
+
+
+    rows = []
+    total_due = 0
+    for inv in qs:
+        balance_eff = inv.balance_due_effective_cents()
+        total_due += balance_eff
+        rows.append(
+            {
+                "invoice": inv,
+                "total": int(inv.total_cents or 0),
+                "paid": int(inv.amount_paid_cents or 0),
+                "credit_notes": int(inv.credit_applied_cents() or 0),
+                "credit_apps": int(inv.credit_applications_cents() or 0),
+                "balance": int(balance_eff),
+                "total_display": _money(int(inv.total_cents or 0)),
+                "paid_display": _money(int(inv.amount_paid_cents or 0)),
+                "credits_display": _money(int((inv.credit_applied_cents() or 0) + (inv.credit_applications_cents() or 0))),
+                "balance_display": _money(int(balance_eff)),
+            }
+        )
+    return rows, total_due
+
+
+@company_context_required
+@require_min_role(EmployeeRole.MANAGER)
+def _weasyprint_is_installed() -> bool:
+    try:
+        import weasyprint  # type: ignore  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+def client_statement(request, client_pk):
+    company = request.active_company
+    client = get_object_or_404(Client, id=client_pk, company=company, deleted_at__isnull=True)
+
+    # Phase 7H44: record statement view history (best-effort; never blocks).
+    try:
+        activity, _ = ClientStatementActivity.objects.get_or_create(company=company, client=client)
+        activity.last_viewed_at = timezone.now()
+        activity.last_viewed_by = getattr(request, "active_employee", None)
+        activity.save(update_fields=["last_viewed_at", "last_viewed_by", "updated_at"])
+    except Exception:
+        pass
+
+    date_from = _parse_iso_date(request.GET.get('date_from'))
+    date_to = _parse_iso_date(request.GET.get('date_to'))
+
+    if date_from and date_to and date_from > date_to:
+        date_from, date_to = date_to, date_from
+
+    rows, total_due = _statement_rows(company, client, date_from=date_from, date_to=date_to)
+
+    qs_params = []
+    if date_from:
+        qs_params.append(f"date_from={date_from.isoformat()}")
+    if date_to:
+        qs_params.append(f"date_to={date_to.isoformat()}")
+    querystring = ("?" + "&".join(qs_params)) if qs_params else ""
+
+    app_base_url = getattr(settings, "APP_BASE_URL", "").strip()
+    weasyprint_installed = _weasyprint_is_installed()
+
+    # Phase 7H35/7H38: default recipient comes from (1) last-used session value,
+    # then (2) stored preference, then (3) client email.
+    pref = ClientStatementRecipientPreference.objects.filter(company=company, client=client).first()
+    initial_to_email = (request.session.get(f"stmt_to_{client.id}") or (pref.last_to_email if pref else "") or client.email or "").strip()
+
+    # Phase 7H38: cadence helper suggestions and recent sent reminders.
+    today = timezone.localdate()
+
+    def _next_weekday(start: date, weekday: int) -> date:
+        # weekday: Monday=0..Sunday=6
+        delta = (weekday - start.weekday()) % 7
+        return start if delta == 0 else (start + timedelta(days=delta))
+
+    suggestions = [
+        {"label": "In 3 days", "date": (today + timedelta(days=3))},
+        {"label": "In 7 days", "date": (today + timedelta(days=7))},
+        {"label": "In 14 days", "date": (today + timedelta(days=14))},
+        {"label": "Next Monday", "date": _next_weekday(today, 0)},
+    ]
+    # End of month (simple): first of next month - 1 day
+    first_next_month = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
+    end_of_month = first_next_month - timedelta(days=1)
+    suggestions.append({"label": "End of month", "date": end_of_month})
+
+    sent_reminders = (
+        StatementReminder.objects
+        .filter(company=company, client=client, status=StatementReminderStatus.SENT, deleted_at__isnull=True)
+        .order_by("-sent_at", "-scheduled_for")[:5]
+    )
+
+    failed_reminders = (
+        StatementReminder.objects
+        .filter(company=company, client=client, status=StatementReminderStatus.FAILED, deleted_at__isnull=True)
+        .order_by("-attempted_at", "-updated_at")[:10]
+    )
+
+    return render(
+        request,
+        "documents/client_statement.html",
+        {
+            "client": client,
+            "scheduled_reminders": StatementReminder.objects.filter(company=company, client=client, status=StatementReminderStatus.SCHEDULED, deleted_at__isnull=True).order_by("scheduled_for")[:20],
+            "sent_reminders": sent_reminders,
+            "failed_reminders": failed_reminders,
+            "cadence_suggestions": suggestions,
+            "default_recipient_email": initial_to_email,
+            "rows": rows,
+            "total_due_cents": total_due,
+            "total_due": _money(total_due),
+            "app_base_url_missing": not bool(app_base_url),
+            "weasyprint_missing": not bool(weasyprint_installed),
+            "date_from": date_from,
+            "date_to": date_to,
+            "querystring": querystring,
+            "initial_to_email": initial_to_email,
+        },
+    )
+
+
+@company_context_required
+@require_min_role(EmployeeRole.MANAGER)
+def client_statement_csv(request, client_pk):
+    company = request.active_company
+    client = get_object_or_404(Client, id=client_pk, company=company, deleted_at__isnull=True)
+
+    # Phase 7H44: record statement view history (best-effort; never blocks).
+    try:
+        activity, _ = ClientStatementActivity.objects.get_or_create(company=company, client=client)
+        activity.last_viewed_at = timezone.now()
+        activity.last_viewed_by = getattr(request, "active_employee", None)
+        activity.save(update_fields=["last_viewed_at", "last_viewed_by", "updated_at"])
+    except Exception:
+        pass
+
+
+    date_from = _parse_iso_date(request.GET.get('date_from'))
+    date_to = _parse_iso_date(request.GET.get('date_to'))
+    if date_from and date_to and date_from > date_to:
+        date_from, date_to = date_to, date_from
+
+    rows, total_due = _statement_rows(company, client, date_from=date_from, date_to=date_to)
+
+    import csv
+    from io import StringIO
+
+    buf = StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Invoice #", "Issue date", "Due date", "Status", "Total", "Paid", "Credit notes", "Credit applied", "Balance due"])
+    for r in rows:
+        inv = r["invoice"]
+        w.writerow(
+            [
+                inv.number,
+                inv.issue_date.isoformat() if inv.issue_date else "",
+                inv.due_date.isoformat() if inv.due_date else "",
+                inv.status,
+                _money(r["total"]),
+                _money(r["paid"]),
+                _money(r["credit_notes"]),
+                _money(r["credit_apps"]),
+                _money(r["balance"]),
+            ]
+        )
+    w.writerow([])
+    w.writerow(["", "", "", "TOTAL DUE", "", "", "", "", _money(total_due)])
+
+    resp = HttpResponse(buf.getvalue(), content_type="text/csv")
+    resp["Content-Disposition"] = f'attachment; filename="statement_{client.id}.csv"'
+    return resp
+
+
+def _render_statement_pdf_bytes(html: str) -> tuple[bytes | None, str | None]:
+    """Best-effort HTML→PDF via optional WeasyPrint.
+
+    Returns: (pdf_bytes, error_code)
+      - error_code is one of: "not_installed", "render_failed".
+    """
+    try:
+        from weasyprint import HTML  # type: ignore
+    except Exception:
+        return None, "not_installed"
+    try:
+        return HTML(string=html).write_pdf(), None
+    except Exception:
+        return None, "render_failed"
+
+
+@company_context_required
+@require_min_role(EmployeeRole.MANAGER)
+def client_statement_pdf(request, client_pk):
+    company = request.active_company
+    client = get_object_or_404(Client, id=client_pk, company=company, deleted_at__isnull=True)
+
+    # Phase 7H44: record statement view history (best-effort; never blocks).
+    try:
+        activity, _ = ClientStatementActivity.objects.get_or_create(company=company, client=client)
+        activity.last_viewed_at = timezone.now()
+        activity.last_viewed_by = getattr(request, "active_employee", None)
+        activity.save(update_fields=["last_viewed_at", "last_viewed_by", "updated_at"])
+    except Exception:
+        pass
+
+
+    date_from = _parse_iso_date(request.GET.get('date_from'))
+    date_to = _parse_iso_date(request.GET.get('date_to'))
+    if date_from and date_to and date_from > date_to:
+        date_from, date_to = date_to, date_from
+
+    rows, total_due = _statement_rows(company, client, date_from=date_from, date_to=date_to)
+
+    # Keep recipient prefill consistent with the Statement page.
+    pref = ClientStatementRecipientPreference.objects.filter(company=company, client=client).first()
+    initial_to_email = (request.session.get(f"stmt_to_{client.id}") or (pref.last_to_email if pref else "") or client.email or "").strip()
+
+    qs_params = []
+    if date_from:
+        qs_params.append(f"date_from={date_from.isoformat()}")
+    if date_to:
+        qs_params.append(f"date_to={date_to.isoformat()}")
+    querystring = ("?" + "&".join(qs_params)) if qs_params else ""
+
+    html = render_to_string(
+        "documents/client_statement_pdf.html",
+        {
+            "client": client,
+            "scheduled_reminders": StatementReminder.objects.filter(company=company, client=client, status=StatementReminderStatus.SCHEDULED, deleted_at__isnull=True).order_by("scheduled_for")[:20],
+            "default_recipient_email": initial_to_email,
+            "company": company,
+            "rows": rows,
+            "total_due_cents": total_due,
+            "total_due": _money(total_due),
+            "date_from": date_from,
+            "date_to": date_to,
+            "querystring": querystring,
+            "initial_to_email": initial_to_email,
+            "generated_at": timezone.now(),
+            "date_from": date_from,
+            "date_to": date_to,
+            "app_base_url": getattr(settings, "APP_BASE_URL", "").strip(),
+            "statement_path": reverse("documents:client_statement", kwargs={"client_pk": client.id}),
+        },
+    )
+    pdf_bytes, pdf_err = _render_statement_pdf_bytes(html)
+    if not pdf_bytes:
+        if pdf_err == "not_installed":
+            messages.error(
+                request,
+                "PDF export requires WeasyPrint. Install it in this environment (plus system deps like Cairo/Pango) to enable PDF output.",
+            )
+        else:
+            messages.error(
+                request,
+                "PDF export failed. This is usually caused by missing WeasyPrint system dependencies (Cairo/Pango) or an HTML/CSS rendering issue.",
+            )
+        return redirect(f"{reverse('documents:client_statement', kwargs={'client_pk': client.id})}{querystring}")
+
+    resp = HttpResponse(pdf_bytes, content_type="application/pdf")
+    resp["Content-Disposition"] = f'attachment; filename="statement_{client.id}.pdf"'
+    return resp
+
+
+@company_context_required
+@require_min_role(EmployeeRole.MANAGER)
+def client_statement_email(request, client_pk):
+    company = request.active_company
+    employee = request.active_employee
+    client = get_object_or_404(Client, id=client_pk, company=company, deleted_at__isnull=True)
+
+    # Phase 7H44: record statement view history (best-effort; never blocks).
+    try:
+        activity, _ = ClientStatementActivity.objects.get_or_create(company=company, client=client)
+        activity.last_viewed_at = timezone.now()
+        activity.last_viewed_by = getattr(request, "active_employee", None)
+        activity.save(update_fields=["last_viewed_at", "last_viewed_by", "updated_at"])
+    except Exception:
+        pass
+
+
+    from .forms import StatementEmailForm
+    from .services_statements import send_statement_to_client_from_request
+
+    if request.method != "POST":
+        base_url = reverse('documents:client_statement', kwargs={'client_pk': client.id})
+        qs = request.GET.urlencode()
+        return redirect(f"{base_url}{('?' + qs) if qs else ''}")
+
+    post_data = request.POST.copy()
+    test_myself = (post_data.get("test_myself") or "").strip() in {"1", "true", "yes", "on"}
+    if test_myself:
+        post_data["to_email"] = (getattr(request.user, "email", "") or "").strip()
+    form = StatementEmailForm(post_data, client=client)
+    if not form.is_valid():
+        messages.error(request, "Please correct the email form.")
+        qs_params = []
+        if request.POST.get('date_from'):
+            qs_params.append(f"date_from={request.POST.get('date_from')}")
+        if request.POST.get('date_to'):
+            qs_params.append(f"date_to={request.POST.get('date_to')}")
+        querystring = ("?" + "&".join(qs_params)) if qs_params else ""
+        base_url = reverse('documents:client_statement', kwargs={'client_pk': client.id})
+        return redirect(f"{base_url}{querystring}")
+
+    res = send_statement_to_client_from_request(
+        request,
+        company=company,
+        client=client,
+        to_email=form.cleaned_data.get("to_email") or None,
+        date_from=form.cleaned_data.get('date_from'),
+        date_to=form.cleaned_data.get('date_to'),
+        attach_pdf=bool(form.cleaned_data.get('attach_pdf')),
+        template_variant=form.cleaned_data.get('tone') or 'sent',
+    )
+
+    # Optional: email the acting user a copy (best-effort; never blocks primary send).
+    if res.sent and bool(form.cleaned_data.get("email_me_copy")) and not test_myself:
+        try:
+            from .services_statements import send_statement_copy_to_actor
+
+            actor_email = (getattr(request.user, "email", "") or "").strip()
+            if actor_email and actor_email.lower() != (res.to or "").strip().lower():
+                send_statement_copy_to_actor(
+                    company=company,
+                    client=client,
+                    actor=getattr(request, "active_employee", None),
+                    to_email=actor_email,
+                    date_from=form.cleaned_data.get('date_from'),
+                    date_to=form.cleaned_data.get('date_to'),
+                    attach_pdf=bool(form.cleaned_data.get('attach_pdf')),
+                )
+        except Exception:
+            pass
+    if res.sent:
+        messages.success(request, f"Statement emailed to {res.to}.")
+    else:
+        messages.error(request, res.message)
+
+    # Persist last-used recipient per client (per company) for faster collections workflows.
+    if res.sent and not test_myself and (res.to or '').strip():
+        try:
+            ClientStatementRecipientPreference.objects.update_or_create(
+                company=company,
+                client=client,
+                defaults={
+                    'last_to_email': (res.to or '').strip(),
+                    'updated_at': timezone.now(),
+                    'updated_by': request.user if getattr(request, 'user', None) and getattr(request.user, 'is_authenticated', False) else None,
+                },
+            )
+        except Exception:
+            pass
+
+    qs_params = []
+    if form.cleaned_data.get('date_from'):
+        qs_params.append(f"date_from={form.cleaned_data['date_from'].isoformat()}")
+    if form.cleaned_data.get('date_to'):
+        qs_params.append(f"date_to={form.cleaned_data['date_to'].isoformat()}")
+    querystring = ("?" + "&".join(qs_params)) if qs_params else ""
+
+    base_url = reverse('documents:client_statement', kwargs={'client_pk': client.id})
+    return redirect(f"{base_url}{querystring}")
+
+
+@company_context_required
+@require_min_role(EmployeeRole.MANAGER)
+def client_statement_email_preview(request, client_pk):
+    """Return a best-effort preview of the statement email without sending it."""
+    company = request.active_company
+    client = get_object_or_404(Client, id=client_pk, company=company, deleted_at__isnull=True)
+
+    # Phase 7H44: record statement view history (best-effort; never blocks).
+    try:
+        activity, _ = ClientStatementActivity.objects.get_or_create(company=company, client=client)
+        activity.last_viewed_at = timezone.now()
+        activity.last_viewed_by = getattr(request, "active_employee", None)
+        activity.save(update_fields=["last_viewed_at", "last_viewed_by", "updated_at"])
+    except Exception:
+        pass
+
+
+    date_from = _parse_iso_date(request.GET.get("date_from"))
+    date_to = _parse_iso_date(request.GET.get("date_to"))
+    if date_from and date_to and date_from > date_to:
+        date_from, date_to = date_to, date_from
+
+    to_email = (request.GET.get("to_email") or client.email or "").strip()
+    attach_pdf = str(request.GET.get("attach_pdf") or "").strip().lower() in {"1", "true", "yes", "on"}
+    tone = (request.GET.get("tone") or "friendly").strip()
+
+    from .services_statements import build_statement_email_preview
+
+    preview = build_statement_email_preview(
+        company=company,
+        client=client,
+        to_email=to_email or None,
+        date_from=date_from,
+        date_to=date_to,
+        attach_pdf=attach_pdf,
+        tone=tone if tone in {"friendly", "past_due"} else "friendly",
+    )
+
+    return JsonResponse(
+        {
+            "ok": preview.ok,
+            "to": preview.to,
+            "subject": preview.subject,
+            "html": preview.html,
+            "text": preview.text,
+            "warnings": preview.warnings,
+            "errors": preview.errors,
+        }
+    )
+
+
+@login_required
+@require_active_company
+def client_statement_reminder_create(request, client_pk):
+    company = request.company
+    client = get_object_or_404(Client, pk=client_pk, company=company, deleted_at__isnull=True)
+
+    if request.method != "POST":
+        return redirect("documents:client_statement", client_pk=client.id)
+
+    scheduled_for = request.POST.get("scheduled_for")
+    recipient_email = (request.POST.get("recipient_email") or "").strip()
+    attach_pdf = bool(request.POST.get("attach_pdf"))
+    tone = (request.POST.get("tone") or "friendly").strip()
+
+    date_from = request.POST.get("date_from") or None
+    date_to = request.POST.get("date_to") or None
+
+    if not scheduled_for:
+        messages.error(request, "Choose a reminder date")
+        return redirect("documents:client_statement", client_pk=client.id)
+
+    try:
+        from django.utils.dateparse import parse_date
+
+        sched = parse_date(str(scheduled_for))
+        if not sched:
+            raise ValueError
+        df = parse_date(str(date_from)) if date_from else None
+        dt = parse_date(str(date_to)) if date_to else None
+    except Exception:
+        messages.error(request, "Invalid reminder date")
+        return redirect("documents:client_statement", client_pk=client.id)
+
+    actor = getattr(request, "employee_profile", None)
+    StatementReminder.objects.create(
+        company=company,
+        client=client,
+        scheduled_for=sched,
+        recipient_email=recipient_email or (client.email or ""),
+        date_from=df,
+        date_to=dt,
+        attach_pdf=attach_pdf,
+        tone=tone if tone in {"friendly", "past_due"} else "friendly",
+        created_by=actor,
+        modified_by=actor,
+        updated_by_user=request.user if getattr(request, "user", None) and getattr(request.user, "is_authenticated", False) else None,
+        status=StatementReminderStatus.SCHEDULED,
+    )
+
+    messages.success(request, "Reminder scheduled")
+    return redirect("documents:client_statement", client_pk=client.id)
+
+
+@login_required
+@require_active_company
+def client_statement_reminder_cancel(request, client_pk, reminder_pk):
+    company = request.company
+    client = get_object_or_404(Client, pk=client_pk, company=company, deleted_at__isnull=True)
+    reminder = get_object_or_404(StatementReminder, pk=reminder_pk, company=company, client=client, deleted_at__isnull=True)
+
+    if request.method == "POST":
+        actor = getattr(request, "employee_profile", None)
+        reminder.status = StatementReminderStatus.CANCELED
+        reminder.modified_by = actor
+        reminder.updated_by_user = request.user if getattr(request, "user", None) and getattr(request.user, "is_authenticated", False) else None
+        reminder.save(update_fields=["status", "modified_by", "updated_by_user", "updated_at"])
+        messages.success(request, "Reminder canceled")
+
+    return redirect("documents:client_statement", client_pk=client.id)
+
+
+@login_required
+@require_active_company
+def client_statement_reminder_reschedule(request, client_pk, reminder_pk):
+    """One-click reschedule for FAILED reminders.
+
+    Intended workflow: staff see a failed attempt, then reschedule to a new date.
+    """
+    company = request.company
+    client = get_object_or_404(Client, pk=client_pk, company=company, deleted_at__isnull=True)
+    reminder = get_object_or_404(StatementReminder, pk=reminder_pk, company=company, client=client, deleted_at__isnull=True)
+
+    if request.method != "POST":
+        return redirect("documents:client_statement", client_pk=client.id)
+
+    from django.utils.dateparse import parse_date
+
+    scheduled_for = (request.POST.get("scheduled_for") or "").strip()
+    sched = parse_date(scheduled_for) if scheduled_for else None
+    if not sched:
+        # Default reschedule is +7 days
+        sched = timezone.localdate() + timedelta(days=7)
+
+    actor = getattr(request, "employee_profile", None)
+    reminder.scheduled_for = sched
+    reminder.status = StatementReminderStatus.SCHEDULED
+    reminder.last_error = ""
+    reminder.sent_at = None
+    reminder.modified_by = actor
+    reminder.updated_by_user = request.user if getattr(request, "user", None) and getattr(request.user, "is_authenticated", False) else None
+    reminder.save(update_fields=["scheduled_for", "status", "last_error", "sent_at", "modified_by", "updated_by_user", "updated_at"])
+
+    messages.success(request, f"Reminder rescheduled for {sched}.")
+    return redirect("documents:client_statement", client_pk=client.id)
+
+
+@login_required
+@require_active_company
+def client_statement_reminder_retry_now(request, client_pk, reminder_pk):
+    """Staff-only: retry sending a single reminder immediately.
+
+    This is intentionally synchronous and best-effort for ops/support workflows.
+    Always records an attempt timestamp/counter.
+    """
+
+    user = getattr(request, "user", None)
+    if not user or not (user.is_staff or user.is_superuser):
+        messages.error(request, "Staff access required.")
+        return redirect("documents:client_statement", client_pk=client_pk)
+
+    company = request.company
+    client = get_object_or_404(Client, pk=client_pk, company=company, deleted_at__isnull=True)
+    reminder = get_object_or_404(StatementReminder, pk=reminder_pk, company=company, client=client, deleted_at__isnull=True)
+
+    if request.method != "POST":
+        return redirect("documents:client_statement", client_pk=client.id)
+
+    from documents.services_statements import send_statement_to_client
+
+    try:
+        # Always record an attempt timestamp/counter, regardless of success.
+        actor = getattr(request, "employee_profile", None)
+        reminder.attempted_at = timezone.now()
+        reminder.attempt_count = int(getattr(reminder, "attempt_count", 0) or 0) + 1
+        reminder.modified_by = actor
+        reminder.updated_by_user = request.user if getattr(request, "user", None) and getattr(request.user, "is_authenticated", False) else None
+        reminder.save(update_fields=["attempted_at", "attempt_count", "modified_by", "updated_by_user", "updated_at"])
+
+        res = send_statement_to_client(
+            company=reminder.company,
+            client=reminder.client,
+            actor=reminder.created_by,
+            to_email=reminder.recipient_email,
+            date_from=reminder.date_from,
+            date_to=reminder.date_to,
+            attach_pdf=bool(reminder.attach_pdf),
+            template_variant=getattr(reminder, "tone", "friendly") or "friendly",
+        )
+
+        if res.sent:
+            reminder.status = StatementReminderStatus.SENT
+            reminder.sent_at = timezone.now()
+            reminder.last_error = ""
+            reminder.save(update_fields=["status", "sent_at", "last_error", "updated_at"])
+            messages.success(request, "Reminder sent.")
+        else:
+            reminder.status = StatementReminderStatus.FAILED
+            reminder.last_error = res.message
+            reminder.save(update_fields=["status", "last_error", "updated_at"])
+            messages.error(request, f"Send failed: {res.message}")
+    except Exception as exc:
+        reminder.status = StatementReminderStatus.FAILED
+        reminder.last_error = str(exc)[:2000]
+        reminder.save(update_fields=["status", "last_error", "updated_at"])
+        messages.error(request, f"Send failed: {exc}")
+
+    return redirect("documents:client_statement", client_pk=client.id)
+
+
+@company_context_required
+@require_min_role(EmployeeRole.MANAGER)
+@company_context_required
+@require_min_role(EmployeeRole.MANAGER)
+def statement_reminders_list(request):
+    """Company-wide statement reminder queue.
+
+    Phase 7H42: bulk actions for collections workflows.
+    """
+    company = request.active_company
+
+    status = (request.GET.get("status") or "scheduled").strip().lower()
+    q = (request.GET.get("q") or "").strip()
+
+    qs = (
+        StatementReminder.objects.filter(company=company, deleted_at__isnull=True)
+        .select_related("client")
+        .order_by("-scheduled_for", "-created_at")
+    )
+
+    if status and status != "all":
+        if status in {"scheduled", "failed", "sent", "canceled"}:
+            qs = qs.filter(status=status)
+
+    if q:
+        qs = qs.filter(
+            Q(client__name__icontains=q)
+            | Q(client__email__icontains=q)
+            | Q(recipient_email__icontains=q)
+        )
+
+    # Lightweight delivery report (last 30 days).
+    report_start = timezone.localdate() - timedelta(days=29)
+    attempt_base = StatementReminder.objects.filter(
+        company=company,
+        deleted_at__isnull=True,
+        attempted_at__isnull=False,
+        attempted_at__date__gte=report_start,
+    )
+    by_day = (
+        attempt_base.annotate(day=TruncDate("attempted_at"))
+        .values("day")
+        .annotate(
+            sent=Count("id", filter=Q(status=StatementReminderStatus.SENT)),
+            failed=Count("id", filter=Q(status=StatementReminderStatus.FAILED)),
+        )
+        .order_by("day")
+    )
+
+    report_days: list[dict] = []
+    day_cursor = report_start
+    by_day_map = {r["day"]: r for r in by_day}
+    for _ in range(30):
+        row = by_day_map.get(day_cursor)
+        report_days.append(
+            {
+                "day": day_cursor,
+                "sent": int((row or {}).get("sent") or 0),
+                "failed": int((row or {}).get("failed") or 0),
+            }
+        )
+        day_cursor = day_cursor + timedelta(days=1)
+
+    # Bulk actions
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        ids = []
+        for raw in request.POST.getlist("reminder_ids"):
+            try:
+                ids.append(str(raw))
+            except Exception:
+                continue
+        ids = ids[:500]
+
+        actor = getattr(request, "active_employee", None)
+        now = timezone.now()
+
+        # Staff-only actions (best-effort): allow Django staff OR company admin/owner.
+        user = getattr(request, "user", None)
+        is_privileged = bool(getattr(user, "is_staff", False)) or bool(actor and actor.role in {EmployeeRole.ADMIN, EmployeeRole.OWNER})
+
+        if not ids:
+            messages.info(request, "Select at least one reminder.")
+        elif action == "cancel_selected":
+            updated = (
+                StatementReminder.objects.filter(company=company, id__in=ids, deleted_at__isnull=True)
+                .exclude(status=StatementReminderStatus.CANCELED)
+                .update(
+                    status=StatementReminderStatus.CANCELED,
+                    modified_by=actor,
+                    updated_by_user=request.user
+                    if getattr(request, "user", None) and getattr(request.user, "is_authenticated", False)
+                    else None,
+                    updated_at=now,
+                )
+            )
+            if updated:
+                messages.success(request, f"Canceled {updated} reminder(s).")
+            else:
+                messages.info(request, "No reminders were canceled.")
+        elif action == "reschedule_selected":
+            from django.utils.dateparse import parse_date
+
+            scheduled_for = (request.POST.get("scheduled_for") or "").strip()
+            sched = parse_date(scheduled_for) if scheduled_for else None
+            if not sched:
+                messages.error(request, "Choose a valid reschedule date.")
+            else:
+                updated = StatementReminder.objects.filter(company=company, id__in=ids, deleted_at__isnull=True).update(
+                    scheduled_for=sched,
+                    status=StatementReminderStatus.SCHEDULED,
+                    last_error="",
+                    sent_at=None,
+                    modified_by=actor,
+                    updated_by_user=request.user
+                    if getattr(request, "user", None) and getattr(request.user, "is_authenticated", False)
+                    else None,
+                    updated_at=now,
+                )
+                if updated:
+                    messages.success(request, f"Rescheduled {updated} reminder(s) for {sched}.")
+                else:
+                    messages.info(request, "No reminders were rescheduled.")
+        elif action == "send_now_selected":
+            if not is_privileged:
+                messages.error(request, "You do not have permission to send reminders in bulk.")
+            else:
+                from documents.services_statements import send_statement_to_client
+
+                sent = 0
+                failed = 0
+                processed = 0
+                targets = (
+                    StatementReminder.objects.select_related("company", "client")
+                    .filter(company=company, id__in=ids, deleted_at__isnull=True)
+                    .exclude(status=StatementReminderStatus.CANCELED)
+                )
+                for rem in targets[:200]:
+                    processed += 1
+                    try:
+                        rem.attempted_at = timezone.now()
+                        rem.attempt_count = int(getattr(rem, "attempt_count", 0) or 0) + 1
+                        rem.save(update_fields=["attempted_at", "attempt_count", "updated_at"])
+
+                        res = send_statement_to_client(
+                            company=rem.company,
+                            client=rem.client,
+                            actor=actor,
+                            to_email=rem.recipient_email,
+                            date_from=rem.date_from,
+                            date_to=rem.date_to,
+                            attach_pdf=bool(rem.attach_pdf),
+                            template_variant=getattr(rem, "tone", "friendly") or "friendly",
+                        )
+                        if res.sent:
+                            rem.status = StatementReminderStatus.SENT
+                            rem.sent_at = timezone.now()
+                            rem.last_error = ""
+                            rem.save(update_fields=["status", "sent_at", "last_error", "updated_at"])
+                            sent += 1
+                        else:
+                            rem.status = StatementReminderStatus.FAILED
+                            rem.last_error = (res.message or "")[:2000]
+                            rem.save(update_fields=["status", "last_error", "updated_at"])
+                            failed += 1
+                    except Exception as exc:
+                        rem.status = StatementReminderStatus.FAILED
+                        rem.last_error = str(exc)[:2000]
+                        rem.save(update_fields=["status", "last_error", "updated_at"])
+                        failed += 1
+
+                if processed:
+                    messages.success(request, f"Send-now processed={processed} sent={sent} failed={failed}.")
+                else:
+                    messages.info(request, "No reminders were sent.")
+        elif action == "send_now_filtered":
+            if not is_privileged:
+                messages.error(request, "You do not have permission to send reminders in bulk.")
+            else:
+                confirm = request.POST.get("confirm_send_now_filtered") == "1"
+                if not confirm:
+                    messages.error(request, "Confirm the checkbox to send reminders for the filtered set.")
+                else:
+                    from documents.services_statements import send_statement_to_client
+
+                    sent = 0
+                    failed = 0
+                    processed = 0
+
+                    filtered_targets = (
+                        qs.exclude(status=StatementReminderStatus.CANCELED)
+                        .filter(status__in=[StatementReminderStatus.SCHEDULED, StatementReminderStatus.FAILED])
+                        .select_related("company", "client")
+                    )
+
+                    cap = 200
+                    for rem in filtered_targets[:cap]:
+                        processed += 1
+                        try:
+                            rem.attempted_at = timezone.now()
+                            rem.attempt_count = int(getattr(rem, "attempt_count", 0) or 0) + 1
+                            rem.save(update_fields=["attempted_at", "attempt_count", "updated_at"]) 
+
+                            res = send_statement_to_client(
+                                company=rem.company,
+                                client=rem.client,
+                                actor=actor,
+                                to_email=rem.recipient_email,
+                                date_from=rem.date_from,
+                                date_to=rem.date_to,
+                                attach_pdf=bool(rem.attach_pdf),
+                                template_variant=getattr(rem, "tone", "friendly") or "friendly",
+                            )
+                            if res.sent:
+                                rem.status = StatementReminderStatus.SENT
+                                rem.sent_at = timezone.now()
+                                rem.last_error = ""
+                                rem.save(update_fields=["status", "sent_at", "last_error", "updated_at"]) 
+                                sent += 1
+                            else:
+                                rem.status = StatementReminderStatus.FAILED
+                                rem.last_error = (res.message or "")[:2000]
+                                rem.save(update_fields=["status", "last_error", "updated_at"]) 
+                                failed += 1
+                        except Exception as exc:
+                            rem.status = StatementReminderStatus.FAILED
+                            rem.last_error = str(exc)[:2000]
+                            rem.save(update_fields=["status", "last_error", "updated_at"]) 
+                            failed += 1
+
+                    if processed:
+                        messages.success(request, f"Send-now filtered processed={processed} (cap={cap}) sent={sent} failed={failed}.")
+                    else:
+                        messages.info(request, "No reminders matched the filtered set.")
+        else:
+            messages.error(request, "Unknown bulk action.")
+
+        qs_params = request.GET.urlencode()
+        return redirect(f"{reverse('documents:statement_reminders')}" + (f"?{qs_params}" if qs_params else ""))
+
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get("page") or 1)
+
+    qs_no_page = request.GET.copy()
+    qs_no_page.pop("page", None)
+
+    return render(
+        request,
+        "documents/statement_reminders.html",
+        {
+            "items": list(page_obj.object_list),
+            "page_obj": page_obj,
+            "qs_no_page": qs_no_page.urlencode(),
+            "status": status,
+            "q": q,
+            "status_choices": StatementReminderStatus.choices,
+            "delivery_report_days": report_days,
+            "delivery_report_start": report_start,
         },
     )

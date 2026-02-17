@@ -1,18 +1,108 @@
 {% extends "helpcenter/_help_base.html" %}
+{% load static %}
 
-{% block help_h1 %}Accounting engine{% endblock %}
+{% block help_h1 %}Accounting{% endblock %}
 
 {% block help_body %}
-<p>The accounting module provides:</p>
-<ul>
-  <li>Chart of Accounts per company (seeded defaults).</li>
-  <li>Journal entries + journal lines with idempotent posting.</li>
-  <li>Financial statements: Profit & Loss, Balance Sheet, Trial Balance, General Ledger.</li>
-  <li>Operational reports: Aging, Revenue by Client.</li>
-</ul>
+<p class="text-secondary">The accounting engine powers your books: chart of accounts, journal entries, and financial reports. Invoices, payments, and expenses post journal entries automatically.</p>
 
 <div class="alert alert-warning mb-0">
   <div class="fw-semibold">Permissions</div>
-  <div class="small">Accounting features are restricted to manager+ by default. Ops console can further validate accounting readiness.</div>
+  <div class="small">Accounting features are restricted to <strong>Manager+</strong> by default. Admin/Owner manage the Chart of Accounts and advanced settings.</div>
 </div>
+
+<hr class="my-4">
+<h2 class="h6">What’s included</h2>
+<ul>
+  <li>Chart of Accounts per company (seeded defaults).</li>
+  <li>Journal entries + journal lines with idempotent posting.</li>
+  <li>Financial statements: Profit &amp; Loss, Balance Sheet, Trial Balance, General Ledger.</li>
+  <li>Operational reports: Accounts Aging, Revenue by Client.</li>
+</ul>
+
+<h2 class="h6 mt-3">Typical workflow</h2>
+<ul class="small">
+  <li>Create invoices / record payments / enter expenses → the system posts matching journal entries automatically.</li>
+  <li>Review the General Ledger and Trial Balance to validate postings.</li>
+  <li>Run Profit &amp; Loss and Balance Sheet for reporting periods.</li>
+  <li>Use Ops Console → Launch checks to validate accounting readiness.</li>
+</ul>
+
+<hr class="my-4">
+<h2 class="h6">Screenshots</h2>
+<div class="row g-3">
+  <div class="col-lg-12">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Accounting overview</div>
+        <img class="img-fluid border rounded" src="{% static 'images/helpcenter/accounting_overview.png' %}" alt="Accounting overview">
+        <div class="text-secondary small mt-2">Placeholder image — replace with a real screenshot in a launch polishing pass.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Chart of Accounts</div>
+        <img class="img-fluid border rounded" src="{% static 'images/helpcenter/chart_of_accounts.png' %}" alt="Chart of accounts">
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Journal entries</div>
+        <img class="img-fluid border rounded" src="{% static 'images/helpcenter/journal_entries.png' %}" alt="Journal entries">
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Reports index</div>
+        <img class="img-fluid border rounded" src="{% static 'images/helpcenter/reports_index.png' %}" alt="Reports index">
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">General Ledger detail</div>
+        <img class="img-fluid border rounded" src="{% static 'images/helpcenter/general_ledger.png' %}" alt="General ledger">
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Profit &amp; Loss</div>
+        <img class="img-fluid border rounded" src="{% static 'images/helpcenter/profit_loss.png' %}" alt="Profit and Loss">
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Balance Sheet</div>
+        <img class="img-fluid border rounded" src="{% static 'images/helpcenter/balance_sheet.png' %}" alt="Balance sheet">
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Trial Balance</div>
+        <img class="img-fluid border rounded" src="{% static 'images/helpcenter/trial_balance.png' %}" alt="Trial balance">
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}

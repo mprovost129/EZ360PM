@@ -1,3 +1,40 @@
+## 2026-02-16 — Phase 7H42 (Statement tone preview + Reminder bulk actions + Ops export/quick snooze)
+
+**Shipped:**
+- Statements:
+  - Statement email now supports **Tone** selection (Standard/Friendly/Past due).
+  - Statement email preview modal previews the selected tone.
+  - Reminder scheduler now supports **Preview reminder email** before scheduling.
+  - Added company-wide **Statement Reminders** queue with bulk cancel/reschedule.
+- Ops:
+  - Alerts list shows `dedup_count` (Dup column) when alerts were deduplicated.
+  - Added quick snooze actions from the list view.
+  - Added one-click CSV export for unresolved alerts (filters respected, capped).
+
+## 2026-02-16 — Phase 7H29 (Daily ops alert routing + Financial statement help)
+
+**Shipped:**
+- `ez360_run_ops_checks_daily` now raises an Ops Alert + optional admin email when any scheduled check fails.
+- Help Center: added Profit & Loss, Balance Sheet, and Trial Balance pages; linked from Help Home + sidebar.
+- Accounting report pages now include contextual Help links to these Help Center articles.
+
+## 2026-02-16 — Phase 7H32 (Statements PDF/email hardening + APP_BASE_URL readiness + Ops copy JSON)
+
+**Shipped:**
+- Statements:
+  - Added optional “Attach PDF” checkbox on statement emails (WeasyPrint-only).
+  - Improved statement PDF styling for print (Letter sizing, margins, page numbers, cleaner header/table layout).
+  - Fixed statement PDF/email redirect flows and querystring handling.
+- Readiness:
+  - Added `APP_BASE_URL` check (warns when blank with DEBUG=False) so email deep links remain reliable.
+- Ops:
+  - Added alert detail links in the Ops Alerts list table.
+  - Added “Copy JSON” button on alert detail page.
+
+**Why:**
+- Statement delivery must work for “print + email” workflows with predictable links.
+- Staff needs quick access to alert details (and a copy-to-clipboard affordance) for vendor support tickets.
+
 ## 2026-02-16 — Phase 7H20 (Template/Static sanity + Readiness staticfiles)
 
 **Shipped:**
@@ -980,3 +1017,219 @@ Next:
   - `ez360_run_ops_checks_daily` (persist OpsCheckRun runs; intended for daily scheduler)
   - `ez360_prune_ops_check_runs` (retention by days, protects recent-per-kind)
 - Help Center Ops Console updated with daily routine guidance.
+
+## 2026-02-16 — Phase 7H26 (Help Center A/R + contextual help)
+
+**Shipped:**
+- Help Center: Accounts Receivable, Client Credits, A/R Aging pages added and linked from Help Home + Help sidebar.
+- Reports: Accounts Aging report includes a contextual Help button.
+
+**Why:**
+- Corporate users expect “what does this page mean?” help directly from reports.
+- A/R is core to finance workflows; documenting credits and aging reduces support load.
+
+## 2026-02-16 — Phase 7H27 (Help Center A/R workflows + A/P Aging help + Production runbook)
+
+**Shipped:**
+- Help Center: added Collections, Statements, and Report interpretation pages (A/R workflows + report guidance).
+- Help Center: added A/P Aging page; A/P Aging report now includes a contextual Help button.
+- Help Center: added Production runbook page (deploy checks, daily ops checks, scheduling guidance, incident workflow).
+
+**Why:**
+- Finance-heavy apps need an in-product “how to run the business” layer—especially around collections and aging.
+- A/P aging is a core control; help + a dedicated page prevents confusion and reduces support requests.
+
+## 2026-02-16 — Phase 7H28
+**DONE**
+- Ops Checks: added Run recommended preset.
+- Ops dashboard: added Copy Company ID button for UUID copy.
+- Template sanity: warn when humanize filters are used without `{% load humanize %}`.
+
+**NEXT**
+- Continue template sweep: ensure `{% load money %}`/`{% load static %}`/`{% load humanize %}` where needed.
+- Expand help content with screenshots placeholders and role-based permission tables.
+
+
+## 2026-02-16 — Phase 7H30 (Statements + Help workflows + Ops alert routing)
+
+**Shipped:**
+- Documents: added **Client Statements** page (open invoices) with CSV export and optional PDF export (WeasyPrint if installed).
+- Clients list: added quick action to open a client's Statement.
+- Statements: added ability to email a statement notification to the client (templated email).
+- Help Center: added role-based workflow guidance + screenshot placeholders for Time Tracking, Invoices & Payments, Accounting, and Statements.
+- Ops: added DB-backed **Ops SiteConfig** singleton for alert routing (email/webhook), staff UI to edit it, and Ops Dashboard now shows recent alerts + link to routing.
+
+**Notes:**
+- Alert routing is best-effort and never breaks request paths.
+- PDF export requires WeasyPrint (optional dependency).
+
+## 2026-02-16 — Phase 7H31 (Statements polish + Ops deep links + Template sweep)
+
+**Shipped:**
+- Template sweep:
+  - Fixed remaining un-namespaced `{% url 'home' %}` usages (404/500) to `core:home`.
+  - Removed invalid parentheses in a `{% if %}` block (team list) to satisfy template sanity checks.
+- Statements polish:
+  - Added optional statement **date-range filter** (issue date; falls back to created date when issue date missing).
+  - CSV/PDF exports honor the same date range.
+  - Added `APP_BASE_URL` setting so statement emails/PDFs can include a **“View statement”** link back into the app.
+- Ops:
+  - Added **alert detail** page and deep links from Ops dashboard “Recent alerts”.
+  - Added **Send test alert** panel on Ops dashboard to exercise alert routing.
+  - Added `ops_dashboard` as an alert source for auditability.
+- Help Center:
+  - Replaced placeholder text with actual placeholder images under `static/images/helpcenter/` (ready to swap with real screenshots).
+
+**Notes:**
+- `APP_BASE_URL` should be set in production (ex: `https://ez360pm.com`). If blank, emails/PDFs simply omit the link.
+
+
+## 2026-02-16 — Phase 7H33 (Statement email preview + PDF error hints + Ops JSON download + Help screenshots)
+
+**Shipped:**
+- Statements:
+  - Added **Email preview** modal on Client Statement page (renders subject + HTML + text without sending).
+  - Added a staff JSON endpoint to render the preview (`/documents/statements/client/<id>/email/preview/`).
+  - Improved PDF export error messaging to differentiate “WeasyPrint missing” vs “render/deps failure” (Cairo/Pango hints).
+- Ops:
+  - Added **Details JSON download** (`/ops/alerts/<id>/details.json`).
+  - Alert Detail shows a best-effort **Request ID** correlation value from alert details (copy button) when present.
+- Help Center:
+  - Replaced remaining screenshot text blocks with richer placeholder images for Statements, Time Tracking, and Invoices/Payments.
+
+**NEXT:**
+- Continue swapping screenshot placeholders for the Accounting pages.
+- Inline warning UI on Statements page for missing `APP_BASE_URL` and missing WeasyPrint.
+
+## 2026-02-16 — Phase 7H34 (Help Center Accounting screenshots + Statement inline warnings + Ops alert quick-filters)
+
+**Shipped:**
+- Help Center: finished removing remaining "[Screenshot: ...]" text blocks and replaced Accounting screenshots with placeholder screenshot cards (CoA, Journal Entries, Reports index, General Ledger).
+- Statements: added inline warning banner on the Statement page when `APP_BASE_URL` is missing and/or WeasyPrint is not installed (so staff know why PDF / deep links may not work).
+- Ops Alerts: KPI cards (Open/Webhooks/Email/Slow) now act as one-click quick-filters using querystring parameters.
+
+**Why:**
+- Help Center needs consistent, professional screenshot sections (even as placeholders) to serve as a launch manual.
+- Statements should communicate environment limitations up-front (missing `APP_BASE_URL` or WeasyPrint) to prevent “dead-end” actions.
+- Ops quick-filters reduce time-to-triage while staying compatible with existing URL/querystring filtering.
+
+
+## 2026-02-16 — Phase 7H35 (Ops alert pagination + Bulk resolve + Statement recipient defaults + Finance help permissions)
+
+**Shipped:**
+- Ops Alerts:
+  - Added server-side **pagination** (50 per page) to keep the alerts screen fast.
+  - Added a **bulk resolve** workflow (resolve selected on page, or resolve current filtered set up to 500).
+- Statements:
+  - Statement page now remembers the **last-used recipient email** per Client (scoped to Company) and uses it as the default next time.
+  - Added **“Send test to myself”** action (sends the statement email to the logged-in user’s email).
+- Help Center:
+  - Added a standard **Permissions** table (Staff/Manager/Admin/Owner) to core finance/reporting articles.
+
+**Notes:**
+- Bulk resolve is capped (500) to prevent accidental mass changes.
+- Statement recipient defaults are stored in `ClientStatementRecipientPreference`.
+
+
+## 2026-02-16 — Phase 7H36
+- Statements: added StatementReminder scheduling hook + send-due management command.
+- Ops: added noise filters (path prefixes/user-agent tokens) and resolved-alert pruning command.
+
+
+## 2026-02-16 — Phase 7H37
+- Help Center: Production runbook now includes concrete scheduling guidance (Render cron examples) for daily ops checks, statement reminders, and pruning.
+- Statements: reminder presets added (Friendly nudge / Past due) with dedicated email templates; reminders store tone and send the corresponding template.
+
+
+## 2026-02-16 — Phase 7H38
+
+**Shipped:**
+- Ops Checks: added a **Render cron jobs** guidance card with copy/paste commands + link to Render docs.
+- Statements: added a **cadence helper** (quick-pick dates like 3/7/14 days, next Monday, end-of-month) when scheduling reminders.
+- Statements: added a **Last sent** table (recent sent reminders) for visibility and collections cadence.
+
+**Notes:**
+- Cadence suggestions are UI-only helpers; they don’t schedule anything until the user submits the form.
+
+
+## 2026-02-16 — Phase 7H39
+
+**Shipped:**
+- Statements/Reminders:
+  - Added `attempted_at` + `attempt_count` tracking to `StatementReminder` so failures have clear “last attempt” metadata.
+  - `ez360_send_statement_reminders` now records an attempt timestamp/counter for every send attempt.
+  - Statement page now shows a **Failed attempts** table (attempt time + last error) and supports **one-click reschedule (+7 days)**.
+- Ops:
+  - Ops Dashboard now includes copy/paste cron commands.
+  - Added scheduler/env sanity warnings (APP_BASE_URL + email backend/SMTP placeholder checks).
+
+**Notes:**
+- Attempt metadata is intentionally lightweight (timestamp + counter) and is updated even when the underlying send fails.
+- Reschedule clears error state and sets the reminder back to SCHEDULED.
+
+
+## 2026-02-16 — Phase 7H40
+
+**Shipped:**
+- Statements/Reminders:
+  - Failed reminders UI now supports **reschedule-to-date** (date input) instead of only “+7 days”. Blank date still defaults to +7 days.
+  - Added **Retry now** action (staff-only) to attempt sending a single reminder immediately, recording attempt metadata and updating status.
+- Ops:
+  - Expanded production scheduler/env sanity warnings to include **Stripe key presence**, **S3/storage readiness**, **backup S3 readiness**, and **APP_BASE_URL domain alignment** against ALLOWED_HOSTS + CSRF_TRUSTED_ORIGINS.
+
+**Notes:**
+- “Retry now” is synchronous and intended for support workflows; scheduled sending still uses the management command.
+
+
+## 2026-02-16 — Phase 7H41
+
+**Shipped:**
+- Statements/Email:
+  - Added **“Email me a copy”** option when sending a client statement email.
+  - Copy email is sent to the acting user’s email (best-effort) and logs `statement.emailed_copy`.
+- Statements/Reminders (audit trail):
+  - Added `StatementReminder.modified_by` to track who last changed a reminder.
+  - Reminder create/cancel/reschedule/retry now sets `modified_by` + `updated_by_user` for clearer auditability.
+  - Statement page now shows per-reminder **Scheduled by / Updated by + timestamp** for Scheduled / Failed / Sent tables.
+- Ops Alerts:
+  - Added **alert deduplication window** (SiteConfig: `ops_alert_dedup_minutes`) to coalesce identical open alerts.
+  - Added **OpsAlertSnooze** (per-source, optional per-company) and a UI action to **Snooze alerts** from the alert detail page.
+
+**Notes:**
+- Dedup logic increments `details.dedup_count` and records `details.dedup_last_at` rather than creating new rows.
+- Snooze suppresses *new* alerts for the source; it does not hide existing alert rows.
+
+
+## 2026-02-16 — Phase 7H42
+
+**Shipped:**
+- Statements:
+  - Statement email send supports **Tone** selection (Standard / Friendly nudge / Past due) and the Preview modal reflects the selected tone.
+  - Reminder scheduler includes **Preview reminder email** action (tone + optional PDF attachment).
+  - Added company-wide **Statement Reminders queue** with bulk cancel/reschedule.
+- Ops:
+  - Alerts list shows `dedup_count` and supports quick snooze from the list.
+  - Added unresolved alerts CSV export (filters respected; capped).
+
+
+## 2026-02-16 — Phase 7H43
+
+**Shipped:**
+- Statements:
+  - Added staff/admin-only bulk action **Send now (selected)** for statement reminders (best-effort; capped).
+  - Added **Reminder delivery report** (last 30 days: sent/failed by day) to the reminders queue.
+- Ops:
+  - Added **Open alerts summary** on Ops Dashboard grouped by **source** and **source+company** for faster triage.
+
+**Notes:**
+- Bulk send-now is intentionally capped for safety and records attempt metadata per reminder.
+
+
+## 2026-02-16 — Phase 7H44 (DONE)
+- Statements: added bulk **Send now (filtered set)** with confirmation + safety cap in Statement Reminders queue.
+- Statements: added per-client statement activity tracking (last viewed/last emailed) and surfaced it on a new Client Detail page.
+- Ops: added company_id filter to Ops Alerts list and updated Ops Dashboard deep links to preserve company scope.
+
+## 2026-02-16 — Phase 7H45 (DONE)
+- Help Center: verified help screenshot assets exist under `static/images/helpcenter/` and standardized Statements help linking.
+- Statements: added contextual **Help** links to Statement page, Statement Reminders queue, and Client Detail (Statement history) to reduce dead ends.

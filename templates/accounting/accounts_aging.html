@@ -9,8 +9,11 @@
     <h1 class="h4 mb-1">Accounts Aging</h1>
     <div class="text-secondary small">Open invoice balances bucketed by due date.</div>
   </div>
-  <a class="btn btn-outline-dark" href="{% url 'accounting:reports_home' %}">Reports</a>
-          <a class="btn btn-outline-dark" href="?{% if request.GET.start %}start={{ request.GET.start }}&{% endif %}{% if request.GET.end %}end={{ request.GET.end }}&{% endif %}format=csv"><i class="bi bi-download me-1"></i>Export CSV</a>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-dark" href="{% url 'accounting:reports_home' %}">Reports</a>
+    <a class="btn btn-outline-dark" href="{% url 'helpcenter:ar_aging' %}"><i class="bi bi-question-circle me-1"></i>Help</a>
+    <a class="btn btn-outline-dark" href="?{% if request.GET.start %}start={{ request.GET.start }}&{% endif %}{% if request.GET.end %}end={{ request.GET.end }}&{% endif %}format=csv"><i class="bi bi-download me-1"></i>Export CSV</a>
+  </div>
 </div>
 
 <div class="card shadow-sm mb-3">

@@ -21,6 +21,7 @@ class OpsAlertSource(models.TextChoices):
     LAUNCH_GATE = "launch_gate", "Launch gate"
     BACKUP = "backup", "Backup"
     RESTORE_TEST = "restore_test", "Restore test"
+    OPS_DASHBOARD = "ops_dashboard", "Ops dashboard"
     PROBE = "probe", "Probe"
 
 
@@ -64,6 +65,30 @@ class OpsAlertEvent(models.Model):
         self.resolved_by_email = (by_email or "").strip()[:254]
         if save:
             self.save(update_fields=["is_resolved", "resolved_at", "resolved_by_email"])
+
+
+class OpsAlertSnooze(models.Model):
+    """Suppress creation of new alerts for a source (and optionally a company) until a time."""
+
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    created_by_email = models.EmailField(blank=True, default="")
+
+    source = models.CharField(max_length=32, choices=OpsAlertSource.choices, db_index=True)
+    company = models.ForeignKey(Company, null=True, blank=True, on_delete=models.SET_NULL, related_name="ops_alert_snoozes")
+
+    snoozed_until = models.DateTimeField(db_index=True)
+    reason = models.CharField(max_length=200, blank=True, default="")
+
+    class Meta:
+        ordering = ["-snoozed_until"]
+        indexes = [
+            models.Index(fields=["source", "snoozed_until"], name="ops_snooze_source_until_idx"),
+            models.Index(fields=["company", "source", "snoozed_until"], name="ops_snooze_co_source_until_idx"),
+        ]
+
+    def __str__(self) -> str:
+        co = self.company.name if self.company else "Platform"
+        return f"Snooze {self.source} for {co} until {self.snoozed_until:%Y-%m-%d %H:%M}"
 
 
 class LaunchGateItem(models.Model):
@@ -374,3 +399,77 @@ class OpsProbeEvent(models.Model):
 
     def __str__(self) -> str:
         return f"{self.created_at:%Y-%m-%d %H:%M} {self.kind} ({self.status})"
+
+class SiteConfig(models.Model):
+    """Singleton settings for Ops alert routing.
+
+    Purpose: make alert routing (email/webhook) configurable from the Ops UI without
+    requiring environment variable changes.
+    """
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+
+    # Webhook routing (Slack/Discord/custom)
+    ops_alert_webhook_enabled = models.BooleanField(default=False)
+    ops_alert_webhook_url = models.URLField(blank=True, default="")
+    ops_alert_webhook_timeout_seconds = models.DecimalField(max_digits=5, decimal_places=2, default=2.50)
+
+    # Email routing (admin alert emails)
+    ops_alert_email_enabled = models.BooleanField(default=False)
+    ops_alert_email_recipients = models.TextField(
+        blank=True,
+        default="",
+        help_text="Comma-separated list of recipient email addresses.",
+    )
+    ops_alert_email_min_level = models.CharField(
+        max_length=16,
+        choices=OpsAlertLevel.choices,
+        default=OpsAlertLevel.ERROR,
+        help_text="Minimum alert level to email (inclusive).",
+    )
+
+    # Noise filters (best-effort): skip creating alerts that match these patterns.
+    ops_alert_noise_path_prefixes = models.TextField(
+        blank=True,
+        default="",
+        help_text="One per line. If details.path starts with any prefix, the alert will be ignored.",
+    )
+    ops_alert_noise_user_agents = models.TextField(
+        blank=True,
+        default="",
+        help_text="One per line. If details.user_agent contains any token (case-insensitive), the alert will be ignored.",
+    )
+
+    # Deduplication: if an identical alert (source+title+company) is created within this
+    # window and the prior alert is still open, we increment a counter instead of creating
+    # a new row.
+    ops_alert_dedup_minutes = models.PositiveSmallIntegerField(
+        default=10,
+        help_text="Deduplicate identical open alerts within this many minutes (0 disables).",
+    )
+
+    # Retention helpers (used by management command).
+    ops_alert_prune_resolved_after_days = models.PositiveSmallIntegerField(
+        default=30,
+        help_text="Resolved alerts older than this many days may be pruned.",
+    )
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Ops Site Config"
+        verbose_name_plural = "Ops Site Config"
+
+    def __str__(self) -> str:
+        return "Ops Site Config"
+
+    @classmethod
+    def get_solo(cls) -> "SiteConfig":
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def email_recipients_list(self) -> list[str]:
+        raw = self.ops_alert_email_recipients or ""
+        parts = [p.strip() for p in raw.split(",")]
+        return [p for p in parts if p]
+

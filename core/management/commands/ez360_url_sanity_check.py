@@ -102,21 +102,25 @@ class Command(BaseCommand):
                 count += 1
             return count
 
-        def expected_arg_counts(name: str) -> set[int] | None:
-            """Best-effort extraction of positional arg counts for a url name."""
+        def expected_param_name_sets(name: str) -> list[set[str]] | None:
+            """Best-effort extraction of parameter-name sets for a url name."""
             try:
                 entries = resolver.reverse_dict.getlist(name)
             except Exception:
                 return None
-            counts: set[int] = set()
+            sets: list[set[str]] = []
             for e in entries:
-                # Django's reverse_dict entries are internal; try to infer param-list length.
-                # We look for a list/tuple of parameter names among tuple elements.
                 if isinstance(e, (list, tuple)):
                     for part in e:
                         if isinstance(part, (list, tuple)) and part and all(isinstance(x, str) for x in part):
-                            counts.add(len(part))
-            return counts or None
+                            sets.append(set(part))
+            return sets or None
+
+        def expected_arg_counts(name: str) -> set[int] | None:
+            sets = expected_param_name_sets(name)
+            if not sets:
+                return None
+            return {len(s) for s in sets}
 
         # Pass 2: validate existence and (for top N) obvious arg-count mismatches.
         for path, name, rest in occurrences:
@@ -136,6 +140,16 @@ class Command(BaseCommand):
                 if fail_fast:
                     raise SystemExit(2)
                 continue
+
+            if ":" not in name:
+                # If an un-namespaced name is used but a namespaced variant exists, warn.
+                candidates = [k for k in reverse_keys if isinstance(k, str) and k.endswith(f":{name}")]
+                if candidates:
+                    warnings += 1
+                    out(
+                        f"WARN: {path.relative_to(templates_dir)} uses un-namespaced url '{name}' but namespaced variants exist (e.g. '{candidates[0]}')."
+                    )
+
 
             # Only do arg-count heuristics for the top N most-used names.
             if name not in top_names:

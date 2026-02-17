@@ -27,6 +27,7 @@
       <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:ops' %}">Ops guide</a>
         <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:ops_console' %}">Ops Console</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:production_runbook' %}">Production runbook</a>
       </div>
     </div>
   </div>
@@ -61,6 +62,16 @@
       <div class="text-secondary small mb-2">Posting rules, reports, A/R + A/P.</div>
       <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:accounting' %}">Accounting</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:accounts_receivable' %}">Accounts receivable</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:client_credits' %}">Client credits</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:ar_aging' %}">A/R aging</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:collections' %}">Collections</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:statements' %}">Statements</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:report_interpretation' %}">Report interpretation</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:bills' %}">Bills (A/P)</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:vendor_credits' %}">Vendor credits</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:ap_aging' %}">A/P aging</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:ap_reconciliation' %}">A/P reconciliation</a>
         <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:recurring_bills' %}">Recurring Bills</a>
       </div>
     </div>

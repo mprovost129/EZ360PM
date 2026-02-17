@@ -5,11 +5,15 @@ import time
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
+from django.conf import settings
 from django.core.management import call_command
 from django.utils import timezone
 
 from companies.models import Company
 from ops.models import OpsCheckKind, OpsCheckRun
+from ops.models import OpsAlertLevel, OpsAlertSource
+from ops.services_alerts import create_ops_alert
+from core.ops_alerts import alert_admins
 
 
 class Command(BaseCommand):
@@ -85,9 +89,12 @@ class Command(BaseCommand):
             duration_ms = int((time.time() - started) * 1000)
 
             _store(kind, kwargs, ok, duration_ms, buf.getvalue())
+            results.append((kind, ok))
             return ok
 
         self.stdout.write("Running scheduled ops checks...")
+
+        results: list[tuple[str, bool]] = []  # (kind, ok)
 
         # Global checks
         _run(OpsCheckKind.READINESS, "ez360_readiness_check")
@@ -107,5 +114,31 @@ class Command(BaseCommand):
             _run(OpsCheckKind.IDEMPOTENCY, "ez360_idempotency_scan", company_id=str(company.id), **kwargs_common)
             if include_smoke:
                 _run(OpsCheckKind.SMOKE, "ez360_smoke_test", company_id=str(company.id))
+
+
+
+        failed_kinds = [k for (k, ok) in results if not ok]
+        if failed_kinds:
+            title = "Daily ops checks failed"
+            msg_lines = [
+        f"Environment: {getattr(settings, 'ENVIRONMENT', '')}",
+        f"Company: {company.name if company else '(none)'}",
+        f"Failed checks: {', '.join(failed_kinds)}",
+        f"Runs saved: {len(results)}",
+            ]
+            message = "\n".join([l for l in msg_lines if l])
+            # Persist an ops alert event + optional webhook.
+            create_ops_alert(
+        title=title,
+        message=message,
+        level=OpsAlertLevel.ERROR,
+        source=OpsAlertSource.LAUNCH_GATE,
+        company=company,
+        details={"failed_kinds": failed_kinds, "total_runs": len(results)},
+            )
+            # Optional: email configured ADMINS (best-effort).
+            alert_admins(title, message, fail_silently=True, extra={"failed_kinds": ", ".join(failed_kinds)})
+            self.stdout.write(self.style.ERROR("FAILED: " + message))
+            raise SystemExit(2)
 
         self.stdout.write("OK: scheduled ops checks completed and evidence saved.")

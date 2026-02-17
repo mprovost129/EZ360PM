@@ -22,6 +22,8 @@ class EmailSpec:
     template_txt: str | None = None
     from_email: str | None = None
     reply_to: list[str] | None = None
+    # Optional attachments: (filename, bytes, mimetype)
+    attachments: list[tuple[str, bytes, str]] | None = None
 
 
 def format_email_subject(subject: str) -> str:
@@ -79,6 +81,14 @@ def send_templated_email(spec: EmailSpec, *, fail_silently: bool = False) -> int
         reply_to=spec.reply_to or None,
     )
     msg.attach_alternative(html_body, "text/html")
+
+    # Attachments (optional)
+    if spec.attachments:
+        for filename, content, mimetype in spec.attachments:
+            try:
+                msg.attach(filename, content, mimetype)
+            except Exception:
+                logger.exception("email_attach_failed filename=%s subject=%s", filename, subject)
 
     try:
         sent = msg.send(fail_silently=fail_silently)

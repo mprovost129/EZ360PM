@@ -4,7 +4,7 @@ from core.money import format_money_cents
 
 from core.admin_mixins import IncludeSoftDeletedAdminMixin
 
-from .models import Document, DocumentLineItem, DocumentTemplate, NumberingScheme, CreditNote, CreditNoteNumberSequence
+from .models import Document, DocumentLineItem, DocumentTemplate, NumberingScheme, CreditNote, CreditNoteNumberSequence, StatementReminder
 
 
 class DocumentLineItemInline(admin.TabularInline):
@@ -98,3 +98,23 @@ class CreditNoteAdmin(IncludeSoftDeletedAdminMixin, admin.ModelAdmin):
 class CreditNoteNumberSequenceAdmin(IncludeSoftDeletedAdminMixin, admin.ModelAdmin):
     list_display = ("company", "next_number")
     search_fields = ("company__name",)
+
+
+@admin.register(StatementReminder)
+class StatementReminderAdmin(IncludeSoftDeletedAdminMixin, admin.ModelAdmin):
+    list_display = (
+        "company",
+        "client",
+        "scheduled_for",
+        "recipient_email",
+        "tone",
+        "status",
+        "attempt_count",
+        "attempted_at",
+        "sent_at",
+        "attach_pdf",
+        "created_at",
+    )
+    list_filter = ("status", "tone", "attach_pdf", "company")
+    search_fields = ("recipient_email", "client__first_name", "client__last_name", "client__company_name")
+    readonly_fields = ("id", "created_at", "updated_at", "sent_at", "attempted_at", "attempt_count", "last_error")

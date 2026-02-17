@@ -16,6 +16,8 @@ from companies.decorators import company_context_required, require_min_role
 from companies.models import EmployeeRole
 from projects.models import Project
 
+from documents.models import ClientStatementActivity
+
 from core.pagination import paginate
 
 from .forms import (
@@ -626,3 +628,40 @@ def client_export(request: HttpRequest) -> HttpResponse:
     resp = HttpResponse(output.getvalue(), content_type="text/csv")
     resp["Content-Disposition"] = 'attachment; filename="clients.csv"'
     return resp
+
+
+@company_context_required
+def client_detail(request: HttpRequest, pk) -> HttpResponse:
+    """Client detail page.
+
+    Phase 7H44: includes statement history (last viewed / last emailed).
+    """
+    company = request.active_company
+    client = get_object_or_404(Client, id=pk, company=company, deleted_at__isnull=True)
+
+    employee = request.active_employee
+    if employee.role == EmployeeRole.STAFF:
+        ok = Project.objects.filter(company=company, assigned_to=employee, client=client, deleted_at__isnull=True).exists()
+        if not ok:
+            messages.error(request, "You do not have access to this client.")
+            return redirect("crm:client_list")
+
+    activity = ClientStatementActivity.objects.filter(company=company, client=client, deleted_at__isnull=True).first()
+
+    recent_projects = (
+        Project.objects.filter(company=company, client=client, deleted_at__isnull=True)
+        .order_by("-created_at")[:10]
+    )
+
+    can_manage = employee.role in {EmployeeRole.MANAGER, EmployeeRole.ADMIN, EmployeeRole.OWNER}
+
+    return render(
+        request,
+        "crm/client_detail.html",
+        {
+            "client": client,
+            "activity": activity,
+            "recent_projects": list(recent_projects),
+            "can_manage": can_manage,
+        },
+    )

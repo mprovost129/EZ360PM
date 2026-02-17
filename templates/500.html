@@ -10,7 +10,7 @@
     {% if request.request_id %}
       <div class="text-secondary small mb-3">Request ID: <code>{{ request.request_id }}</code></div>
     {% endif %}
-    <a class="btn btn-outline-dark" href="{% url 'home' %}">Back to home</a>
+    <a class="btn btn-outline-dark" href="{% url 'core:home' %}">Back to home</a>
   </div>
 </div>
 {% endblock %}

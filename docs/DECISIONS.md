@@ -1,3 +1,14 @@
+## 2026-02-16 — Phase 7H29
+
+- **Daily ops checks alerting:** scheduled checks MAY emit OpsAlertEvent + webhook + mail_admins when failures occur; alerts must never break the request path.
+- **Financial statements help:** P&L / Balance Sheet / Trial Balance pages are documented in Help Center and linked contextually from reports.
+
+## 2026-02-16 — Phase 7H42
+
+- **Statement email tones:** Statements support three tone variants — `sent` (standard), `friendly`, and `past_due`. UI preview must reflect the selected tone before sending.
+- **Collections reminders workflow:** Statement reminders are manageable from a company-wide queue with bulk cancel/reschedule (cap 500 per action) to support collections operations.
+- **Ops alert exports:** Ops supports one-click CSV export of unresolved alerts (filters respected; capped) for vendor/support escalations.
+
 ## Template sanity policy (money/static tag libraries)
 
 - Any template that uses `|money` or `|money_cents` MUST include `{% load money %}`.
@@ -736,3 +747,165 @@ Rationale:
 - Retention:
   - Run `python manage.py ez360_prune_ops_check_runs --days 30` to delete older evidence while protecting recent-per-kind runs.
 - Rationale: keep launch evidence + regression tracking without unbounded DB growth.
+
+## Help Center: A/R topics
+- Help Center includes first-class A/R documentation pages: Accounts Receivable, Client Credits, and A/R Aging.
+- Financial reports should include contextual Help links when available.
+
+## Help Center: Collections/Statements + Report interpretation (2026-02-16)
+- Corporate-grade finance UX requires explicit “what does this mean?” guidance in-product.
+- Help Center includes Collections, Statements, and Report interpretation pages as part of the launch manual.
+
+## Help Center: A/P Aging contextual help (2026-02-16)
+- The A/P Aging report must include a contextual Help link to the Help Center A/P Aging article.
+
+## Help Center: Production runbook (2026-02-16)
+- The Help Center must include a Production Runbook page covering deploy checks, daily ops routines, scheduling options, and incident workflow.
+
+## Ops Checks presets
+- **Run recommended** runs: Readiness, Template sanity, URL sanity, Invariants, Idempotency. Smoke runs only when a company is selected.
+
+## Template tag loading policy
+- If a template uses `|money` / `|money_cents`, it must include `{% load money %}`.
+- If a template uses humanize filters (e.g., `|intcomma`, `|naturaltime`), it must include `{% load humanize %}`.
+
+
+## 2026-02-16 — Phase 7H30
+
+- Ops alert routing is **DB-backed** (Ops.SiteConfig singleton) so staff can change webhook/email recipients without redeploying.
+- Client Statements default to **open invoices only** (exclude Paid/Void) for the initial collections workflow.
+- Statement PDF export is **optional** and only enabled when WeasyPrint is installed (lazy import / graceful fallback).
+
+## 2026-02-16 — Statements links + APP_BASE_URL
+
+- Introduced `APP_BASE_URL` (env-driven) to build absolute links in outbound emails and generated PDFs. If unset, emails/PDFs omit deep links.
+- Client Statements support optional date-range filtering by invoice `issue_date` (fallback to `created_at` date when `issue_date` is missing). Exports honor the same filter.
+- Ops alerts now have a staff detail view and a dashboard-driven “test alert” source (`ops_dashboard`) for routing verification.
+
+## 2026-02-16 — Phase 7H32: Email attachments + statement delivery
+
+- `core.email_utils.EmailSpec` supports optional attachments (filename, bytes, mimetype). Default is none to preserve existing call-sites.
+- Statement emails may optionally include a PDF attachment when WeasyPrint is installed.
+- Alert details support a “Copy JSON” affordance to speed up support tickets and debugging.
+
+## 2026-02-16 — Phase 7H33: Statement email preview + Ops JSON download
+
+- Statement delivery includes a **non-sending preview** endpoint so staff can validate subject/body before emailing a client.
+- Statement PDF export failures should be actionable: distinguish **WeasyPrint not installed** vs **system dependency/render failure**.
+- Ops alerts must support **exportable JSON** (download as file) and display a best-effort **Request ID correlation** when present.
+
+## 2026-02-16 — Phase 7H34: Statements + Help Center + Ops triage affordances
+
+- Statements page must surface **inline warnings** when:
+  - `APP_BASE_URL` is not set (deep links in emails/PDFs are omitted).
+  - WeasyPrint is not installed (PDF export / attachments unavailable).
+  Rationale: prevent staff from assuming a broken workflow when it is an environment limitation.
+
+- Help Center screenshot areas should use **consistent card-based placeholders** (static images) rather than raw "[Screenshot: ...]" text blocks.
+  Rationale: the Help Center is part of the launch manual; placeholders must still look intentional.
+
+- Ops Alerts triage should support **one-click quick-filters** via querystring parameters (status/source/level).
+  Rationale: keep URLs shareable/bookmarkable and compatible with staff workflows.
+
+
+## Statements: recipient defaults per client (Phase 7H35)
+
+- We remember the last-used **statement recipient email** per Client, scoped to Company.
+- Purpose: speed up collections workflows when clients want statements sent to a billing email that differs from the primary contact email.
+- Storage: `documents.ClientStatementRecipientPreference`.
+
+
+## Statement reminders (v1)
+- Reminders are stored as DB records (StatementReminder) and executed by a periodic management command.
+- v1 is manual scheduling (staff-driven); automation can be layered later using the same hook.
+
+
+## Statement reminders: reminder tone presets (Phase 7H37)
+- Reminders support two presets:
+  - `friendly` (Friendly nudge)
+  - `past_due` (Past due)
+- The preset controls the email subject line + templates while reusing the same statement link and optional PDF attachment.
+
+
+## Statement reminders: cadence helper + last-sent visibility (Phase 7H38)
+
+- The Statement page provides **quick-pick cadence suggestions** for scheduling reminders:
+  - In 3 days / In 7 days / In 14 days
+  - Next Monday
+  - End of month
+- The Statement page shows a **Last sent** table (recent SENT reminders) to give staff immediate visibility into recent outreach.
+- Default reminder recipient resolution order (UI default):
+  1) last-used session value (`stmt_to_<client_id>`)
+  2) saved per-client preference (`ClientStatementRecipientPreference.last_to_email`)
+  3) `Client.email`
+
+
+## Statement reminders: attempt tracking + failed reschedule (Phase 7H39)
+
+- Every reminder send attempt records:
+  - `attempted_at` (timestamp)
+  - `attempt_count` (counter)
+  Rationale: failures must be debuggable without digging through host logs.
+
+- Rescheduling a FAILED reminder:
+  - sets `status=SCHEDULED`
+  - clears `last_error`
+  - clears `sent_at`
+  Rationale: keep the model simple; attempt metadata remains historical context while the reminder is retried.
+
+
+## Statement reminders: retry now + reschedule-to-date (Phase 7H40)
+
+- Failed reminder rescheduling supports an optional **date input** (if blank, default remains +7 days).
+  Rationale: staff often want to align follow-ups to a specific day (e.g., next pay cycle) without extra clicks.
+
+- Added **Retry now** action (staff-only) that performs a synchronous send attempt and records attempt metadata.
+  Rationale: support workflows need a one-click "try again" after fixing email configuration or recipient issues; restricting to staff prevents accidental spam by normal users.
+
+- Ops scheduler warnings expanded to include Stripe/storage/domain readiness.
+  Rationale: reduce "silent misconfiguration" risk before going live by surfacing common production gaps on the Ops Dashboard.
+
+
+## Statements: “Email me a copy” + reminder audit trail (Phase 7H41)
+
+- Statement email send includes an optional **“Email me a copy”** checkbox.
+  - If enabled, the app sends a best-effort copy to the acting user’s email with subject prefix `Copy ·`.
+  - Copy send is intentionally secondary and must never block the primary client send.
+
+- Reminder audit trail is captured with:
+  - `created_by` (who scheduled)
+  - `modified_by` (who last changed)
+  - `updated_at` (when last changed)
+  Rationale: collections workflows require accountability without adding heavyweight history tables.
+
+
+## Ops alerts: dedup + snooze (Phase 7H41)
+
+- Ops alert creation supports:
+  - **Dedup window** (SiteConfig `ops_alert_dedup_minutes`) for identical open alerts.
+  - **Snooze** (OpsAlertSnooze) per source and optional per-company scope.
+  Rationale: reduce alert spam while retaining a durable record of the first occurrence.
+
+
+## Statement reminders: bulk send-now + delivery report (Phase 7H43)
+
+- Bulk **Send now** is restricted to **Django staff OR company admin/owner** and is capped (200 reminders) to prevent accidental spam.
+  Rationale: collections workflows need a fast “push now” button, but it must be guarded and rate-limited.
+
+- Reminder delivery report is computed from `attempted_at` (not `scheduled_for`) and grouped by day for the last 30 days.
+  Rationale: attempted-at reflects actual delivery work; scheduled-for reflects intent.
+
+## Ops dashboard: open alert grouping summary (Phase 7H43)
+
+- Ops Dashboard includes an “Open alerts summary” grouped by **source** and **source+company** (top 25).
+  Rationale: staff can quickly identify the noisiest source/company pairs without combing the full alerts list.
+
+
+## 2026-02-16 — Phase 7H44
+- Statement reminders bulk sending supports **selected IDs** and **filtered set**; filtered sends require an explicit confirm checkbox and are safety-capped at 200 to prevent accidental mass sends.
+- Statement activity tracking is best-effort and must never block collections workflows.
+- Ops dashboard deep links prefer `company_id` filtering over company-name search to avoid ambiguity.
+
+## 2026-02-16 — Phase 7H45
+- Key workflow pages should include contextual Help Center links (e.g., Statements & reminder queues) to prevent user dead ends.
+- Help Center screenshots live under `static/images/helpcenter/` and can be swapped without changing URLs to keep docs stable.

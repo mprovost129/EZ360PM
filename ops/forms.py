@@ -3,7 +3,7 @@ from __future__ import annotations
 from django import forms
 
 from companies.models import Company
-from .models import ReleaseNote
+from .models import ReleaseNote, SiteConfig, OpsAlertLevel
 
 
 class ReleaseNoteForm(forms.ModelForm):
@@ -67,6 +67,12 @@ class OpsChecksForm(forms.Form):
     )
 
     run_smoke = forms.BooleanField(required=False, widget=forms.CheckboxInput(attrs={"class": "form-check-input"}))
+    run_recommended = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        help_text="Runs the recommended launch checks (readiness + template/url sanity + invariants/idempotency). Smoke Test runs only when a company is selected.",
+    )
+
     run_all = forms.BooleanField(
         required=False,
         widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
@@ -93,6 +99,15 @@ class OpsChecksForm(forms.Form):
         cleaned = super().clean()
         company = cleaned.get("company")
 
+        # Convenience: Run Recommended.
+        if cleaned.get("run_recommended"):
+            cleaned["run_invariants"] = True
+            cleaned["run_idempotency"] = True
+            cleaned["run_template_sanity"] = True
+            cleaned["run_url_sanity"] = True
+            cleaned["run_readiness"] = True
+            cleaned["run_smoke"] = bool(company)
+
         # Convenience: Run All.
         if cleaned.get("run_all"):
             cleaned["run_invariants"] = True
@@ -106,4 +121,38 @@ class OpsChecksForm(forms.Form):
         run_smoke = bool(cleaned.get("run_smoke"))
         if run_smoke and not company:
             self.add_error("company", "Select a company to run the smoke test.")
+        return cleaned
+
+class OpsAlertRoutingForm(forms.ModelForm):
+    class Meta:
+        model = SiteConfig
+        fields = [
+            "ops_alert_webhook_enabled",
+            "ops_alert_webhook_url",
+            "ops_alert_webhook_timeout_seconds",
+            "ops_alert_email_enabled",
+            "ops_alert_email_recipients",
+            "ops_alert_email_min_level",
+            "ops_alert_noise_path_prefixes",
+            "ops_alert_noise_user_agents",
+            "ops_alert_dedup_minutes",
+            "ops_alert_prune_resolved_after_days",
+        ]
+        widgets = {
+            "ops_alert_webhook_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "ops_alert_webhook_url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://…"}),
+            "ops_alert_webhook_timeout_seconds": forms.NumberInput(attrs={"class": "form-control", "step": "0.1", "min": "0.1"}),
+            "ops_alert_email_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "ops_alert_email_recipients": forms.Textarea(attrs={"class": "form-control", "rows": 2, "placeholder": "ops@example.com, admin@example.com"}),
+            "ops_alert_email_min_level": forms.Select(attrs={"class": "form-select"}),
+            "ops_alert_noise_path_prefixes": forms.Textarea(attrs={"class": "form-control", "rows": 4, "placeholder": "/wp-login.php\n/.env\n/robots.txt"}),
+            "ops_alert_noise_user_agents": forms.Textarea(attrs={"class": "form-control", "rows": 4, "placeholder": "AhrefsBot\nSemrushBot\nMJ12bot"}),
+            "ops_alert_dedup_minutes": forms.NumberInput(attrs={"class": "form-control", "min": 0, "max": 1440}),
+            "ops_alert_prune_resolved_after_days": forms.NumberInput(attrs={"class": "form-control", "min": 1, "max": 365}),
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("ops_alert_webhook_enabled") and not (cleaned.get("ops_alert_webhook_url") or "").strip():
+            self.add_error("ops_alert_webhook_url", "Webhook URL is required when webhook routing is enabled.")
         return cleaned

@@ -411,6 +411,9 @@ LOGOUT_REDIRECT_URL = "/"
 
 SITE_NAME = _getenv("SITE_NAME", "EZ360PM")
 
+# Absolute public base URL for building links in emails/PDFs (e.g. https://ez360pm.com)
+APP_BASE_URL = _getenv("APP_BASE_URL", "").strip()
+
 
 # --------------------------------------------------------------------------------------
 # Email

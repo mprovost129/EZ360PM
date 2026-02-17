@@ -121,13 +121,15 @@
                     {% endif %}
                   </td>
                   <td class="text-end">
-                    {% if (is_admin or is_owner) and st and st.is_locked %}
+                    {% if is_admin or is_owner %}
+                      {% if st and st.is_locked %}
                       <form method="post" action="{% url 'companies:employee_unlock' e.id %}" class="d-inline">
                         {% csrf_token %}
                         <button class="btn btn-sm btn-outline-danger" type="submit">Unlock</button>
                       </form>
                     {% else %}
                       <span class="text-secondary small">—</span>
+                      {% endif %}
                     {% endif %}
                   </td>
                 </tr>

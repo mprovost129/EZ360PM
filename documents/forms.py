@@ -206,3 +206,48 @@ class CreditNoteForm(forms.Form):
             "reason": cleaned.get("reason") or "",
         }
 
+class StatementEmailForm(forms.Form):
+    TONE_CHOICES = (
+        ('sent', 'Standard'),
+        ('friendly', 'Friendly nudge'),
+        ('past_due', 'Past due'),
+    )
+
+    to_email = forms.EmailField(required=False, widget=forms.EmailInput(attrs={"class": "form-control", "placeholder": "client@email.com"}))
+    date_from = forms.DateField(required=False, widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}))
+    date_to = forms.DateField(required=False, widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}))
+    tone = forms.ChoiceField(
+        required=False,
+        choices=TONE_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        initial='sent',
+    )
+    attach_pdf = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        help_text="Attach a PDF statement (requires WeasyPrint).",
+    )
+
+    email_me_copy = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        help_text="Email me a copy of this statement.",
+    )
+
+    def __init__(self, *args, client: Client, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.client = client
+        if not self.is_bound:
+            self.fields["to_email"].initial = (client.email or "").strip()
+
+    def clean_to_email(self):
+        val = (self.cleaned_data.get("to_email") or "").strip()
+        if not val and not (self.client.email or "").strip():
+            raise forms.ValidationError("Client has no email address. Enter an address to send to.")
+        return val
+
+    def clean_tone(self):
+        val = (self.cleaned_data.get('tone') or 'sent').strip().lower()
+        if val not in {'sent', 'friendly', 'past_due'}:
+            val = 'sent'
+        return val

@@ -6,6 +6,7 @@ import io
 import csv
 import zipfile
 from datetime import timedelta
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.contrib import messages
@@ -17,6 +18,7 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from django.core.management import call_command
+from django.core.paginator import Paginator
 from django.core.mail import EmailMultiAlternatives
 from django.core.mail import get_connection
 
@@ -34,7 +36,9 @@ from billing.stripe_service import fetch_and_sync_subscription_from_stripe
 from core.launch_checks import run_launch_checks
 from core.retention import get_retention_days, run_prune_jobs
 
-from .forms import ReleaseNoteForm, OpsChecksForm, OpsEmailTestForm
+
+from .forms import ReleaseNoteForm, OpsChecksForm, OpsEmailTestForm, OpsAlertRoutingForm
+from .decorators import staff_only
 
 from .services_alerts import create_ops_alert
 
@@ -56,6 +60,7 @@ from .models import (
     OpsProbeStatus,
     OpsCheckRun,
     OpsCheckKind,
+    SiteConfig,
 )
 
 
@@ -117,6 +122,7 @@ def version(request: HttpRequest) -> HttpResponse:
 @user_passes_test(_is_staff)
 def ops_dashboard(request: HttpRequest) -> HttpResponse:
     q = (request.GET.get("q") or "").strip()
+    company_id = (request.GET.get("company_id") or "").strip()
 
     companies = Company.objects.all().annotate(
         employee_count=Count("employees", filter=Q(employees__deleted_at__isnull=True), distinct=True),
@@ -160,6 +166,84 @@ def ops_dashboard(request: HttpRequest) -> HttpResponse:
         "sentry_enabled": bool(os.environ.get("SENTRY_DSN")),
     }
 
+    cron_commands = "\n".join(
+        [
+            "python manage.py ez360_run_ops_checks_daily",
+            "python manage.py ez360_send_statement_reminders",
+            "python manage.py ez360_prune_ops_check_runs --days 30",
+            "python manage.py ez360_prune_ops_alerts",
+        ]
+    )
+
+    scheduler_warnings: list[str] = []
+    if not bool(getattr(settings, "DEBUG", False)):
+        app_base_url = (getattr(settings, "APP_BASE_URL", "") or "").strip()
+        if not app_base_url:
+            scheduler_warnings.append("APP_BASE_URL is not set. Scheduled emails will omit deep links.")
+
+        email_backend = (getattr(settings, "EMAIL_BACKEND", "") or "")
+        if "console" in email_backend.lower():
+            scheduler_warnings.append("EMAIL_BACKEND is console backend in production settings. Scheduled emails will not deliver.")
+
+        email_host = (getattr(settings, "EMAIL_HOST", "") or "").strip()
+        if email_host in {"localhost", "127.0.0.1"}:
+            scheduler_warnings.append("EMAIL_HOST is set to localhost in production. Verify SMTP provider settings for scheduled emails.")
+
+        from_email = (getattr(settings, "DEFAULT_FROM_EMAIL", "") or "").strip()
+        if not from_email or "example" in from_email.lower():
+            scheduler_warnings.append("DEFAULT_FROM_EMAIL is missing or looks like a placeholder.")
+
+        # Stripe readiness (subscriptions)
+        stripe_secret = (getattr(settings, "STRIPE_SECRET_KEY", "") or "").strip()
+        stripe_pub = (getattr(settings, "STRIPE_PUBLISHABLE_KEY", "") or "").strip()
+        stripe_whsec = (getattr(settings, "STRIPE_WEBHOOK_SECRET", "") or "").strip()
+        if not stripe_secret or "example" in stripe_secret.lower():
+            scheduler_warnings.append("STRIPE_SECRET_KEY is missing or looks like a placeholder.")
+        if not stripe_pub or "example" in stripe_pub.lower():
+            scheduler_warnings.append("STRIPE_PUBLISHABLE_KEY is missing or looks like a placeholder.")
+        if not stripe_whsec or "example" in stripe_whsec.lower():
+            scheduler_warnings.append("STRIPE_WEBHOOK_SECRET is missing or looks like a placeholder.")
+
+        # Storage readiness (media/backups)
+        if bool(getattr(settings, "USE_S3", False)):
+            bucket = (
+                (getattr(settings, "S3_PUBLIC_MEDIA_BUCKET", "") or "").strip()
+                or (getattr(settings, "AWS_STORAGE_BUCKET_NAME", "") or "").strip()
+            )
+            if not bucket:
+                scheduler_warnings.append("USE_S3 is enabled but no S3 public media bucket is configured.")
+
+            aws_key = (getattr(settings, "AWS_ACCESS_KEY_ID", "") or "").strip()
+            aws_secret = (getattr(settings, "AWS_SECRET_ACCESS_KEY", "") or "").strip()
+            if not aws_key or not aws_secret:
+                scheduler_warnings.append("USE_S3 is enabled but AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY are missing.")
+
+        if bool(getattr(settings, "BACKUP_ENABLED", False)) and (getattr(settings, "BACKUP_STORAGE", "") or "").strip().lower() == "s3":
+            b = (getattr(settings, "BACKUP_S3_BUCKET", "") or "").strip()
+            if not b:
+                scheduler_warnings.append("BACKUP_ENABLED is true with BACKUP_STORAGE=s3, but BACKUP_S3_BUCKET is not set.")
+
+        # Domain readiness: APP_BASE_URL should align with ALLOWED_HOSTS + CSRF_TRUSTED_ORIGINS
+        if app_base_url:
+            try:
+                parsed = urlparse(app_base_url)
+                host = (parsed.hostname or "").strip()
+                scheme = (parsed.scheme or "").strip()
+
+                if not host:
+                    scheduler_warnings.append("APP_BASE_URL is set but could not parse a hostname.")
+                else:
+                    allowed_hosts = set(getattr(settings, "ALLOWED_HOSTS", []) or [])
+                    if host not in allowed_hosts and f".{host}" not in allowed_hosts:
+                        scheduler_warnings.append("APP_BASE_URL host is not present in ALLOWED_HOSTS.")
+
+                    csrf = set(getattr(settings, "CSRF_TRUSTED_ORIGINS", []) or [])
+                    expected_origin = f"{scheme or 'https'}://{host}"
+                    if expected_origin not in csrf:
+                        scheduler_warnings.append("APP_BASE_URL origin is not present in CSRF_TRUSTED_ORIGINS.")
+            except Exception:
+                scheduler_warnings.append("APP_BASE_URL parsing failed. Verify it is a full URL like https://ez360pm.com")
+
     metrics = {
         "companies_total": Company.objects.count(),
         "companies_with_subscription": CompanySubscription.objects.count(),
@@ -169,18 +253,113 @@ def ops_dashboard(request: HttpRequest) -> HttpResponse:
         "open_alerts": OpsAlertEvent.objects.filter(is_resolved=False).count(),
     }
 
+    # Phase 7H43: fast triage summary for open alerts grouped by source/company.
+    open_alert_groups = (
+        OpsAlertEvent.objects.filter(is_resolved=False)
+        .values("source", "company_id", "company__name")
+        .annotate(total=Count("id"))
+        .order_by("-total", "source")
+    )[:25]
+
+    open_alert_by_source = (
+        OpsAlertEvent.objects.filter(is_resolved=False)
+        .values("source")
+        .annotate(total=Count("id"))
+        .order_by("-total", "source")
+    )[:20]
+
     return render(
         request,
         "ops/dashboard.html",
         {
             "q": q,
+            "company_id": company_id,
             "rows": rows,
             "metrics": metrics,
             "system_status": system_status,
             "open_alerts": OpsAlertEvent.objects.filter(is_resolved=False).count(),
+            "recent_alerts": OpsAlertEvent.objects.select_related("company").order_by("-created_at")[:20],
+            "site_config": (SiteConfig.get_solo() if hasattr(SiteConfig, "get_solo") else None),
+            "cron_commands": cron_commands,
+            "scheduler_warnings": scheduler_warnings,
+            "open_alert_groups": list(open_alert_groups),
+            "open_alert_by_source": list(open_alert_by_source),
         },
     )
 
+
+@login_required
+@user_passes_test(_is_staff)
+
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_alerts_export_csv(request: HttpRequest) -> HttpResponse:
+    """Export unresolved Ops alerts as CSV.
+
+    Phase 7H42: quick export for triage/reconciliation.
+    """
+    source = (request.GET.get("source") or "").strip()
+    level = (request.GET.get("level") or "").strip()
+    q = (request.GET.get("q") or "").strip()
+    company_id = (request.GET.get("company_id") or "").strip()
+
+    qs = OpsAlertEvent.objects.filter(is_resolved=False).select_related("company").order_by("-created_at")
+
+    if source:
+        qs = qs.filter(source=source)
+    if level:
+        qs = qs.filter(level=level)
+    if q:
+        qs = qs.filter(Q(title__icontains=q) | Q(message__icontains=q) | Q(company__name__icontains=q))
+
+    # Hard cap to keep exports reasonable.
+    rows = list(qs[:2000])
+
+    resp = HttpResponse(content_type="text/csv")
+    resp["Content-Disposition"] = 'attachment; filename="ops_alerts_unresolved.csv"'
+
+    w = csv.writer(resp)
+    w.writerow(["created_at", "source", "level", "company", "title", "message", "dedup_count", "request_id"])
+
+    for a in rows:
+        details = a.details or {}
+        dedup = int(details.get("dedup_count") or 1)
+        request_id = (
+            details.get("request_id")
+            or details.get("requestID")
+            or details.get("rid")
+            or details.get("requestId")
+            or details.get("x_request_id")
+            or ""
+        )
+        request_id = str(request_id).strip()[:128]
+        w.writerow([
+            a.created_at.isoformat(),
+            a.source,
+            a.level,
+            a.company.name if a.company else "",
+            a.title,
+            (a.message or "")[:500],
+            dedup,
+            request_id,
+        ])
+
+    return resp
+def ops_alert_routing(request: HttpRequest) -> HttpResponse:
+    """Configure where Ops alerts route (email/webhook)."""
+    config = SiteConfig.get_solo()
+
+    if request.method == "POST":
+        form = OpsAlertRoutingForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Alert routing updated.")
+            return redirect("ops:alert_routing")
+    else:
+        form = OpsAlertRoutingForm(instance=config)
+
+    return render(request, "ops/alert_routing.html", {"form": form, "config": config})
 
 @login_required
 @user_passes_test(_is_staff)
@@ -240,6 +419,23 @@ def ops_slo_dashboard(request: HttpRequest) -> HttpResponse:
         },
     )
 
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_alert_routing(request: HttpRequest) -> HttpResponse:
+    """Configure where Ops alerts route (email/webhook)."""
+    config = SiteConfig.get_solo()
+
+    if request.method == "POST":
+        form = OpsAlertRoutingForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Alert routing updated.")
+            return redirect("ops:alert_routing")
+    else:
+        form = OpsAlertRoutingForm(instance=config)
+
+    return render(request, "ops/alert_routing.html", {"form": form, "config": config})
 
 @login_required
 @user_passes_test(_is_staff)
@@ -335,6 +531,23 @@ def ops_email_test(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @user_passes_test(_is_staff)
+def ops_alert_routing(request: HttpRequest) -> HttpResponse:
+    """Configure where Ops alerts route (email/webhook)."""
+    config = SiteConfig.get_solo()
+
+    if request.method == "POST":
+        form = OpsAlertRoutingForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Alert routing updated.")
+            return redirect("ops:alert_routing")
+    else:
+        form = OpsAlertRoutingForm(instance=config)
+
+    return render(request, "ops/alert_routing.html", {"form": form, "config": config})
+
+@login_required
+@user_passes_test(_is_staff)
 def ops_checks(request: HttpRequest) -> HttpResponse:
     """Run ops-grade checks that are otherwise CLI-only (staff-only).
 
@@ -344,6 +557,64 @@ def ops_checks(request: HttpRequest) -> HttpResponse:
     form = OpsChecksForm(request.POST or None)
 
     recent_runs = OpsCheckRun.objects.select_related("company").all()[:25]
+
+    # Quick actions (staff-only): run daily checks and prune old runs.
+    action = (request.POST.get("action") or "").strip() if request.method == "POST" else ""
+    if action in {"run_daily_checks", "prune_ops_runs"}:
+        import io
+        import time as _time
+
+        buf = io.StringIO()
+        started = _time.time()
+        ok = False
+        try:
+            if action == "run_daily_checks":
+                company = form.cleaned_data.get("company") if form.is_valid() else None
+                kwargs = {}
+                if company:
+                    kwargs["company_id"] = str(company.id)
+                call_command("ez360_run_ops_checks_daily", stdout=buf, stderr=buf, **kwargs)
+            elif action == "prune_ops_runs":
+                days = int(request.POST.get("days") or 30)
+                keep_per_kind = int(request.POST.get("keep_per_kind") or 200)
+                call_command(
+                    "ez360_prune_ops_check_runs",
+                    stdout=buf,
+                    stderr=buf,
+                    days=days,
+                    keep_per_kind=keep_per_kind,
+                )
+            ok = True
+        except SystemExit as e:
+            code = getattr(e, "code", 1)
+            ok = (code == 0)
+            buf.write(f"\n(exit {code})")
+        except Exception as e:
+            buf.write(f"\n(exception) {e!r}")
+            ok = False
+        finally:
+            duration_ms = int((_time.time() - started) * 1000)
+
+        msg = buf.getvalue() or "(no output)"
+        if action == "run_daily_checks":
+            messages.success(request, "Daily checks executed." if ok else "Daily checks failed; see output below.")
+            output["Daily checks now"] = msg
+        else:
+            messages.success(request, "Prune completed." if ok else "Prune failed; see output below.")
+            output["Prune ops runs"] = msg
+
+        # Refresh recent runs after actions.
+        recent_runs = OpsCheckRun.objects.select_related("company").all()[:25]
+
+        return render(
+            request,
+            "ops/checks.html",
+            {
+                "form": form,
+                "output": output,
+                "recent_runs": recent_runs,
+            },
+        )
 
     if request.method == "POST" and form.is_valid():
         company = form.cleaned_data.get("company")
@@ -435,6 +706,15 @@ def ops_checks(request: HttpRequest) -> HttpResponse:
             if quiet:
                 kwargs["quiet"] = True
             _run("Template Sanity", OpsCheckKind.TEMPLATE_SANITY, "ez360_template_sanity_check", **kwargs)
+
+        if form.cleaned_data.get("run_url_sanity"):
+            ran_any = True
+            kwargs = {}
+            if fail_fast:
+                kwargs["fail_fast"] = True
+            if quiet:
+                kwargs["quiet"] = True
+            _run("URL Sanity", OpsCheckKind.URL_SANITY, "ez360_url_sanity_check", **kwargs)
 
         if form.cleaned_data.get("run_readiness"):
             ran_any = True
@@ -643,32 +923,85 @@ def ops_probe_test_alert(request: HttpRequest) -> HttpResponse:
 @login_required
 @user_passes_test(_is_staff)
 def ops_alerts(request: HttpRequest) -> HttpResponse:
-    """Ops alerts (staff-only)."""
+    """Ops alerts (staff-only).
+
+    Phase 7H35:
+      - Paginates alerts to avoid huge pages.
+      - Adds lightweight bulk-resolve workflow for noisy sources.
+    """
     status = (request.GET.get("status") or "open").strip().lower()
     source = (request.GET.get("source") or "").strip()
     level = (request.GET.get("level") or "").strip()
     q = (request.GET.get("q") or "").strip()
+    company_id = (request.GET.get("company_id") or "").strip()
 
-    qs = OpsAlertEvent.objects.all().select_related("company").order_by("-created_at")
+    base_qs = OpsAlertEvent.objects.all().select_related("company").order_by("-created_at")
 
     if status == "open":
-        qs = qs.filter(is_resolved=False)
+        base_qs = base_qs.filter(is_resolved=False)
     elif status == "resolved":
-        qs = qs.filter(is_resolved=True)
+        base_qs = base_qs.filter(is_resolved=True)
 
     if source:
-        qs = qs.filter(source=source)
+        base_qs = base_qs.filter(source=source)
     if level:
-        qs = qs.filter(level=level)
+        base_qs = base_qs.filter(level=level)
+    if company_id:
+        try:
+            base_qs = base_qs.filter(company_id=company_id)
+        except Exception:
+            pass
+
     if q:
-        qs = qs.filter(
+        base_qs = base_qs.filter(
             Q(title__icontains=q)
             | Q(message__icontains=q)
             | Q(company__name__icontains=q)
         )
 
-    items = list(qs[:200])
+    # Bulk resolve (POST)
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "bulk_resolve":
+            resolved_count = 0
+            now = timezone.now()
+            actor_email = (getattr(request.user, "email", "") or "")[:254]
 
+            # Resolve filtered results (capped) OR selected IDs.
+            resolve_filtered = request.POST.get("resolve_filtered") == "1"
+            if resolve_filtered:
+                target_qs = base_qs.filter(is_resolved=False)
+                ids = list(target_qs.values_list("id", flat=True)[:500])
+            else:
+                ids = []
+                for raw in request.POST.getlist("alert_ids"):
+                    try:
+                        ids.append(int(raw))
+                    except Exception:
+                        continue
+                ids = ids[:500]
+
+            if ids:
+                resolved_count = OpsAlertEvent.objects.filter(id__in=ids, is_resolved=False).update(
+                    is_resolved=True,
+                    resolved_at=now,
+                    resolved_by_email=actor_email,
+                )
+
+            if resolved_count:
+                messages.success(request, f"Resolved {resolved_count} alert(s).")
+            else:
+                messages.info(request, "No alerts were resolved.")
+
+        # redirect back to the list with the same GET filters
+        qs = request.GET.urlencode()
+        return redirect(f"{reverse('ops:alerts')}{('?' + qs) if qs else ''}")
+
+    # Pagination (GET)
+    paginator = Paginator(base_qs, 50)
+    page_obj = paginator.get_page(request.GET.get("page") or 1)
+
+    # Summary cards should reflect open totals (not filtered).
     summary = {
         "open_total": OpsAlertEvent.objects.filter(is_resolved=False).count(),
         "open_webhooks": OpsAlertEvent.objects.filter(is_resolved=False, source=OpsAlertSource.STRIPE_WEBHOOK).count(),
@@ -676,25 +1009,181 @@ def ops_alerts(request: HttpRequest) -> HttpResponse:
         "open_slow": OpsAlertEvent.objects.filter(is_resolved=False, source=OpsAlertSource.SLOW_REQUEST).count(),
     }
 
+    # Preserve filters in pagination links (drop "page" from current query).
+    qs_no_page = request.GET.copy()
+    qs_no_page.pop("page", None)
+    qs_no_page_str = qs_no_page.urlencode()
+
     return render(
         request,
         "ops/alerts.html",
         {
-            "items": items,
+            "items": list(page_obj.object_list),
+            "page_obj": page_obj,
+            "paginator": paginator,
+            "qs_no_page": qs_no_page_str,
             "status": status,
             "source": source,
             "level": level,
             "q": q,
+            "company_id": company_id,
             "summary": summary,
             "sources": OpsAlertSource.choices,
             "levels": OpsAlertLevel.choices,
+            "companies": list(Company.objects.order_by("name")[:200]),
         },
     )
+@login_required
+@user_passes_test(_is_staff)
+def ops_alert_routing(request: HttpRequest) -> HttpResponse:
+    """Configure where Ops alerts route (email/webhook)."""
+    config = SiteConfig.get_solo()
 
+    if request.method == "POST":
+        form = OpsAlertRoutingForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Alert routing updated.")
+            return redirect("ops:alert_routing")
+    else:
+        form = OpsAlertRoutingForm(instance=config)
+
+    return render(request, "ops/alert_routing.html", {"form": form, "config": config})
 
 @login_required
 @user_passes_test(_is_staff)
 @require_POST
+
+
+@staff_only
+def ops_alert_detail(request: HttpRequest, alert_id: int) -> HttpResponse:
+    alert = get_object_or_404(OpsAlertEvent, id=alert_id)
+    # Active snooze info (for UI).
+    snooze_until = None
+    try:
+        from .models import OpsAlertSnooze
+
+        now = timezone.now()
+        qs = OpsAlertSnooze.objects.filter(source=alert.source, snoozed_until__gt=now)
+        if alert.company_id:
+            qs = qs.filter(Q(company__isnull=True) | Q(company=alert.company))
+        else:
+            qs = qs.filter(company__isnull=True)
+        snooze = qs.order_by("-snoozed_until").first()
+        snooze_until = snooze.snoozed_until if snooze else None
+    except Exception:
+        snooze_until = None
+    details = alert.details or {}
+    # Best-effort request-id extraction for correlation (common keys seen in logs).
+    request_id = (
+        details.get("request_id")
+        or details.get("requestID")
+        or details.get("rid")
+        or details.get("requestId")
+        or details.get("x_request_id")
+        or ""
+    )
+    request_id = str(request_id).strip()[:128]
+    return render(
+        request,
+        "ops/alert_detail.html",
+        {"alert": alert, "request_id": request_id, "snooze_until": snooze_until},
+    )
+
+
+@staff_only
+@require_POST
+def ops_alert_snooze(request: HttpRequest) -> HttpResponse:
+    """Snooze a source (optionally company-scoped) for a short window."""
+    from datetime import timedelta
+
+    src = (request.POST.get("source") or "").strip()
+    minutes_raw = (request.POST.get("minutes") or "").strip()
+    company_id_raw = (request.POST.get("company_id") or "").strip()
+
+    try:
+        minutes = int(minutes_raw or 60)
+    except Exception:
+        minutes = 60
+    minutes = max(5, min(minutes, 7 * 24 * 60))
+
+    if src not in dict(OpsAlertSource.choices):
+        messages.error(request, "Invalid alert source.")
+        return redirect("ops:alerts")
+
+    company = None
+    if company_id_raw:
+        try:
+            company = Company.objects.filter(id=company_id_raw).first()
+        except Exception:
+            company = None
+
+    until = timezone.now() + timedelta(minutes=minutes)
+    try:
+        from .models import OpsAlertSnooze
+
+        OpsAlertSnooze.objects.update_or_create(
+            source=src,
+            company=company,
+            defaults={
+                "snoozed_until": until,
+                "created_by_email": (getattr(getattr(request, "user", None), "email", "") or "")[:254],
+                "reason": (request.POST.get("reason") or "").strip()[:200],
+            },
+        )
+        scope = f"{company.name}" if company else "platform"
+        messages.success(request, f"Snoozed {dict(OpsAlertSource.choices).get(src, src)} alerts for {scope} until {until:%Y-%m-%d %H:%M}.")
+    except Exception:
+        messages.error(request, "Could not snooze alerts.")
+
+    back = (request.POST.get("next") or "").strip()
+    if back:
+        return redirect(back)
+    return redirect("ops:alerts")
+
+
+@staff_only
+def ops_alert_details_json(request: HttpRequest, alert_id: int) -> HttpResponse:
+    """Download alert details JSON as a file."""
+    alert = get_object_or_404(OpsAlertEvent, id=alert_id)
+    data = {
+        "id": alert.id,
+        "created_at": alert.created_at.isoformat(),
+        "level": alert.level,
+        "source": alert.source,
+        "company_id": str(alert.company_id) if alert.company_id else None,
+        "title": alert.title,
+        "message": alert.message,
+        "details": alert.details or {},
+        "is_resolved": bool(alert.is_resolved),
+        "resolved_at": alert.resolved_at.isoformat() if alert.resolved_at else None,
+        "resolved_by_email": alert.resolved_by_email or "",
+    }
+    resp = JsonResponse(data, json_dumps_params={"indent": 2, "sort_keys": True})
+    resp["Content-Disposition"] = f'attachment; filename="ops_alert_{alert.id}_details.json"'
+    return resp
+
+
+@staff_only
+def ops_alert_send_test(request: HttpRequest) -> HttpResponse:
+    if request.method != "POST":
+        return redirect("ops:dashboard")
+
+    level = (request.POST.get("level") or OpsAlertLevel.WARN).strip() or OpsAlertLevel.WARN
+    message = (request.POST.get("message") or "Test alert").strip()
+
+    create_ops_alert(
+        title="Test alert (manual)",
+        message=message,
+        level=level if level in dict(OpsAlertLevel.choices) else OpsAlertLevel.WARN,
+        source=OpsAlertSource.OPS_DASHBOARD,
+        company=None,
+        details={"kind": "test"},
+    )
+
+    messages.success(request, "Test alert created. If routing is enabled, it should deliver to your configured webhook/email.")
+    return redirect("ops:dashboard")
+
 def ops_alert_resolve(request: HttpRequest, alert_id: int) -> HttpResponse:
     obj = get_object_or_404(OpsAlertEvent, pk=alert_id)
     try:
@@ -733,6 +1222,23 @@ def ops_launch_checks(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @user_passes_test(_is_staff)
+def ops_alert_routing(request: HttpRequest) -> HttpResponse:
+    """Configure where Ops alerts route (email/webhook)."""
+    config = SiteConfig.get_solo()
+
+    if request.method == "POST":
+        form = OpsAlertRoutingForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Alert routing updated.")
+            return redirect("ops:alert_routing")
+    else:
+        form = OpsAlertRoutingForm(instance=config)
+
+    return render(request, "ops/alert_routing.html", {"form": form, "config": config})
+
+@login_required
+@user_passes_test(_is_staff)
 @login_required
 @user_passes_test(_is_staff)
 def ops_security(request: HttpRequest) -> HttpResponse:
@@ -761,6 +1267,23 @@ def ops_security(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @user_passes_test(_is_staff)
+def ops_alert_routing(request: HttpRequest) -> HttpResponse:
+    """Configure where Ops alerts route (email/webhook)."""
+    config = SiteConfig.get_solo()
+
+    if request.method == "POST":
+        form = OpsAlertRoutingForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Alert routing updated.")
+            return redirect("ops:alert_routing")
+    else:
+        form = OpsAlertRoutingForm(instance=config)
+
+    return render(request, "ops/alert_routing.html", {"form": form, "config": config})
+
+@login_required
+@user_passes_test(_is_staff)
 def ops_launch_gate(request: HttpRequest) -> HttpResponse:
     items = LaunchGateItem.objects.all()
     total = items.count()
@@ -775,6 +1298,23 @@ def ops_launch_gate(request: HttpRequest) -> HttpResponse:
         },
     )
 
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_alert_routing(request: HttpRequest) -> HttpResponse:
+    """Configure where Ops alerts route (email/webhook)."""
+    config = SiteConfig.get_solo()
+
+    if request.method == "POST":
+        form = OpsAlertRoutingForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Alert routing updated.")
+            return redirect("ops:alert_routing")
+    else:
+        form = OpsAlertRoutingForm(instance=config)
+
+    return render(request, "ops/alert_routing.html", {"form": form, "config": config})
 
 @login_required
 @user_passes_test(_is_staff)
@@ -826,6 +1366,23 @@ def ops_company_detail(request: HttpRequest, company_id: int) -> HttpResponse:
 
 @login_required
 @user_passes_test(_is_staff)
+def ops_alert_routing(request: HttpRequest) -> HttpResponse:
+    """Configure where Ops alerts route (email/webhook)."""
+    config = SiteConfig.get_solo()
+
+    if request.method == "POST":
+        form = OpsAlertRoutingForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Alert routing updated.")
+            return redirect("ops:alert_routing")
+    else:
+        form = OpsAlertRoutingForm(instance=config)
+
+    return render(request, "ops/alert_routing.html", {"form": form, "config": config})
+
+@login_required
+@user_passes_test(_is_staff)
 def ops_company_timeline(request: HttpRequest, company_id: int) -> HttpResponse:
     company = get_object_or_404(Company, pk=company_id)
     # Audit events (company scoped)
@@ -860,6 +1417,23 @@ def ops_company_timeline(request: HttpRequest, company_id: int) -> HttpResponse:
         },
     )
 
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_alert_routing(request: HttpRequest) -> HttpResponse:
+    """Configure where Ops alerts route (email/webhook)."""
+    config = SiteConfig.get_solo()
+
+    if request.method == "POST":
+        form = OpsAlertRoutingForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Alert routing updated.")
+            return redirect("ops:alert_routing")
+    else:
+        form = OpsAlertRoutingForm(instance=config)
+
+    return render(request, "ops/alert_routing.html", {"form": form, "config": config})
 
 @login_required
 @user_passes_test(_is_staff)
@@ -907,6 +1481,23 @@ def ops_retention(request: HttpRequest) -> HttpResponse:
         },
     )
 
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_alert_routing(request: HttpRequest) -> HttpResponse:
+    """Configure where Ops alerts route (email/webhook)."""
+    config = SiteConfig.get_solo()
+
+    if request.method == "POST":
+        form = OpsAlertRoutingForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Alert routing updated.")
+            return redirect("ops:alert_routing")
+    else:
+        form = OpsAlertRoutingForm(instance=config)
+
+    return render(request, "ops/alert_routing.html", {"form": form, "config": config})
 
 @login_required
 @user_passes_test(_is_staff)
@@ -988,6 +1579,23 @@ def ops_reconciliation(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @user_passes_test(_is_staff)
+def ops_alert_routing(request: HttpRequest) -> HttpResponse:
+    """Configure where Ops alerts route (email/webhook)."""
+    config = SiteConfig.get_solo()
+
+    if request.method == "POST":
+        form = OpsAlertRoutingForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Alert routing updated.")
+            return redirect("ops:alert_routing")
+    else:
+        form = OpsAlertRoutingForm(instance=config)
+
+    return render(request, "ops/alert_routing.html", {"form": form, "config": config})
+
+@login_required
+@user_passes_test(_is_staff)
 def ops_drift_tools(request: HttpRequest) -> HttpResponse:
     """Staff-only tools to fix common reconciliation drift cases."""
     from payments.models import Payment, PaymentStatus
@@ -1050,6 +1658,23 @@ def ops_drift_tools(request: HttpRequest) -> HttpResponse:
         },
     )
 
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_alert_routing(request: HttpRequest) -> HttpResponse:
+    """Configure where Ops alerts route (email/webhook)."""
+    config = SiteConfig.get_solo()
+
+    if request.method == "POST":
+        form = OpsAlertRoutingForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Alert routing updated.")
+            return redirect("ops:alert_routing")
+    else:
+        form = OpsAlertRoutingForm(instance=config)
+
+    return render(request, "ops/alert_routing.html", {"form": form, "config": config})
 
 @login_required
 @user_passes_test(_is_staff)
@@ -1234,6 +1859,23 @@ def ops_backups(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @user_passes_test(_is_staff)
+def ops_alert_routing(request: HttpRequest) -> HttpResponse:
+    """Configure where Ops alerts route (email/webhook)."""
+    config = SiteConfig.get_solo()
+
+    if request.method == "POST":
+        form = OpsAlertRoutingForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Alert routing updated.")
+            return redirect("ops:alert_routing")
+    else:
+        form = OpsAlertRoutingForm(instance=config)
+
+    return render(request, "ops/alert_routing.html", {"form": form, "config": config})
+
+@login_required
+@user_passes_test(_is_staff)
 @require_POST
 def ops_backup_record_run(request: HttpRequest) -> HttpResponse:
     status = request.POST.get("status") or BackupRunStatus.SUCCESS
@@ -1308,6 +1950,7 @@ def ops_releases(request: HttpRequest) -> HttpResponse:
     """Staff release notes + current build metadata."""
 
     q = (request.GET.get("q") or "").strip()
+    company_id = (request.GET.get("company_id") or "").strip()
     env = (request.GET.get("env") or "").strip()
 
     notes_qs = ReleaseNote.objects.all()
@@ -1352,6 +1995,7 @@ def ops_releases(request: HttpRequest) -> HttpResponse:
 
     ctx = {
         "q": q,
+            "company_id": company_id,
         "env": env,
         "notes": notes,
         "form": form,

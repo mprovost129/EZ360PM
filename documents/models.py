@@ -4,6 +4,7 @@ from __future__ import annotations
 from django.db import models
 from django.db.models import Q
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 
 class InvoiceLockedError(ValidationError):
@@ -15,6 +16,7 @@ from companies.models import Company, EmployeeProfile
 from crm.models import Client
 from catalog.models import CatalogItem
 from projects.models import Project
+import uuid
 
 
 class DocumentType(models.TextChoices):
@@ -483,3 +485,141 @@ class CreditNoteNumberSequence(models.Model):
 
     def __str__(self) -> str:
         return f"CreditNoteSequence({self.company_id})={self.next_number}"
+
+class ClientStatementRecipientPreference(models.Model):
+    """Stores per-company, per-client statement email defaults.
+
+    Phase 7H35: speed up collections workflows by remembering the last-used
+    statement recipient for a client.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="statement_recipient_prefs")
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="statement_recipient_prefs")
+
+    last_to_email = models.EmailField(blank=True, default="")
+
+    updated_at = models.DateTimeField(default=timezone.now)
+    updated_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="statement_recipient_prefs_updated",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["company", "client"], name="uniq_company_client_stmt_recipient"),
+        ]
+        indexes = [
+            models.Index(fields=["company", "updated_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.company.name} · {self.client.display_label()} · {self.last_to_email or '(none)'}"
+
+
+
+
+
+class ClientStatementActivity(SyncModel):
+    """Per-client statement activity for collections workflows.
+
+    Phase 7H44:
+    - Track last viewed statement page.
+    - Track last emailed statement (manual send or reminder send).
+
+    Used for lightweight CRM context on the client detail page.
+    """
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="client_statement_activity")
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="statement_activity")
+
+    last_viewed_at = models.DateTimeField(null=True, blank=True)
+    last_viewed_by = models.ForeignKey(
+        EmployeeProfile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="viewed_statement_activity",
+    )
+
+    last_sent_at = models.DateTimeField(null=True, blank=True)
+    last_sent_to = models.EmailField(blank=True, default="")
+    last_sent_by = models.ForeignKey(
+        EmployeeProfile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="sent_statement_activity",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["company", "client"], name="doc_stmt_activity_company_client_uniq"),
+        ]
+        indexes = [
+            models.Index(fields=["company", "last_viewed_at"], name="doc_stmtact_company_viewed_idx"),
+            models.Index(fields=["company", "last_sent_at"], name="doc_stmtact_company_sent_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.company.name} · {self.client.display_label()}"
+
+class StatementReminderTone(models.TextChoices):
+    FRIENDLY = "friendly", "Friendly nudge"
+    PAST_DUE = "past_due", "Past due"
+
+
+class StatementReminderStatus(models.TextChoices):
+    SCHEDULED = "scheduled", "Scheduled"
+    SENT = "sent", "Sent"
+    CANCELED = "canceled", "Canceled"
+    FAILED = "failed", "Failed"
+
+
+class StatementReminder(SyncModel):
+    """A lightweight scheduling hook for statement reminder emails.
+
+    Staff schedule reminders; a periodic management command sends due reminders.
+    """
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="statement_reminders")
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="statement_reminders")
+
+    scheduled_for = models.DateField(db_index=True)
+    recipient_email = models.EmailField(blank=True, default="")
+
+    date_from = models.DateField(null=True, blank=True)
+    date_to = models.DateField(null=True, blank=True)
+    attach_pdf = models.BooleanField(default=False)
+
+    tone = models.CharField(max_length=16, choices=StatementReminderTone.choices, default=StatementReminderTone.FRIENDLY, db_index=True)
+
+    status = models.CharField(max_length=16, choices=StatementReminderStatus.choices, default=StatementReminderStatus.SCHEDULED, db_index=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    attempted_at = models.DateTimeField(null=True, blank=True)
+    attempt_count = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True, default="")
+
+    created_by = models.ForeignKey(EmployeeProfile, null=True, blank=True, on_delete=models.SET_NULL, related_name="created_statement_reminders")
+
+    # Audit trail: who last modified the reminder (reschedule/cancel edits).
+    modified_by = models.ForeignKey(
+        EmployeeProfile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="modified_statement_reminders",
+    )
+
+    class Meta:
+        ordering = ["-scheduled_for", "-created_at"]
+        indexes = [
+            models.Index(fields=["company", "status", "scheduled_for"], name="doc_stmtrem_co_stat_sched"),
+            models.Index(fields=["client", "status", "scheduled_for"], name="doc_stmtrem_cl_stat_sched"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.company.name} · {self.client.display_label()} · {self.scheduled_for} ({self.status})"
