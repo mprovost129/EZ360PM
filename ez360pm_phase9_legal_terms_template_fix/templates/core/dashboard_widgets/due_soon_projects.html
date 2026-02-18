@@ -1,0 +1,38 @@
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+      <div>
+        <div class="fw-semibold">Due soon projects</div>
+        <div class="text-secondary small">Upcoming deadlines (if set).</div>
+      </div>
+      <a class="btn btn-sm btn-outline-dark" href="{% url 'projects:project_list' %}"><i class="bi bi-arrow-right me-1"></i>All projects</a>
+    </div>
+
+    {% if due_soon_projects %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr class="text-secondary small">
+              <th scope="col">Project</th>
+              <th scope="col">Client</th>
+              <th scope="col" class="text-end">Due</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in due_soon_projects %}
+              <tr>
+                <td>
+                  <a class="text-decoration-none" href="{% url 'projects:project_detail' p.id %}">{{ p.number }} · {{ p.name }}</a>
+                </td>
+                <td class="text-secondary">{% if p.client %}{{ p.client.name }}{% else %}-{% endif %}</td>
+                <td class="text-end text-secondary">{{ p.due_date }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-secondary small">No projects with upcoming due dates.</div>
+    {% endif %}
+  </div>
+</div>

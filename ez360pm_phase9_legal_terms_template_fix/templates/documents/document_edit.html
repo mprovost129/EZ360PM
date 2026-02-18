@@ -1,0 +1,364 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% load media_extras %}
+{% load formatting %}
+
+{% block title %}{{ doc_label }} · EZ360PM{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/document_composer.css' %}">
+{% endblock %}
+
+{% block content %}
+<div data-doc-composer="1">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">
+        {{ doc_label }} {% if doc.number %}· {{ doc.number }}{% else %}<span class="text-secondary">· Draft</span>{% endif %}
+      </h1>
+      <div class="text-secondary small">This editor mirrors the customer-facing document. Save to update totals and assign a number.</div>
+    </div>
+    <div class="d-flex gap-2">
+      {% if doc_type == "invoice" %}{% url "documents:invoice_print" doc.id as print_url %}{% url "documents:invoice_pdf" doc.id as pdf_url %}{% elif doc_type == "estimate" %}{% url "documents:estimate_print" doc.id as print_url %}{% url "documents:estimate_pdf" doc.id as pdf_url %}{% else %}{% url "documents:proposal_print" doc.id as print_url %}{% url "documents:proposal_pdf" doc.id as pdf_url %}{% endif %}
+      <a class="btn btn-outline-dark" href="{{ print_url }}" target="_blank" rel="noopener">
+        <i class="bi bi-printer me-1"></i>Print
+      </a>
+      <a class="btn btn-dark" href="{{ pdf_url }}">
+        <i class="bi bi-filetype-pdf me-1"></i>PDF
+      </a>
+      <a class="btn btn-outline-secondary" href="{% url 'helpcenter:invoices_payments' %}">
+        <i class="bi bi-question-circle me-1"></i>Help
+      </a>
+      <a class="btn btn-outline-secondary" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_list' %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_list' %}{% else %}{% url 'documents:proposal_list' %}{% endif %}">
+        Back
+      </a>
+      {% if doc_type == 'invoice' and is_manager %}
+        <a class="btn btn-outline-dark" href="{% url 'payments:invoice_reconcile' doc.id %}">
+          Reconcile
+        </a>
+      {% endif %}
+      {% if is_manager %}
+        <a class="btn btn-outline-danger" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_delete' doc.id %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_delete' doc.id %}{% else %}{% url 'documents:proposal_delete' doc.id %}{% endif %}">
+          Delete
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if is_locked %}
+    <div class="alert alert-warning">
+      <strong>Invoice locked.</strong> This invoice can’t be edited{% if lock_reason %} because {{ lock_reason }}{% endif %}.
+    </div>
+  {% endif %}
+
+  <form method="post" novalidate class="ez-form" data-doc-form="1">
+    {% csrf_token %}
+
+    <div class="ez-paper-wrap">
+      <div class="ez-paper">
+        <div class="ez-paper-body">
+          <!-- Header: branding + company info -->
+          <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+            <div class="d-flex align-items-center gap-2">
+              {% with company.logo|safe_media_url as logo_url %}
+              {% if logo_url %}
+                <img src="{{ logo_url }}" alt="{{ company.name }}" style="height:44px; width:auto;" class="rounded">
+              {% else %}
+                <img src="{% static 'images/ez360pm_logo.png' %}" alt="EZ360PM" style="height:44px; width:auto;" class="rounded">
+              {% endif %}
+              {% endwith %}
+              <div>
+                <div class="fw-semibold">{{ company.name }}</div>
+                <div class="text-secondary small">
+                  {% if company.address1 %}{{ company.address1 }}{% endif %}{% if company.address2 %}, {{ company.address2 }}{% endif %}{% if company.city or company.state or company.zip_code %}<br>{% endif %}
+                  {% if company.city %}{{ company.city }}{% endif %}{% if company.state %}, {{ company.state }}{% endif %}{% if company.zip_code %} {{ company.zip_code }}{% endif %}
+                  {% if company.email_from_address %}<br>{{ company.email_from_address }}{% endif %}
+                </div>
+              </div>
+            </div>
+
+            <div class="text-end">
+              <div class="fw-semibold">{{ doc_label }}</div>
+              <div class="text-secondary small">
+                {% if doc.number %}# {{ doc.number }}{% else %}Draft{% endif %}
+              </div>
+              <div class="mt-2">
+                <label class="form-label small mb-1">Status</label>
+                {{ form.status }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Optional header block (template-driven) -->
+          <div class="mt-2">
+            <label class="form-label small mb-1">Header text (optional)</label>
+            {{ form.header_text }}
+            <div class="text-secondary small mt-1">Shown near the top of the customer-facing document.</div>
+          </div>
+
+          <hr class="my-3">
+
+          <!-- Parties + dates -->
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="fw-semibold mb-2">Bill to</div>
+              <div class="mb-2">
+                <label class="form-label small mb-1">Client</label>
+                {{ form.client }}
+              </div>
+              <div class="mb-2">
+                <label class="form-label small mb-1">Project</label>
+                {{ form.project }}
+              </div>
+              <div class="mb-2">
+                <label class="form-label small mb-1">Title</label>
+                {{ form.title }}
+              </div>
+              <div class="mb-0">
+                <label class="form-label small mb-1">Description</label>
+                {{ form.description }}
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <div class="fw-semibold mb-2">Document details</div>
+              <div class="row g-2">
+                <div class="col-6">
+                  <label class="form-label small mb-1">Issue date</label>
+                  {{ form.issue_date }}
+                </div>
+                <div class="col-6">
+                  {% if doc_type == 'invoice' %}
+                    <label class="form-label small mb-1">Due date</label>
+                    {{ form.due_date }}
+                  {% else %}
+                    <label class="form-label small mb-1">Valid until</label>
+                    {{ form.valid_until }}
+                  {% endif %}
+                </div>
+              </div>
+
+              {% if doc_type == 'invoice' %}
+                <div class="row g-2 mt-1">
+                  <div class="col-6">
+                    <label class="form-label small mb-1">Sales tax %</label>
+                    {{ form.sales_tax_percent }}
+                    <div class="text-secondary small mt-1">Used for the PDF and live totals. Line items still control what’s taxable.</div>
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label small mb-1">Deposit</label>
+                    <div class="d-flex gap-2">
+                      <div style="min-width: 140px;">{{ form.deposit_type }}</div>
+                      <div style="flex: 1;">{{ form.deposit_value }}</div>
+                    </div>
+                    <div class="text-secondary small mt-1">
+                      <span data-ez-deposit="percent">Enter a percent (e.g., 25.00).</span>
+                      <span data-ez-deposit="flat" style="display:none;">Enter a dollar amount (e.g., 500.00).</span>
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <hr class="my-3">
+
+          <!-- Line items -->
+          <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+            <div class="fw-semibold">Line items</div>
+            <div class="d-flex gap-2">
+              <button id="ezAddLineBtn" class="btn btn-outline-dark btn-sm" type="button" {% if is_locked %}disabled{% endif %}>
+                <i class="bi bi-plus-circle me-1"></i>Add line
+              </button>
+            </div>
+          </div>
+
+          {{ formset.management_form }}
+
+          <div class="table-responsive">
+            <table class="table align-middle ez-lineitems-table">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:70px;">Order</th>
+                  <th style="width:220px;">Service</th>
+                  <th>Description</th>
+                  <th style="width:90px;">Qty</th>
+                  <th style="width:140px;" class="text-end">Rate</th>
+                  <th style="width:90px;" class="text-center">Tax</th>
+                  <th style="width:140px;" class="text-end">Tax $</th>
+                  <th style="width:140px;" class="text-end">Line total</th>
+                  <th style="width:80px;" class="text-center">Del</th>
+                </tr>
+              </thead>
+              <tbody id="ezLineItemsBody">
+                {% for f in formset.forms %}
+                  <tr data-ez-line="1">
+                    <td>{{ f.sort_order }}</td>
+                    <td>
+                      {# Provide a stable base for the JSON autofill endpoint #}
+                      {% if f.catalog_item %}
+                        {% if f.catalog_item.field.queryset %}{% endif %}
+                      {% endif %}
+                      {{ f.catalog_item }}
+                      <div class="mt-2">{{ f.name }}</div>
+                    </td>
+                    <td>
+                      {{ f.description }}
+                    </td>
+                    <td>{{ f.qty }}</td>
+                    <td class="ez-money">{{ f.unit_price_cents }}</td>
+                    <td class="text-center">{{ f.is_taxable }}</td>
+                    <td class="ez-money">{{ f.tax_cents }}</td>
+                    <td class="ez-money"><span data-ez-line-total="1">$0.00</span></td>
+                    <td class="text-center">{{ f.DELETE }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="d-flex justify-content-end mt-3">
+            <div class="ez-totals">
+              <div class="rowline"><span class="label">Subtotal</span><span class="value" data-ez-total="subtotal">{{ doc.subtotal_cents|cents_to_dollars }}</span></div>
+              <div class="rowline"><span class="label">Tax</span><span class="value" data-ez-total="tax">{{ doc.tax_cents|cents_to_dollars }}</span></div>
+              <hr class="my-2">
+              <div class="rowline"><span class="label">Total</span><span class="value" data-ez-total="total">{{ doc.total_cents|cents_to_dollars }}</span></div>
+              {% if doc_type == 'invoice' %}
+                <div class="rowline"><span class="label">Deposit due</span><span class="value" data-ez-total="deposit">$0.00</span></div>
+                <div class="rowline"><span class="label">Balance after deposit</span><span class="value" data-ez-total="balance">$0.00</span></div>
+                <div class="rowline mt-1"><span class="label">Paid</span><span class="value">{{ doc.amount_paid_cents|cents_to_dollars }}</span></div>
+                <div class="rowline"><span class="label">Balance due</span><span class="value">{{ doc.balance_due_cents|cents_to_dollars }}</span></div>
+              {% endif %}
+            </div>
+          </div>
+
+          <hr class="my-3">
+
+          <!-- Customer notes -->
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="fw-semibold mb-2">Notes for the customer</div>
+              {{ form.notes }}
+            </div>
+            <div class="col-md-6">
+              {% if doc_type == 'invoice' %}
+                <div class="fw-semibold mb-2">Terms</div>
+                {{ form.terms }}
+                <div class="text-secondary small mt-1">Shown on the PDF sent to the client.</div>
+              {% else %}
+                <div class="fw-semibold mb-2">Terms</div>
+                <div class="text-secondary small">For {{ doc_label|lower }}s, terms are typically included in the body of the document. (No separate terms section.)</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <div class="fw-semibold mb-2">Footer text (optional)</div>
+            {{ form.footer_text }}
+            <div class="text-secondary small mt-1">Shown near the bottom of the customer-facing document.</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    {# Sticky actions #}
+    {% if doc_type == 'invoice' %}{% url 'documents:invoice_list' as cancel_url %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_list' as cancel_url %}{% else %}{% url 'documents:proposal_list' as cancel_url %}{% endif %}
+    {% include "partials/form_footer.html" with cancel_url=cancel_url primary_label="Save" disabled=is_locked disabled_title="This document is locked and cannot be edited." %}
+
+  </form>
+
+  <!-- Hidden empty-form template row for JS add-line -->
+  <template id="ezLineItemEmptyRow">
+    {% with f=formset.empty_form %}
+      <td>{{ f.sort_order }}</td>
+      <td>{{ f.catalog_item }}<div class="mt-2">{{ f.name }}</div></td>
+      <td>{{ f.description }}</td>
+      <td>{{ f.qty }}</td>
+      <td class="ez-money">{{ f.unit_price_cents }}</td>
+      <td class="text-center">{{ f.is_taxable }}</td>
+      <td class="ez-money">{{ f.tax_cents }}</td>
+      <td class="ez-money"><span data-ez-line-total="1">$0.00</span></td>
+      <td class="text-center">{{ f.DELETE }}</td>
+    {% endwith %}
+  </template>
+
+  {% if doc_type == 'invoice' %}
+    <div class="row g-3 mt-3">
+      <div class="col-lg-6">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h2 class="h6 mb-2">Email</h2>
+            <div class="text-secondary small mb-3">Send this {{ doc_label|lower }} to the client using your configured email provider.</div>
+
+            {% if doc.client and doc.client.email %}
+              <form method="post" class="d-inline">
+                {% csrf_token %}
+                <button class="btn btn-outline-primary" type="submit" name="action" value="send_email" {% if is_locked %}disabled{% endif %}>
+                  <i class="bi bi-send me-1"></i>Send to {{ doc.client.email }}
+                </button>
+              </form>
+              <div class="text-secondary small mt-2">Tip: Save updates first if you’ve made changes.</div>
+            {% else %}
+              <div class="alert alert-warning mb-0">Select a client with an email address to enable sending.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h2 class="h6 mb-2">Billing helpers</h2>
+            <div class="text-secondary small mb-3">Convert approved unbilled time into a line item (invoices only).</div>
+            {% if doc.project %}
+              <form method="post" class="d-inline">
+                {% csrf_token %}
+                <button class="btn btn-outline-dark" type="submit" name="action" value="add_unbilled_time" {% if is_locked %}disabled{% endif %}>
+                  <i class="bi bi-stopwatch me-1"></i>Add unbilled time
+                </button>
+              </form>
+            {% else %}
+              <div class="alert alert-warning mb-0">Select a project, Save, then you can add unbilled time.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if doc.client and client_credit_cents %}
+      <div class="card shadow-sm mt-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <strong>Client Credit</strong>
+          <span class="text-secondary small">Available: {{ client_credit_cents|cents_to_dollars }}</span>
+        </div>
+        <div class="card-body">
+          {% if can_apply_credit and apply_credit_form %}
+            <form method="post" action="{% url 'documents:invoice_apply_credit' doc.id %}" class="row g-2 align-items-end">
+              {% csrf_token %}
+              <div class="col-12 col-md-4">
+                <label class="form-label mb-1">Apply amount</label>
+                <input type="number" step="0.01" min="0.01" name="amount_dollars" class="form-control" placeholder="0.00" required>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label mb-1">Memo (optional)</label>
+                <input type="text" name="memo" class="form-control" placeholder="e.g., Credit from overpayment">
+              </div>
+              <div class="col-12 col-md-2 d-grid">
+                <button class="btn btn-dark" type="submit">Apply</button>
+              </div>
+            </form>
+          {% else %}
+            <div class="text-secondary small">No credit can be applied right now.</div>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/document_composer.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base_app.html" %}
+{% block title %}{% if mode == 'edit' %}Edit recurring bill plan{% else %}New recurring bill plan{% endif %} · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h4 mb-1">{% if mode == 'edit' %}Edit recurring bill plan{% else %}New recurring bill plan{% endif %}</h1>
+    <div class="text-secondary small">A plan that generates vendor bills on a schedule.</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'payables:recurring_bill_plan_list' %}"><i class="bi bi-arrow-left me-1"></i>Back</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Vendor</label>
+          {{ form.vendor }}
+          {% if form.vendor.errors %}<div class="text-danger small">{{ form.vendor.errors }}</div>{% endif %}
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Expense account</label>
+          {{ form.expense_account }}
+          {% if form.expense_account.errors %}<div class="text-danger small">{{ form.expense_account.errors }}</div>{% endif %}
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Frequency</label>
+          {{ form.frequency }}
+          {% if form.frequency.errors %}<div class="text-danger small">{{ form.frequency.errors }}</div>{% endif %}
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Next run</label>
+          {{ form.next_run }}
+          {% if form.next_run.errors %}<div class="text-danger small">{{ form.next_run.errors }}</div>{% endif %}
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Amount</label>
+          <div class="input-group"><span class="input-group-text">$</span>{{ form.amount_cents }}</div>
+          {% if form.amount_cents.errors %}<div class="text-danger small">{{ form.amount_cents.errors }}</div>{% endif %}
+          <div class="form-text">Enter dollars (e.g., 125.00).</div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="form-check mt-2">
+            {{ form.is_active }}
+            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">Active</label>
+          </div>
+          {% if form.is_active.errors %}<div class="text-danger small">{{ form.is_active.errors }}</div>{% endif %}
+          <div class="form-text">If disabled, the plan will not generate bills.</div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="form-check mt-2">
+            {{ form.auto_post }}
+            <label class="form-check-label" for="{{ form.auto_post.id_for_label }}">Auto-post generated bills</label>
+          </div>
+          {% if form.auto_post.errors %}<div class="text-danger small">{{ form.auto_post.errors }}</div>{% endif %}
+          <div class="form-text">If enabled, generated bills will be posted immediately.</div>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2 mt-4">
+        <a class="btn btn-outline-secondary" href="{% url 'payables:recurring_bill_plan_list' %}">Cancel</a>
+        <button class="btn btn-primary" type="submit">{% if mode == 'edit' %}Save changes{% else %}Create plan{% endif %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% load static %}
+<!doctype html>
+<html>
+  <body style="font-family: Arial, sans-serif; color: #111;">
+    <p>Hi{% if client.first_name %} {{ client.first_name }}{% endif %},</p>
+
+    <p>This is a friendly reminder that your current statement is available in EZ360PM.</p>
+
+    {% if statement_url %}
+    <p>
+      <a href="{{ statement_url }}" style="display:inline-block; padding:10px 14px; background:#111; color:#fff; text-decoration:none; border-radius:6px;">View statement</a>
+    </p>
+    <p style="color:#666; font-size: 13px;">If the button doesn't work, copy/paste: {{ statement_url }}</p>
+    {% endif %}
+
+    <p>
+      If you have any questions, reply to this email or contact {{ support_email }}.
+    </p>
+
+    <p style="color:#666; font-size: 13px;">
+      Sent by {{ company.name }} via {{ site_name }}.
+    </p>
+  </body>
+</html>

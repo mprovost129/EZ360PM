@@ -1,0 +1,130 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% load formatting %}
+
+{% block title %}Expenses · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="ez-page-title">Expenses</h1>
+    <div class="ez-page-subtitle">Track business expenses and link them to clients and projects.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'expenses:merchant_list' %}"><i class="bi bi-shop me-1"></i>Merchants</a>
+    <a class="btn btn-dark" href="{% url 'expenses:expense_create' %}"><i class="bi bi-plus-lg me-1"></i>New Expense</a>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-6">
+        <label class="form-label small text-secondary">Search</label>
+        <input class="form-control" name="q" value="{{ q }}" placeholder="Merchant, client, project, description">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small text-secondary">Status</label>
+        <select class="form-select" name="status">
+          {% for v,label in statuses %}
+            <option value="{{ v }}" {% if status == v %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3 d-flex gap-2">
+        <button class="btn btn-outline-dark w-100" type="submit"><i class="bi bi-search me-1"></i>Filter</button>
+        <a class="btn btn-outline-secondary w-100" href="{% url 'expenses:expense_list' %}">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle ez-table">
+      <thead class="table-light">
+        <tr>
+          <th>Date</th>
+          <th>Merchant</th>
+          <th>Client</th>
+          <th>Project</th>
+          <th>Description</th>
+          <th class="text-end">Amount</th>
+          <th class="text-end">Tax</th>
+          <th class="text-end">Total</th>
+          <th>Status</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for e in expenses %}
+        <tr>
+          <td>{{ e.date|date:"Y-m-d"|default:"—" }}</td>
+          <td>{{ e.merchant.name|default:"—" }}</td>
+          <td>{{ e.client.display_label|default:"—" }}</td>
+          <td>{{ e.project.name|default:"—" }}</td>
+          <td class="text-truncate" style="max-width: 340px;">{{ e.description|default:"" }}</td>
+          <td class="text-end">{{ e.amount_cents|cents_to_dollars }}</td>
+          <td class="text-end">{{ e.tax_cents|cents_to_dollars }}</td>
+          <td class="text-end">{{ e.total_cents|cents_to_dollars }}</td>
+          <td><span class="badge text-bg-secondary">{{ e.get_status_display }}</span></td>
+          <td class="text-end">
+            <div class="btn-group">
+              {% if e.receipt %}
+                <a class="btn btn-sm btn-outline-secondary btn-icon" href="{% url 'expenses:expense_receipt_open' e.id %}" target="_blank" rel="noopener" title="Open receipt">
+                  <i class="bi bi-paperclip"></i>
+                </a>
+              {% endif %}
+              <a class="btn btn-sm btn-outline-dark btn-icon" title="Edit" href="{% url 'expenses:expense_edit' e.id %}">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <button type="button" class="btn btn-sm btn-outline-dark btn-icon dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                <span class="visually-hidden">More</span>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                  <a class="dropdown-item" href="{% url 'expenses:expense_edit' e.id %}">
+                    <i class="bi bi-pencil me-2"></i>Edit
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <a class="dropdown-item text-danger" href="{% url 'expenses:expense_delete' e.id %}">
+                    <i class="bi bi-trash me-2"></i>Delete
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="10">
+            {% if q or (status and status != 'all') %}
+              {% include "includes/empty_state.html" with icon="bi-funnel" title="No expenses match your filters" subtitle="Try adjusting your search or resetting the filters." %}
+              <div class="text-center pb-4">
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'expenses:expense_list' %}">
+                  <i class="bi bi-arrow-counterclockwise me-1"></i>Reset filters
+                </a>
+              </div>
+            {% else %}
+              {% include "includes/empty_state.html" with icon="bi-receipt" title="No expenses yet" subtitle="Add expenses to keep your books accurate and improve profit reporting." %}
+              <div class="text-center pb-4">
+                <a class="btn btn-sm btn-dark" href="{% url 'expenses:expense_create' %}">
+                  <i class="bi bi-plus-lg me-1"></i>Add your first expense
+                </a>
+                <a class="btn btn-sm btn-outline-secondary ms-1" href="{% url 'expenses:merchant_list' %}">
+                  <i class="bi bi-shop me-1"></i>Manage merchants
+                </a>
+              </div>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% include "includes/pagination.html" %}
+{% endblock %}
