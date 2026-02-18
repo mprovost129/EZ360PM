@@ -1,3 +1,15 @@
+## 2026-02-18 — Phase 9 (P9-DOC-TAX-SERVER) — Server-side Tax Recalc for Composer (DONE)
+
+Goal: Ensure document tax totals are correct even if JS is disabled and remain consistent when tax percent changes.
+
+Done:
+- Updated `documents.services.recalc_document_totals()` to recompute per-line tax and line totals using `Document.sales_tax_percent` for taxable lines (when > 0).
+- Added a regression test covering server-side tax recomputation from `sales_tax_percent`.
+
+Acceptance checks:
+- Creating/saving a document with `sales_tax_percent > 0` recomputes taxable line `tax_cents` and `line_total_cents`.
+- `python manage.py test documents` passes.
+
 ## 2026-02-18 — Phase 9 (P9-BANK-DUPE-LINK) — Bank Review Duplicate-Link Action (DONE)
 
 Goal: Prevent duplicate expenses during bank-feed review by making the “suggested existing expense” linkable in one click.
@@ -1214,3 +1226,8 @@ We are entering **Phase 9** with a strict **feature-by-feature QA + fix loop**.
 
 ### DONE — 2026-02-18
 - **P9-DOC-LOGO-SAFE:** Prevent document pages from 500ing when company logo storage is misconfigured; added safe media URL helper and template fallbacks.
+
+### P9-LEGAL-PAGES (DONE)
+- Ensure all public legal routes render successfully in production.
+- Templates present for: terms, privacy, cookies, acceptable use, security, refund policy.
+- Smoke tests added in helpcenter app.

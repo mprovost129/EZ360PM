@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 from dataclasses import dataclass
 from datetime import date
 
@@ -89,39 +90,41 @@ def recalc_document_totals(doc: Document) -> None:
 
     items = list(doc.line_items.filter(deleted_at__isnull=True).order_by("sort_order", "created_at"))
 
-    # If the document is set to tax-by-rate, compute tax per taxable line and persist onto the line.
-    use_rate = False
-    try:
-        use_rate = getattr(doc, "tax_mode", None) == Document.TaxMode.RATE
-    except Exception:
-        use_rate = False
 
-    rate = Decimal("0")
-    if use_rate:
-        try:
-            rate = Decimal(getattr(doc, "tax_rate_percent", 0) or 0)
-        except Exception:
-            rate = Decimal("0")
+# ------------------------------------------------------------------
+# Tax rollup policy (Phase 9)
+# ------------------------------------------------------------------
+# The paper-style composer uses `Document.sales_tax_percent` and auto-computes tax per taxable line
+# in the browser. Server must remain the source of truth, so we recompute here as well so:
+#  - totals remain correct if JS is disabled
+#  - changing the tax percent reliably updates all taxable lines
+#
+# If sales_tax_percent is 0, we respect the per-line tax inputs (manual tax scenarios).
+sales_tax_pct = Decimal("0")
+try:
+    sales_tax_pct = Decimal(getattr(doc, "sales_tax_percent", 0) or 0)
+except Exception:
+    sales_tax_pct = Decimal("0")
 
-    if use_rate and rate > 0:
-        changed = []
-        now = timezone.now()
-        for li in items:
-            line_sub = int(li.line_subtotal_cents or 0)
-            if bool(li.is_taxable):
-                line_tax = int((Decimal(line_sub) * (rate / Decimal("100"))).quantize(Decimal("1")))
-            else:
-                line_tax = 0
-            line_total = line_sub + line_tax
+if sales_tax_pct > 0:
+    changed = []
+    now = timezone.now()
+    for li in items:
+        line_sub = int(li.line_subtotal_cents or 0)
+        if bool(li.is_taxable):
+            line_tax = int((Decimal(line_sub) * (sales_tax_pct / Decimal("100"))).quantize(Decimal("1")))
+        else:
+            line_tax = 0
+        line_total = line_sub + line_tax
 
-            if int(li.tax_cents or 0) != line_tax or int(li.line_total_cents or 0) != line_total:
-                li.tax_cents = line_tax
-                li.line_total_cents = line_total
-                li.updated_at = now
-                changed.append(li)
+        if int(li.tax_cents or 0) != line_tax or int(li.line_total_cents or 0) != line_total:
+            li.tax_cents = line_tax
+            li.line_total_cents = line_total
+            li.updated_at = now
+            changed.append(li)
 
-        if changed:
-            DocumentLineItem.objects.bulk_update(changed, ["tax_cents", "line_total_cents", "updated_at"])
+    if changed:
+        DocumentLineItem.objects.bulk_update(changed, ["tax_cents", "line_total_cents", "updated_at"])
 
     # Roll up totals
     for li in items:

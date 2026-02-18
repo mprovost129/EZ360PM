@@ -1,0 +1,215 @@
+{% extends "base_app.html" %}
+{% block title %}Reconciliation · {{ period.start_date }}–{{ period.end_date }} · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">Reconciliation: {{ period.start_date }} → {{ period.end_date }}</h1>
+    <div class="text-secondary small">
+      Status:
+      {% if period.status == 'locked' %}
+        <span class="badge bg-success">Locked</span>
+        {% if period.locked_at %}<span class="text-muted">· Locked {{ period.locked_at }}</span>{% endif %}
+      {% else %}
+        <span class="badge bg-secondary">Open</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'integrations:banking_reconciliation_periods' %}"><i class="bi bi-arrow-left me-1"></i>Periods</a>
+    <a class="btn btn-outline-secondary" href="{% url 'integrations:banking_review_queue' %}"><i class="bi bi-inbox me-1"></i>Review queue</a>
+    <a class="btn btn-outline-primary" href="{% url 'integrations:banking_reconciliation_export_csv' period.pk %}"><i class="bi bi-download me-1"></i>Export CSV</a>
+
+    {% if period.status != 'locked' %}
+      <form method="post" action="{% url 'integrations:banking_reconciliation_lock' period.pk %}">
+        {% csrf_token %}
+        <button class="btn btn-primary" type="submit" data-ez-confirm="Lock this reconciliation period? This saves a snapshot.">
+          <i class="bi bi-lock me-1"></i>Lock
+        </button>
+      </form>
+    {% else %}
+      <form method="post" action="{% url 'integrations:banking_reconciliation_unlock' period.pk %}">
+        {% csrf_token %}
+        <button class="btn btn-outline-danger" type="submit" data-ez-confirm="Unlock this period (undo)? Snapshot will remain for transparency.">
+          <i class="bi bi-unlock me-1"></i>Undo lock
+        </button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-md-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-secondary">Eligible bank tx</div>
+        <div class="h4 mb-0">{{ eligible_total }}</div>
+        <div class="small text-secondary mt-1">Imported total: {{ txs_total }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-secondary">Bank outflow</div>
+        <div class="h4 mb-0">{{ bank_outflow_cents|money_cents }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-secondary">Expense total</div>
+        <div class="h4 mb-0">{{ expense_total_cents|money_cents }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-secondary">Difference (bank - expenses)</div>
+        <div class="h4 mb-0">{{ diff_cents|money_cents }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-12 col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-secondary">Matched</div>
+        <div class="h4 mb-0">{{ matched_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-secondary">Unmatched bank tx</div>
+        <div class="h4 mb-0">{{ unmatched_bank_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-secondary">Unmatched expenses</div>
+        <div class="h4 mb-0">{{ unmatched_expense_count }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mt-3">
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div>
+            <div class="fw-semibold">Unmatched bank transactions</div>
+            <div class="small text-secondary">Eligible transactions without a linked expense.</div>
+          </div>
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'integrations:banking_review_queue' %}">Open review queue</a>
+        </div>
+
+        <div class="table-responsive mt-3">
+          <table class="table table-sm table-hover align-middle ez-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Merchant</th>
+                <th class="text-end">Amount</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for tx in bank_page %}
+                <tr>
+                  <td class="text-nowrap">{{ tx.posted_date|default:"" }}</td>
+                  <td class="fw-semibold">{{ tx.name|default:"" }}</td>
+                  <td class="text-end">{{ tx.amount_cents|money_cents }}</td>
+                  <td><span class="badge bg-secondary">{{ tx.status }}</span></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="text-secondary small py-3">No unmatched bank transactions.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {% if bank_page.paginator.num_pages > 1 %}
+          <nav class="mt-2">
+            <ul class="pagination pagination-sm">
+              {% if bank_page.has_previous %}
+                <li class="page-item"><a class="page-link" href="?bp={{ bank_page.previous_page_number }}&ep={{ exp_page.number }}">Previous</a></li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link">Previous</span></li>
+              {% endif %}
+              <li class="page-item disabled"><span class="page-link">Page {{ bank_page.number }} of {{ bank_page.paginator.num_pages }}</span></li>
+              {% if bank_page.has_next %}
+                <li class="page-item"><a class="page-link" href="?bp={{ bank_page.next_page_number }}&ep={{ exp_page.number }}">Next</a></li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link">Next</span></li>
+              {% endif %}
+            </ul>
+          </nav>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold">Unmatched expenses</div>
+        <div class="small text-secondary">Expenses in the period without a linked bank transaction (for this window).</div>
+
+        <div class="table-responsive mt-3">
+          <table class="table table-sm table-hover align-middle ez-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Merchant</th>
+                <th class="text-end">Total</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for e in exp_page %}
+                <tr>
+                  <td class="text-nowrap">{{ e.date|default:"" }}</td>
+                  <td class="fw-semibold">{% if e.merchant %}{{ e.merchant.name }}{% else %}—{% endif %}</td>
+                  <td class="text-end">{{ e.total_cents|money_cents }}</td>
+                  <td><span class="badge bg-secondary">{{ e.status }}</span></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="text-secondary small py-3">No unmatched expenses.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {% if exp_page.paginator.num_pages > 1 %}
+          <nav class="mt-2">
+            <ul class="pagination pagination-sm">
+              {% if exp_page.has_previous %}
+                <li class="page-item"><a class="page-link" href="?bp={{ bank_page.number }}&ep={{ exp_page.previous_page_number }}">Previous</a></li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link">Previous</span></li>
+              {% endif %}
+              <li class="page-item disabled"><span class="page-link">Page {{ exp_page.number }} of {{ exp_page.paginator.num_pages }}</span></li>
+              {% if exp_page.has_next %}
+                <li class="page-item"><a class="page-link" href="?bp={{ bank_page.number }}&ep={{ exp_page.next_page_number }}">Next</a></li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link">Next</span></li>
+              {% endif %}
+            </ul>
+          </nav>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

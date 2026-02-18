@@ -1,3 +1,9 @@
+## 2026-02-18 — Phase 9 Pack: P9-DOC-TAX-SERVER (DONE)
+
+- Hardened server-side document totals by recomputing taxable line tax from `sales_tax_percent` in `recalc_document_totals`.
+- Added documents regression test ensuring tax/total rollups remain correct even without JS.
+
+
 ## 2026-02-18 — Phase 9 — Legal pages smoke tests (P9-LEGAL-SMOKE)
 
 - Added automated smoke tests to ensure all public legal pages render (prevents `TemplateDoesNotExist` regressions in production).
@@ -1629,3 +1635,7 @@ Next:
 - Added automated regression tests to protect the company isolation invariant:
   - Active company auto-selection when missing from session on company-scoped pages.
   - Cross-company document access returns 404 for edit/print routes.
+
+## P9-LEGAL-PAGES (2026-02-18)
+- Fixed footer legal links (Terms/Privacy/Cookies/Security/Acceptable Use/Refund Policy) by adding missing templates under helpcenter.
+- Added smoke tests to ensure legal pages render (HTTP 200).

@@ -1,0 +1,91 @@
+{% extends "base_app.html" %}
+{% block title %}System status · Ops · EZ360PM{% endblock %}
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+      <div class="ez-page-title">System status</div>
+      <div class="ez-page-subtitle">Runtime and migration state for the current environment.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-dark" href="{% url 'ops:dashboard' %}">Back to Ops</a>
+      <a class="btn btn-outline-dark" href="{% url 'ops:healthz' %}" target="_blank" rel="noopener">healthz</a>
+      <a class="btn btn-outline-dark" href="{% url 'version' %}" target="_blank" rel="noopener">version</a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-6">
+      <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body">
+          <div class="h6 text-muted text-uppercase mb-3">Environment</div>
+          <dl class="row mb-0">
+            <dt class="col-5 text-secondary">Environment</dt>
+            <dd class="col-7 mb-2"><code>{{ environment|default:"" }}</code></dd>
+
+            <dt class="col-5 text-secondary">DEBUG</dt>
+            <dd class="col-7 mb-2"><code>{{ debug }}</code></dd>
+
+            <dt class="col-5 text-secondary">Version</dt>
+            <dd class="col-7 mb-2"><code>{{ version|default:"" }}</code></dd>
+
+            <dt class="col-5 text-secondary">DB vendor</dt>
+            <dd class="col-7 mb-2"><code>{{ db_vendor }}</code></dd>
+
+            <dt class="col-5 text-secondary">DB name</dt>
+            <dd class="col-7 mb-2"><code>{{ db_name }}</code></dd>
+
+            <dt class="col-5 text-secondary">DB host</dt>
+            <dd class="col-7 mb-0"><code>{{ db_host }}</code></dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <div class="h6 text-muted text-uppercase mb-0">Pending migrations</div>
+            {% if pending_migrations and pending_migrations.0.0 != "error" %}
+              <span class="badge text-bg-{% if pending_migrations|length == 0 %}success{% else %}warning{% endif %}">
+                {% if pending_migrations|length == 0 %}Up to date{% else %}{{ pending_migrations|length }} pending{% endif %}
+              </span>
+            {% endif %}
+          </div>
+
+          {% if pending_migrations and pending_migrations.0.0 == "error" %}
+            <div class="alert alert-danger">
+              Could not compute migration state: <code>{{ pending_migrations.0.1 }}</code>
+            </div>
+          {% elif pending_migrations|length == 0 %}
+            <div class="alert alert-success mb-0">No pending migrations.</div>
+          {% else %}
+            <div class="table-responsive">
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>App</th>
+                    <th>Migration</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for app_label, mig_name in pending_migrations %}
+                    <tr>
+                      <td><code>{{ app_label }}</code></td>
+                      <td><code>{{ mig_name }}</code></td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <div class="small text-secondary mt-2">
+              If you see pending migrations in production, run <code>python manage.py migrate</code>.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

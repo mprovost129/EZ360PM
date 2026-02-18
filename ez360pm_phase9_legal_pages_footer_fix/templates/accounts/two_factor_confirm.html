@@ -1,0 +1,31 @@
+{% extends "base_public.html" %}
+{% load static %}
+{% block title %}2FA Required · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 520px;">
+  <h1 class="h4 mb-2">Two-factor authentication required</h1>
+  <div class="text-secondary small mb-3">
+    Enter the current 6-digit code from your authenticator app for <strong>{{ email }}</strong>.
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="mb-3">
+          {{ form.code.label_tag }}
+          {{ form.code }}
+          {% if form.code.errors %}
+            <div class="text-danger small mt-1">{{ form.code.errors|join:", " }}</div>
+          {% endif %}
+        </div>
+        <button class="btn btn-primary w-100" type="submit">Verify</button>
+      </form>
+      <div class="text-center mt-3">
+        <a class="small" href="{% url 'accounts:profile' %}">Account settings</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends "helpcenter/_help_base.html" %}
+{% load static %}
+
+{% block help_h1 %}Help Center{% endblock %}
+
+{% block help_body %}
+<p class="mb-3">Use this section as the in-app manual. It mirrors the PDF under <code>docs/</code> and is designed to prevent dead ends before launch.</p>
+
+<div class="alert alert-light border d-flex flex-wrap align-items-center justify-content-between gap-2">
+  <div>
+    <div class="fw-semibold">User Manual (PDF)</div>
+    <div class="text-secondary small">Printable walkthrough of roles, workflows, and settings.</div>
+  </div>
+  <a class="btn btn-sm btn-outline-dark" href="{% static 'docs/ez360pm_user_manual.pdf' %}" target="_blank" rel="noopener">
+    <i class="bi bi-filetype-pdf me-1"></i>Open manual
+  </a>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-md-6">
+    <div class="border rounded p-3 h-100">
+      <div class="fw-semibold">Start here</div>
+      <div class="text-secondary small mb-2">First-time setup and the expected workflow.</div>
+      <a class="btn btn-sm btn-dark" href="{% url 'helpcenter:getting_started' %}">Getting started</a>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <div class="border rounded p-3 h-100">
+      <div class="fw-semibold">Roles & permissions</div>
+      <div class="text-secondary small mb-2">Exactly who can access what.</div>
+      <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:roles_permissions' %}">View matrix</a>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <div class="border rounded p-3 h-100">
+      <div class="fw-semibold">Ops console</div>
+      <div class="text-secondary small mb-2">Launch Gate, storage posture, smoke tests, retention.</div>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:ops' %}">Ops guide</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:ops_console' %}">Ops Console</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:production_runbook' %}">Production runbook</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <div class="border rounded p-3 h-100">
+      <div class="fw-semibold">Storage & files</div>
+      <div class="text-secondary small mb-2">Direct S3 uploads + private downloads.</div>
+      <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:storage_files' %}">Storage guide</a>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6">
+    <div class="border rounded p-3 h-100">
+      <div class="fw-semibold">Time tracking</div>
+      <div class="text-secondary small mb-2">Timer, approvals, billable workflow.</div>
+      <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:time_tracking' %}">Time tracking</a>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <div class="border rounded p-3 h-100">
+      <div class="fw-semibold">Invoices & payments</div>
+      <div class="text-secondary small mb-2">Documents, partial payments, refunds.</div>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:invoices_payments' %}">Invoices & payments</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:refunds' %}">Refunds</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <div class="border rounded p-3 h-100">
+      <div class="fw-semibold">Accounting</div>
+      <div class="text-secondary small mb-2">Posting rules, reports, A/R + A/P.</div>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:accounting' %}">Accounting</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:accounts_receivable' %}">Accounts receivable</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:client_credits' %}">Client credits</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:ar_aging' %}">A/R aging</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:collections' %}">Collections</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:statements' %}">Statements</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:report_interpretation' %}">Report interpretation</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:bills' %}">Bills (A/P)</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:vendor_credits' %}">Vendor credits</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:ap_aging' %}">A/P aging</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:ap_reconciliation' %}">A/P reconciliation</a>
+        <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:recurring_bills' %}">Recurring Bills</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <div class="border rounded p-3 h-100">
+      <div class="fw-semibold">Billing</div>
+      <div class="text-secondary small mb-2">Trials, plans, seats, feature gating.</div>
+      <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:billing' %}">Billing</a>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <div class="border rounded p-3 h-100">
+      <div class="fw-semibold">FAQ</div>
+      <div class="text-secondary small mb-2">Answers to common operational questions.</div>
+      <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:faq' %}">FAQ</a>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <div class="border rounded p-3 h-100">
+      <div class="fw-semibold">Legal</div>
+      <div class="text-secondary small mb-2">Terms, Privacy, Cookies, Security, AUP.</div>
+      <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:terms' %}">Legal</a>
+    </div>
+  </div>
+</div>
+
+<hr class="my-4">
+
+<div class="fw-semibold mb-2">Recommended launch flow</div>
+<ol class="mb-0">
+  <li>Create company → invite team → assign roles.</li>
+  <li>Create client → create project → assign staff.</li>
+  <li>Track time (draft → submit → approve) and convert unbilled to invoice.</li>
+  <li>Record payment (partial supported) and confirm invoice status updates.</li>
+  <li>Add expenses with receipts (direct upload) and confirm private download works.</li>
+  <li>Upload project files (direct upload) and confirm private download works.</li>
+  <li>Ops → Launch Checks: confirm all gates green before going live.</li>
+</ol>
+{% endblock %}

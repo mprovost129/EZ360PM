@@ -1,0 +1,148 @@
+{% extends "base_app.html" %}
+{% load static file_extras %}
+
+{% block title %}{% if mode == 'edit' %}Edit Expense{% else %}New Expense{% endif %} · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a class="btn btn-outline-dark btn-sm" href="{% url 'expenses:expense_list' %}">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h1 class="h5 mb-3">{% if mode == 'edit' %}Edit Expense{% else %}New Expense{% endif %}</h1>
+
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      {{ form.receipt_s3_key }}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Merchant</label>
+          {{ form.merchant }}
+          {% if form.merchant.errors %}<div class="text-danger small">{{ form.merchant.errors }}</div>{% endif %}
+          <div class="mt-2">
+            <label class="form-label small text-secondary">Or create new merchant</label>
+            {{ form.new_merchant_name }}
+          </div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Vendor (optional)</label>
+          {{ form.vendor }}
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Date</label>
+          {{ form.date }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Category</label>
+          {{ form.category }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Status</label>
+          {{ form.status }}
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Client (optional)</label>
+          {{ form.client }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Project (optional)</label>
+          {{ form.project }}
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">Description</label>
+          {{ form.description }}
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Receipt (optional)</label>
+          {{ form.receipt }}
+          {% if mode == 'edit' and expense.receipt %}
+            <div class="mt-2">
+              {% if expense.receipt.name|previewable %}
+              <a class="btn btn-sm btn-outline-secondary me-2" href="{% url 'expenses:expense_receipt_open' expense.id %}?preview=1" target="_blank" rel="noopener"><i class="bi bi-eye me-1"></i>Preview</a>
+              {% endif %}
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'expenses:expense_receipt_open' expense.id %}" target="_blank" rel="noopener">
+                <i class="bi bi-paperclip me-1"></i>Open current receipt
+              </a>
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Amount</label>
+          <div class="input-group"><span class="input-group-text">$</span>{{ form.amount_cents }}</div>
+          {% if form.amount_cents.errors %}<div class="text-danger small">{{ form.amount_cents.errors }}</div>{% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Tax</label>
+          <div class="input-group"><span class="input-group-text">$</span>{{ form.tax_cents }}</div>
+          {% if form.tax_cents.errors %}<div class="text-danger small">{{ form.tax_cents.errors }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2 mt-4">
+        <a class="btn btn-outline-secondary" href="{% url 'expenses:expense_list' %}">Cancel</a>
+        <button class="btn btn-dark" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+(function() {
+  var enabled = {{ s3_direct_uploads|yesno:"true,false" }};
+  if (!enabled) return;
+
+  var form = document.querySelector("form");
+  if (!form) return;
+
+  var fileInput = form.querySelector('input[type="file"][name="receipt"]');
+  var keyInput = form.querySelector('input[name="receipt_s3_key"]');
+  if (!fileInput || !keyInput) return;
+
+  form.addEventListener("submit", async function(ev) {
+    if (!fileInput.files || fileInput.files.length === 0) return;
+    ev.preventDefault();
+
+    try {
+      var f = fileInput.files[0];
+      var csrf = form.querySelector('input[name="csrfmiddlewaretoken"]')?.value || "";
+      var resp = await fetch("{% url 'storage:presign_upload' %}", {
+        method: "POST",
+        headers: {"Content-Type":"application/json","X-CSRFToken": csrf},
+        body: JSON.stringify({
+          kind: "expense_receipt",
+          filename: f.name,
+          content_type: f.type || ""
+        })
+      });
+      var data = await resp.json();
+      if (!resp.ok) throw new Error(data.detail || data.error || "presign_failed");
+
+      var fd = new FormData();
+      Object.keys(data.fields).forEach(function(k){ fd.append(k, data.fields[k]); });
+      fd.append("file", f);
+
+      var up = await fetch(data.url, { method: "POST", body: fd });
+      if (!up.ok) throw new Error("upload_failed");
+
+      keyInput.value = data.key;
+      fileInput.value = "";
+      form.submit();
+    } catch (e) {
+      alert("Upload failed: " + (e && e.message ? e.message : e));
+    }
+  });
+})();
+</script>
+
+{% endblock %}

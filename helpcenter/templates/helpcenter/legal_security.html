@@ -1,14 +1,23 @@
 {% extends "helpcenter/_legal_base.html" %}
 
-{% block help_h1 %}Security{% endblock %}
+{% block legal_title %}Security Practices{% endblock %}
 
 {% block legal_body %}
+<p>EZ360PM is designed with security controls appropriate for a business application handling financial records.</p>
+
+<h2 class="h5 mt-4">Account Security</h2>
 <ul>
-  <li>Multi-tenant isolation via company scoping and role enforcement.</li>
-  <li>Private file storage: receipts and project files are not publicly accessible.</li>
-  <li>Signed URL downloads with expiration (when S3 is enabled).</li>
-  <li>Audit logging for key financial and administrative actions.</li>
+  <li>Strong password requirements and login protections.</li>
+  <li>Optional/required MFA depending on role and configuration.</li>
 </ul>
 
-<p>Report security issues via the Help center. If you enable additional monitoring (e.g., Sentry), include contact details for coordinated disclosure.</p>
+<h2 class="h5 mt-4">Data Protection</h2>
+<ul>
+  <li>Secure transport (HTTPS) in production.</li>
+  <li>Access controls and company isolation.</li>
+  <li>Audit logging for sensitive actions.</li>
+</ul>
+
+<h2 class="h5 mt-4">Reporting Vulnerabilities</h2>
+<p>If you believe you’ve found a security issue, contact support and include steps to reproduce.</p>
 {% endblock %}

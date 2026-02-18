@@ -1,3 +1,11 @@
+## 2026-02-18 — Decision: Server is the source of truth for composer tax
+
+- The paper-style composer computes tax in-browser for instant feedback, but the server must recompute and persist tax totals on save.
+- Policy:
+  - If `Document.sales_tax_percent > 0`, recompute `tax_cents` and `line_total_cents` for taxable lines server-side during total rollup.
+  - If `sales_tax_percent == 0`, respect per-line tax inputs (manual tax scenario).
+
+
 ## 2026-02-18 — Decision — Bank feed duplicate prevention UX (Phase 9)
 
 - When a bank transaction has a strong suggested duplicate expense (score >= 90), the UI should prefer linking to the existing expense rather than creating a new one.
@@ -1183,3 +1191,6 @@ These labels are recorded in `docs/QA_PLAN.md` (QA Ledger) and referenced in `do
 - We maintain regression tests that:
   - auto-select a valid active company when missing from session on company-scoped pages
   - enforce 404 for cross-company document access (edit/print)
+
+## P9-LEGAL-PAGES
+Legal and help pages must be treated as production routes. Missing-template regressions are prevented via smoke tests covering all public legal URLs.

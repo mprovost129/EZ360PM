@@ -123,6 +123,7 @@ INSTALLED_APPS = [
     "sync",
     "timetracking",
     "ops",
+    "helpcenter",
 ]
 
 # Optional dependency for S3 media storage

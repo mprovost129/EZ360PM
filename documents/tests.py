@@ -53,3 +53,41 @@ class DocumentCompanyIsolationTests(TestCase):
         url = reverse("documents:invoice_print", kwargs={"pk": self.doc_b.id})
         resp = self.client.get(url)
         self.assertEqual(resp.status_code, 404)
+
+
+from decimal import Decimal
+
+from documents.models import DocumentLineItem
+from documents.services import recalc_document_totals
+
+
+class DocumentTaxRecalcTests(TestCase):
+    def test_sales_tax_percent_recomputes_taxable_lines_server_side(self):
+        company = Company.objects.create(name="Tax Co")
+        doc = Document.objects.create(
+            company=company,
+            doc_type=DocumentType.INVOICE,
+            sales_tax_percent=Decimal("5.000"),
+        )
+
+        li = DocumentLineItem.objects.create(
+            document=doc,
+            sort_order=1,
+            name="Service A",
+            qty=Decimal("2.00"),
+            unit_price_cents=10000,  # $100.00
+            line_subtotal_cents=20000,
+            tax_cents=0,
+            line_total_cents=20000,
+            is_taxable=True,
+        )
+
+        recalc_document_totals(doc)
+        li.refresh_from_db()
+        doc.refresh_from_db()
+
+        # 5% of $200.00 = $10.00
+        self.assertEqual(li.tax_cents, 1000)
+        self.assertEqual(li.line_total_cents, 21000)
+        self.assertEqual(doc.tax_cents, 1000)
+        self.assertEqual(doc.total_cents, 21000)

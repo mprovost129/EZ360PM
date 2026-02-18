@@ -1,0 +1,238 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% block title %}Backups · Ops · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="max-width: 1200px;">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">Backups</h1>
+      <div class="text-secondary small">Configuration visibility + records of backup runs and restore tests.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-dark btn-sm" href="{% url 'ops:dashboard' %}">
+        <i class="bi bi-arrow-left me-1"></i>Ops Dashboard
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="fw-semibold">Backup configuration</div>
+            {% if cfg.backup_enabled %}
+              <span class="badge text-bg-success">Enabled</span>
+            {% else %}
+              <span class="badge text-bg-secondary">Not enabled</span>
+            {% endif %}
+          </div>
+          <hr class="my-3">
+          <div class="small">
+            <div class="d-flex justify-content-between"><span class="text-secondary">Storage</span><span class="fw-semibold">{{ cfg.backup_storage }}</span></div>
+            <div class="d-flex justify-content-between"><span class="text-secondary">Retention days</span><span class="fw-semibold">{{ cfg.backup_retention_days }}</span></div>
+            <div class="d-flex justify-content-between"><span class="text-secondary">Notify</span>
+              <span class="fw-semibold">
+                {% if cfg.backup_notify_emails %}
+                  {{ cfg.backup_notify_emails|join:", " }}
+                {% else %}
+                  —
+                {% endif %}
+              </span>
+            </div>
+          </div>
+          <div class="mt-3 text-secondary small">
+            You can run an on-demand backup from here (manual), but production backups should also be scheduled by your host/platform.
+          </div>
+
+          <div class="mt-3 d-flex flex-wrap gap-2">
+            <form method="post" action="{% url 'ops:backup_run_now' %}">
+              {% csrf_token %}
+              <input type="hidden" name="storage" value="{{ cfg.backup_storage }}">
+              <button class="btn btn-dark btn-sm" type="submit"><i class="bi bi-play-circle me-1"></i>Run backup now</button>
+            </form>
+            <form method="post" action="{% url 'ops:backup_prune' %}">
+              {% csrf_token %}
+              <input type="hidden" name="storage" value="{{ cfg.backup_storage }}">
+              <button class="btn btn-outline-dark btn-sm" type="submit"><i class="bi bi-trash3 me-1"></i>Prune old backups</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="fw-semibold">Latest restore test</div>
+            {% if latest_restore %}
+              {% if latest_restore.outcome == "pass" %}
+                <span class="badge text-bg-success">Pass</span>
+              {% else %}
+                <span class="badge text-bg-danger">Fail</span>
+              {% endif %}
+            {% else %}
+              <span class="badge text-bg-secondary">None</span>
+            {% endif %}
+          </div>
+          <hr class="my-3">
+
+          {% if latest_restore %}
+            <div class="small">
+              <div class="d-flex justify-content-between"><span class="text-secondary">Tested at</span><span class="fw-semibold">{{ latest_restore.tested_at }}</span></div>
+              <div class="d-flex justify-content-between"><span class="text-secondary">By</span><span class="fw-semibold">{{ latest_restore.tested_by_email|default:"—" }}</span></div>
+            </div>
+            {% if latest_restore.notes %}
+              <div class="mt-2 small">{{ latest_restore.notes }}</div>
+            {% endif %}
+          {% else %}
+            <div class="text-secondary small">No restore test recorded yet. You should perform a restore test before launch.</div>
+          {% endif %}
+
+          <div class="mt-3 d-flex flex-wrap gap-2">
+            <form method="post" action="{% url 'ops:backup_record_restore_test' %}">
+              {% csrf_token %}
+              <input type="hidden" name="outcome" value="pass">
+              <button class="btn btn-success btn-sm" type="submit"><i class="bi bi-check2-circle me-1"></i>Record restore test: PASS</button>
+            </form>
+            <form method="post" action="{% url 'ops:backup_record_restore_test' %}">
+              {% csrf_token %}
+              <input type="hidden" name="outcome" value="fail">
+              <button class="btn btn-danger btn-sm" type="submit"><i class="bi bi-x-circle me-1"></i>Record restore test: FAIL</button>
+            </form>
+          </div>
+
+          <div class="mt-2 text-secondary small">
+            Tip: add notes by opening “Recent restore tests” below and copying details into the notes field in admin if needed.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2">Scheduler wiring (host)</div>
+          <div class="text-secondary small mb-3">
+            EZ360PM provides commands, but your host scheduler runs them (cron / Task Scheduler / Render cron job).
+            See <code>docs/BACKUPS.md</code> for ready-to-copy examples.
+          </div>
+          <div class="row g-3">
+            <div class="col-12 col-lg-6">
+              <div class="small fw-semibold mb-1">Daily backup</div>
+              <pre class="mb-0"><code>python manage.py ez360_backup_db --gzip --storage {{ cfg.backup_storage }}</code></pre>
+            </div>
+            <div class="col-12 col-lg-6">
+              <div class="small fw-semibold mb-1">Retention prune</div>
+              <pre class="mb-0"><code>python manage.py ez360_prune_backups --storage {{ cfg.backup_storage }}</code></pre>
+            </div>
+            <div class="col-12">
+              <div class="small fw-semibold mb-1">Record restore test evidence</div>
+              <pre class="mb-0"><code>python manage.py ez360_record_restore_test --outcome pass --notes "Restored backup into staging; smoke OK." --backup-file "ez360pm_db_YYYYMMDD_HHMMSS.sql.gz"</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2">Recent backup runs</div>
+
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <form method="post" action="{% url 'ops:backup_record_run' %}">
+              {% csrf_token %}
+              <input type="hidden" name="status" value="success">
+              <button class="btn btn-outline-success btn-sm" type="submit"><i class="bi bi-plus-circle me-1"></i>Record backup: SUCCESS</button>
+            </form>
+            <form method="post" action="{% url 'ops:backup_record_run' %}">
+              {% csrf_token %}
+              <input type="hidden" name="status" value="failed">
+              <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-plus-circle me-1"></i>Record backup: FAILED</button>
+            </form>
+          </div>
+
+          {% if backup_runs %}
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Status</th>
+                    <th class="text-end">Storage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for r in backup_runs %}
+                  <tr>
+                    <td class="small">{{ r.created_at }}</td>
+                    <td>
+                      {% if r.status == "success" %}
+                        <span class="badge text-bg-success">Success</span>
+                      {% else %}
+                        <span class="badge text-bg-danger">Failed</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end small">{{ r.storage|default:"—" }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="text-secondary small">No backup runs recorded.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2">Recent restore tests</div>
+          {% if restore_tests %}
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Outcome</th>
+                    <th class="text-end">By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for t in restore_tests %}
+                  <tr>
+                    <td class="small">{{ t.tested_at }}</td>
+                    <td>
+                      {% if t.outcome == "pass" %}
+                        <span class="badge text-bg-success">Pass</span>
+                      {% else %}
+                        <span class="badge text-bg-danger">Fail</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end small">{{ t.tested_by_email|default:"—" }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="text-secondary small">No restore tests recorded.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}

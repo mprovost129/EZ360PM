@@ -1,0 +1,17 @@
+{% load formatting %}{{ label }} {{ doc.number }}
+{{ company.name }}
+
+Hi{% if client.first_name %} {{ client.first_name }}{% endif %},
+
+Here are your {{ label|lower }} details:
+
+Total: {{ doc.total_cents|cents_to_dollars }}
+{% if doc.doc_type == 'invoice' and doc.due_date %}Due: {{ doc.due_date }}
+{% endif %}
+
+{% if doc.notes %}Notes:
+{{ doc.notes }}
+
+{% endif %}If you have any questions, just reply to this email.
+
+Sent via {{ site_name }}

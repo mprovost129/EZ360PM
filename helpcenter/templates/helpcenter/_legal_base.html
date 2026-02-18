@@ -1,15 +1,14 @@
-{% extends "helpcenter/_help_base.html" %}
+{% extends shell %}
+{% load static %}
 
-{% block help_body %}
-<div class="alert alert-info">
-  <div class="fw-semibold">Not legal advice</div>
-  <div class="small">These templates are a strong starting point but should be reviewed by counsel for your jurisdiction and business model.</div>
-</div>
-
-{% block legal_body %}{% endblock %}
-
-<hr class="my-4">
-<div class="text-secondary small">
-  Last updated: {% now "Y-m-d" %}
+{% block content %}
+<div class="container py-4" style="max-width: 980px;">
+  <div class="card shadow-sm">
+    <div class="card-body p-4">
+      <h1 class="h3 mb-3">{% block legal_title %}{% endblock %}</h1>
+      <p class="text-muted small mb-4">Last updated: {% now "F j, Y" %}</p>
+      {% block legal_body %}{% endblock %}
+    </div>
+  </div>
 </div>
 {% endblock %}

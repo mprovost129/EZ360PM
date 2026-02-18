@@ -1,0 +1,544 @@
+{% extends "base_app.html" %}
+
+{% block title %}Statement · {{ client.display_label }} · EZ360PM{% endblock %}
+
+{% block app_content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">Statement</h1>
+    <div class="text-secondary small">{{ client.display_label }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-dark" href="{% url 'crm:client_list' %}">Back to clients</a>
+    <a class="btn btn-outline-dark" href="{% url 'documents:client_statement_csv' client.id %}{{ querystring }}"><i class="bi bi-download me-1"></i>CSV</a>
+    <a class="btn btn-outline-dark" href="{% url 'documents:client_statement_pdf' client.id %}{{ querystring }}"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
+  </div>
+</div>
+
+{% if site_base_url_missing or weasyprint_missing %}
+  <div class="alert alert-warning d-flex align-items-start gap-2">
+    <i class="bi bi-exclamation-triangle"></i>
+    <div>
+      <div class="fw-semibold">Statement actions may be limited in this environment</div>
+      <ul class="mb-0 small">
+        {% if site_base_url_missing %}<li><code>SITE_BASE_URL</code> is not set — email and PDF “View online” links will be omitted.</li>{% endif %}
+        {% if weasyprint_missing %}<li>WeasyPrint is not installed — PDF export and PDF email attachments are disabled.</li>{% endif %}
+      </ul>
+    </div>
+  </div>
+{% endif %}
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small mb-1">From</label>
+        <input type="date" class="form-control" name="date_from" value="{{ date_from|date:'Y-m-d' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-1">To</label>
+        <input type="date" class="form-control" name="date_to" value="{{ date_to|date:'Y-m-d' }}">
+      </div>
+      <div class="col-md-6 d-flex gap-2">
+        <button class="btn btn-outline-dark" type="submit"><i class="bi bi-funnel me-1"></i>Apply</button>
+        <a class="btn btn-outline-secondary" href="{% url 'documents:client_statement' client.id %}">Clear</a>
+      </div>
+    </form>
+    <div class="text-secondary small mt-2">
+      Date range filters by invoice issue date (falls back to created date when missing). Exports and email links honor the same range.
+    </div>
+  
+<div class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <div class="d-flex flex-wrap gap-3 align-items-center">
+      <div class="small text-secondary">
+        <strong class="text-body">Last viewed:</strong>
+        {% if activity and activity.last_viewed_at %}{{ activity.last_viewed_at|date:"M j, Y g:i A" }}{% else %}—{% endif %}
+      </div>
+      <div class="small text-secondary">
+        <strong class="text-body">Last sent:</strong>
+        {% if activity and activity.last_sent_at %}{{ activity.last_sent_at|date:"M j, Y g:i A" }}{% else %}—{% endif %}
+      </div>
+      <div class="small text-secondary">
+        <strong class="text-body">Last sent to:</strong>
+        {% if activity and activity.last_sent_to %}{{ activity.last_sent_to }}{% else %}—{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Invoice</th>
+                <th>Issue</th>
+                <th>Due</th>
+                <th>Status</th>
+                <th class="text-end">Total</th>
+                <th class="text-end">Paid</th>
+                <th class="text-end">Credits</th>
+                <th class="text-end">Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in rows %}
+                <tr>
+                  <td class="fw-semibold"><a href="{% url 'documents:invoice_edit' r.invoice.id %}">{{ r.invoice.number|default:"(no #)" }}</a></td>
+                  <td class="text-secondary small">{{ r.invoice.issue_date|date:"Y-m-d" }}</td>
+                  <td class="text-secondary small">{{ r.invoice.due_date|date:"Y-m-d" }}</td>
+                  <td><span class="badge text-bg-secondary text-uppercase">{{ r.invoice.status }}</span></td>
+                  <td class="text-end">${{ r.total_display }}</td>
+                  <td class="text-end">${{ r.paid_display }}</td>
+                  <td class="text-end">${{ r.credits_display }}</td>
+                  <td class="text-end fw-semibold">${{ r.balance_display }}</td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="8" class="p-3 text-secondary">No open invoices for this client.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+            {% if rows %}
+              <tfoot class="table-light">
+                <tr>
+                  <td colspan="7" class="text-end fw-semibold">Total due</td>
+                  <td class="text-end fw-semibold">${{ total_due }}</td>
+                </tr>
+              </tfoot>
+            {% endif %}
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-1">Email statement</div>
+        <div class="text-secondary small mb-2">Send a statement notification email to the client.</div>
+
+        <form method="post" action="{% url 'documents:client_statement_email' client.id %}">
+          {% csrf_token %}
+          {% if date_from %}<input type="hidden" name="date_from" value="{{ date_from|date:'Y-m-d' }}">{% endif %}
+          {% if date_to %}<input type="hidden" name="date_to" value="{{ date_to|date:'Y-m-d' }}">{% endif %}
+
+          <label class="form-label small">To</label>
+          <input type="email" class="form-control" name="to_email" id="stmtToEmail" value="{{ initial_to_email }}" placeholder="client@email.com">
+
+          <label class="form-label small mt-2">Tone</label>
+          <select class="form-select" name="tone" id="stmtTone">
+            <option value="sent" selected>Standard</option>
+            <option value="friendly">Friendly nudge</option>
+            <option value="past_due">Past due</option>
+          </select>
+
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" value="1" id="attachPdf" name="attach_pdf">
+            <label class="form-check-label" for="attachPdf">Attach PDF (requires WeasyPrint)</label>
+          </div>
+
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" value="1" id="emailMeCopy" name="email_me_copy">
+            <label class="form-check-label" for="emailMeCopy">Email me a copy</label>
+          </div>
+
+          <div class="d-grid gap-2 mt-2">
+            <button class="btn btn-dark" type="submit"><i class="bi bi-envelope me-1"></i>Send email</button>
+            <button class="btn btn-outline-dark" type="submit" name="test_myself" value="1"><i class="bi bi-person-check me-1"></i>Send test to myself</button>
+            <button class="btn btn-outline-secondary" type="button" id="previewEmailBtn" data-bs-toggle="modal" data-bs-target="#stmtEmailPreviewModal">
+              <i class="bi bi-eye me-1"></i>Preview email
+            </button>
+          </div>
+        </form>
+
+        <hr>
+        <div class="text-secondary small">PDF export/attachments are optional. If PDF actions error, install WeasyPrint (and system deps like Cairo/Pango) in this environment.</div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mt-3">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div>
+            <h2 class="h6 mb-0">Statement reminders</h2>
+      <a class="btn btn-outline-dark" href="{% url 'documents:collections_followups_due' %}">Collections follow-ups</a>
+            <div class="text-secondary small">Schedule a reminder email for collections follow-up.</div>
+          </div>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'documents:statement_reminders' %}">All reminders</a>
+        </div>
+
+        <form method="post" action="{% url 'documents:client_statement_reminder_create' client_pk=client.id %}" class="row g-2 align-items-end">
+          {% csrf_token %}
+          <input type="hidden" name="date_from" value="{{ date_from|default:'' }}">
+          <input type="hidden" name="date_to" value="{{ date_to|default:'' }}">
+
+          <div class="col-12">
+            <label class="form-label">Send on</label>
+            <input type="date" id="remScheduledFor" name="scheduled_for" class="form-control" required>
+            {% if cadence_suggestions %}
+              <div class="mt-2 d-flex flex-wrap gap-1">
+                {% for s in cadence_suggestions %}
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-set-date="{{ s.date|date:'Y-m-d' }}">{{ s.label }}</button>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Recipient email</label>
+            <input type="email" name="recipient_email" id="remRecipientEmail" class="form-control" value="{{ default_recipient_email|default:client.email }}">
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Tone</label>
+            <select name="tone" class="form-select" id="remTone">
+              <option value="friendly" selected>Friendly nudge</option>
+              <option value="past_due">Past due</option>
+            </select>
+          </div>
+
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" value="1" id="remAttachPdf" name="attach_pdf">
+              <label class="form-check-label" for="remAttachPdf">Attach PDF</label>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <button class="btn btn-outline-dark w-100" type="submit">Schedule</button>
+            <button class="btn btn-outline-secondary w-100 mt-2" type="button" id="previewReminderBtn" data-bs-toggle="modal" data-bs-target="#stmtEmailPreviewModal">
+              <i class="bi bi-eye me-1"></i>Preview reminder email
+            </button>
+          </div>
+        </form>
+
+        {% if scheduled_reminders %}
+          <div class="table-responsive mt-3">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Send on</th>
+                  <th>To</th>
+                  <th>Tone</th>
+                  <th>Audit</th>
+                  <th>Status</th>
+                  <th class="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in scheduled_reminders %}
+                  <tr>
+                    <td>{{ r.scheduled_for }}</td>
+                    <td class="small">{{ r.recipient_email }}</td>
+                    <td class="small">{{ r.get_tone_display }}</td>
+                    <td class="small text-muted">
+                      <div>Scheduled: {{ r.created_by|default:"—" }}</div>
+                      <div>Updated: {{ r.modified_by|default:"—" }} · {{ r.updated_at|date:"Y-m-d H:i" }}</div>
+                    </td>
+                    <td><span class="badge text-bg-secondary">{{ r.status }}</span></td>
+                    <td class="text-end">
+                      <form method="post" action="{% url 'documents:client_statement_reminder_cancel' client_pk=client.id reminder_pk=r.id %}" style="display:inline">
+                        {% csrf_token %}
+                        <button class="btn btn-sm btn-outline-danger" type="submit">Cancel</button>
+                      </form>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-secondary small mt-3">No scheduled reminders.</div>
+        {% endif %}
+
+        {% if failed_reminders %}
+          <hr class="my-3" />
+          <div>
+            <div class="fw-semibold">Last attempts (failed)</div>
+            <div class="text-secondary small">Recent failed sends. Fix the issue, then reschedule.</div>
+          </div>
+          <div class="table-responsive mt-2">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Attempted</th>
+                  <th>To</th>
+                  <th>Audit</th>
+                  <th class="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in failed_reminders %}
+                  <tr>
+                    <td class="text-muted small">{{ r.attempted_at|date:"Y-m-d H:i"|default:"—" }}</td>
+                    <td class="small">
+                      <div>{{ r.recipient_email }}</div>
+                      {% if r.last_error %}<div class="text-danger small text-truncate" style="max-width: 260px;" title="{{ r.last_error }}">{{ r.last_error }}</div>{% endif %}
+                    </td>
+                    <td class="small text-muted">
+                      <div>Scheduled: {{ r.created_by|default:"—" }}</div>
+                      <div>Updated: {{ r.modified_by|default:"—" }} · {{ r.updated_at|date:"Y-m-d H:i" }}</div>
+                    </td>
+                    <td class="text-end">
+                      <form method="post" action="{% url 'documents:client_statement_reminder_reschedule' client_pk=client.id reminder_pk=r.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <div class="d-inline-flex align-items-center gap-1">
+                          <input type="date" name="scheduled_for" class="form-control form-control-sm" style="width: 140px;" value="" />
+                          <button class="btn btn-sm btn-outline-dark" type="submit" title="Reschedule to the selected date (or defaults to +7 days)">Reschedule</button>
+                        </div>
+                      </form>
+
+                      {% if user.is_staff or user.is_superuser %}
+                        <form method="post" action="{% url 'documents:client_statement_reminder_retry_now' client_pk=client.id reminder_pk=r.id %}" class="d-inline ms-1">
+                          {% csrf_token %}
+                          <button class="btn btn-sm btn-outline-primary" type="submit" title="Retry send now (staff only)">Retry now</button>
+                        </form>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+
+        {% if sent_reminders %}
+          <hr class="my-3" />
+          <div>
+            <div class="fw-semibold">Last sent</div>
+            <div class="text-secondary small">Recent reminder emails sent for this client.</div>
+          </div>
+          <div class="table-responsive mt-2">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Sent at</th>
+                  <th>To</th>
+                  <th>Tone</th>
+                  <th>Period</th>
+                  <th>Audit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in sent_reminders %}
+                  <tr>
+                    <td class="text-muted small">{{ r.sent_at|date:"Y-m-d H:i" }}</td>
+                    <td class="small">{{ r.recipient_email }}</td>
+                    <td class="small">{{ r.get_tone_display }}</td>
+                    <td class="text-muted small">
+                      {% if r.date_from or r.date_to %}
+                        {{ r.date_from|default:"" }}{% if r.date_from and r.date_to %} → {% endif %}{{ r.date_to|default:"" }}
+                      {% else %}
+                        All open invoices
+                      {% endif %}
+                    </td>
+                    <td class="small text-muted">
+                      <div>Scheduled: {{ r.created_by|default:"—" }}</div>
+                      <div>Updated: {{ r.modified_by|default:"—" }} · {{ r.updated_at|date:"Y-m-d H:i" }}</div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+      <div class="card shadow-sm mt-3">
+        <div class="card-body">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <h2 class="h6 mb-0">Collections notes</h2>
+              <div class="text-secondary small">Log follow-ups for this client (optional due date).</div>
+            </div>
+            {% if collections_open_followups %}
+              <span class="badge text-bg-warning" title="Open follow-ups due today or earlier">Due: {{ collections_open_followups }}</span>
+            {% endif %}
+          </div>
+
+          <form method="post" action="{% url 'documents:client_statement_collections_note_add' client_pk=client.id %}" class="mt-3">
+            {% csrf_token %}
+            <div class="mb-2">
+              <label class="form-label small mb-1">Note</label>
+              <textarea class="form-control" name="note" rows="3" placeholder="Left voicemail, promised to pay Friday…" required></textarea>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small mb-1">Follow up on</label>
+              <input type="date" class="form-control" name="follow_up_on">
+            </div>
+            <button class="btn btn-outline-dark w-100" type="submit">Add note</button>
+          </form>
+
+          {% if collections_notes %}
+            <hr class="my-3" />
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Note</th>
+                    <th class="text-end">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for n in collections_notes %}
+                    <tr>
+                      <td>
+                        <div class="small">{{ n.note }}</div>
+                        <div class="text-muted small">
+                          {% if n.follow_up_on %}Follow up: {{ n.follow_up_on }} · {% endif %}
+                          Added: {{ n.created_at|date:"Y-m-d H:i" }}{% if n.created_by %} · {{ n.created_by }}{% endif %}
+                        </div>
+                        {% if n.status == 'done' and n.completed_at %}
+                          <div class="text-muted small">Completed: {{ n.completed_at|date:"Y-m-d H:i" }}{% if n.completed_by %} · {{ n.completed_by }}{% endif %}</div>
+                        {% endif %}
+                      </td>
+                      <td class="text-end">
+                        {% if n.status == 'open' %}
+                          <form method="post" action="{% url 'documents:client_statement_collections_note_done' client_pk=client.id note_pk=n.id %}" class="d-inline">
+                            {% csrf_token %}
+                            <button class="btn btn-sm btn-outline-success" type="submit">Done</button>
+                          </form>
+                        {% else %}
+                          <span class="badge text-bg-success">Done</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="text-secondary small mt-3">No collections notes yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Email Preview Modal -->
+<div class="modal fade" id="stmtEmailPreviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Statement email preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="stmtPreviewAlerts"></div>
+        <div class="mb-2"><span class="text-secondary small">To:</span> <span id="stmtPreviewTo" class="fw-semibold"></span></div>
+        <div class="mb-3"><span class="text-secondary small">Subject:</span> <span id="stmtPreviewSubject" class="fw-semibold"></span></div>
+
+        <div class="row g-3">
+          <div class="col-lg-7">
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <div class="fw-semibold mb-2">HTML preview</div>
+                <div class="border rounded p-3" id="stmtPreviewHtml" style="min-height: 240px;"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-5">
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <div class="fw-semibold mb-2">Text preview</div>
+                <pre class="border rounded p-3 mb-0" id="stmtPreviewText" style="white-space: pre-wrap; min-height: 240px;"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    var input = document.getElementById('remScheduledFor');
+    if (input) {
+      document.querySelectorAll('[data-set-date]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          input.value = btn.getAttribute('data-set-date');
+          input.focus();
+        });
+      });
+    }
+
+    var btn = document.getElementById('previewEmailBtn');
+    if (!btn) return;
+
+    function esc(s) {
+      return (s || '').replace(/[&<>"']/g, function(c) {
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+      });
+    }
+
+    function setAlerts(warnings, errors) {
+      var box = document.getElementById('stmtPreviewAlerts');
+      if (!box) return;
+      var html = '';
+      (errors || []).forEach(function(msg) {
+        html += '<div class="alert alert-danger"><div class="fw-semibold">Error</div><div class="small">' + esc(msg) + '</div></div>';
+      });
+      (warnings || []).forEach(function(msg) {
+        html += '<div class="alert alert-warning"><div class="fw-semibold">Warning</div><div class="small">' + esc(msg) + '</div></div>';
+      });
+      box.innerHTML = html;
+    }
+
+    async function loadPreview(opts) {
+      opts = opts || {};
+      var toEmail = document.getElementById(opts.toId || 'stmtToEmail');
+      var attachPdf = document.getElementById(opts.attachId || 'attachPdf');
+      var toneSel = document.getElementById(opts.toneId || 'stmtTone');
+
+      var qs = new URLSearchParams();
+      if (toEmail && toEmail.value) qs.set('to_email', toEmail.value);
+      if (attachPdf && attachPdf.checked) qs.set('attach_pdf', '1');
+      if (toneSel && toneSel.value) qs.set('tone', toneSel.value);
+      {% if date_from %}qs.set('date_from', '{{ date_from|date:"Y-m-d" }}');{% endif %}
+      {% if date_to %}qs.set('date_to', '{{ date_to|date:"Y-m-d" }}');{% endif %}
+
+      var url = "{% url 'documents:client_statement_email_preview' client.id %}?" + qs.toString();
+
+      setAlerts([], []);
+      document.getElementById('stmtPreviewTo').textContent = '...';
+      document.getElementById('stmtPreviewSubject').textContent = '...';
+      document.getElementById('stmtPreviewHtml').innerHTML = '<div class="text-secondary">Loading preview…</div>';
+      document.getElementById('stmtPreviewText').textContent = '';
+
+      try {
+        var resp = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+        var data = await resp.json();
+        document.getElementById('stmtPreviewTo').textContent = data.to || '';
+        document.getElementById('stmtPreviewSubject').textContent = data.subject || '';
+        document.getElementById('stmtPreviewHtml').innerHTML = data.html || '<div class="text-secondary">(No HTML body)</div>';
+        document.getElementById('stmtPreviewText').textContent = data.text || '';
+        setAlerts(data.warnings || [], data.errors || []);
+      } catch (e) {
+        setAlerts([], ['Could not load preview.']);
+        document.getElementById('stmtPreviewHtml').innerHTML = '<div class="text-danger">Preview failed.</div>';
+      }
+    }
+
+    btn.addEventListener('click', function(){ loadPreview({toId: 'stmtToEmail', attachId: 'attachPdf', toneId: 'stmtTone'}); });
+
+    var remBtn = document.getElementById('previewReminderBtn');
+    if (remBtn) {
+      remBtn.addEventListener('click', function(){ loadPreview({toId: 'remRecipientEmail', attachId: 'remAttachPdf', toneId: 'remTone'}); });
+    }
+  })();
+</script>
+{% endblock %}
