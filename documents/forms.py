@@ -46,16 +46,46 @@ class DocumentForm(forms.ModelForm):
             "issue_date",
             "due_date",
             "valid_until",
+            "sales_tax_percent",
+            "deposit_type",
+            "deposit_value",
+            "header_text",
             "notes",
+            "footer_text",
+            "terms",
             "status",
         ]
         widgets = {
             "description": forms.Textarea(attrs={"rows": 2}),
+            "header_text": forms.Textarea(attrs={"rows": 2}),
             "notes": forms.Textarea(attrs={"rows": 3}),
+            "footer_text": forms.Textarea(attrs={"rows": 2}),
+            "terms": forms.Textarea(attrs={"rows": 3}),
         }
 
     def __init__(self, *args, company: Company, doc_type: str, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # Bootstrap styling
+        for name, field in self.fields.items():
+            w = field.widget
+            base_cls = w.attrs.get("class", "")
+            if isinstance(w, forms.Select):
+                w.attrs["class"] = (base_cls + " form-select").strip()
+            elif isinstance(w, (forms.Textarea, forms.TextInput, forms.DateInput, forms.NumberInput)):
+                w.attrs["class"] = (base_cls + " form-control").strip()
+
+        # Tighter composer feel
+        if "description" in self.fields:
+            self.fields["description"].widget.attrs.setdefault("rows", 2)
+        if "notes" in self.fields:
+            self.fields["notes"].widget.attrs.setdefault("rows", 3)
+        if "header_text" in self.fields:
+            self.fields["header_text"].widget.attrs.setdefault("rows", 2)
+        if "footer_text" in self.fields:
+            self.fields["footer_text"].widget.attrs.setdefault("rows", 2)
+        if "terms" in self.fields:
+            self.fields["terms"].widget.attrs.setdefault("rows", 3)
         self.fields["client"].queryset = Client.objects.filter(company=company, deleted_at__isnull=True).order_by(
             "company_name", "last_name", "first_name"
         )
@@ -68,6 +98,19 @@ class DocumentForm(forms.ModelForm):
             self.fields["valid_until"].required = False
         else:
             self.fields["due_date"].required = False
+
+        # Defaults for composer fields
+        if not self.instance.pk and not self.is_bound:
+            try:
+                self.fields["sales_tax_percent"].initial = getattr(company, "default_sales_tax_percent", 0) or 0
+            except Exception:
+                pass
+
+        # Only invoices have deposit + terms; hide for proposals/estimates.
+        if doc_type in {DocumentType.ESTIMATE, DocumentType.PROPOSAL}:
+            self.fields["deposit_type"].required = False
+            self.fields["deposit_value"].required = False
+            self.fields["terms"].required = False
 
         # status choices per doc_type
         if doc_type in {DocumentType.ESTIMATE, DocumentType.PROPOSAL}:
@@ -101,11 +144,49 @@ class LineItemForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         company_default_taxable = bool(kwargs.pop("company_default_taxable", False))
+        company = kwargs.pop("company", None)
         super().__init__(*args, **kwargs)
+
+        # Bootstrap styling
+        for name, field in self.fields.items():
+            w = field.widget
+            base_cls = w.attrs.get("class", "")
+            if isinstance(w, forms.Select):
+                w.attrs["class"] = (base_cls + " form-select form-select-sm").strip()
+            elif isinstance(w, forms.CheckboxInput):
+                w.attrs["class"] = (base_cls + " form-check-input").strip()
+            elif isinstance(w, (forms.Textarea, forms.TextInput, forms.NumberInput)):
+                w.attrs["class"] = (base_cls + " form-control form-control-sm").strip()
+
+        # Numeric inputs feel like money/qty
+        if "qty" in self.fields:
+            self.fields["qty"].widget.attrs.setdefault("step", "0.01")
+
+        # Scope catalog dropdown to the active company
+        if "catalog_item" in self.fields and company is not None:
+            try:
+                from catalog.models import CatalogItem
+
+                self.fields["catalog_item"].queryset = CatalogItem.objects.filter(
+                    company=company, is_active=True, deleted_at__isnull=True
+                ).order_by("name")
+            except Exception:
+                pass
 
         # Sensible defaults for new rows
         if not self.instance.pk and not self.is_bound:
             self.fields["is_taxable"].initial = company_default_taxable
+
+        # Document composer JS auto-fill endpoint base
+        if "catalog_item" in self.fields:
+            try:
+                from django.urls import reverse
+
+                self.fields["catalog_item"].widget.attrs.setdefault(
+                    "data-catalog-json-base", reverse("catalog:item_json", args=[0])
+                )
+            except Exception:
+                pass
 
 
     def clean(self):

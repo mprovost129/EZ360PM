@@ -93,6 +93,7 @@ INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
+    "django.contrib.humanize",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
@@ -469,6 +470,12 @@ RECAPTCHA_MIN_SCORE = float(os.getenv("RECAPTCHA_MIN_SCORE", "0.5"))
 DROPBOX_APP_KEY = _getenv("DROPBOX_APP_KEY", "").strip()
 DROPBOX_APP_SECRET = _getenv("DROPBOX_APP_SECRET", "").strip()
 DROPBOX_REDIRECT_URI = _getenv("DROPBOX_REDIRECT_URI", "").strip()
+
+# Bank feeds (Plaid) - scaffold
+PLAID_ENABLED = _getenv_bool("PLAID_ENABLED", False)
+PLAID_CLIENT_ID = _getenv("PLAID_CLIENT_ID", "").strip()
+PLAID_SECRET = _getenv("PLAID_SECRET", "").strip()
+PLAID_ENV = _getenv("PLAID_ENV", "sandbox").strip()  # sandbox|development|production
 
 EZ360_BACKUP_DIR = Path(_getenv("EZ360_BACKUP_DIR", str(BASE_DIR / "backups")))
 EZ360_BACKUP_RETENTION_DAYS = _getenv_int("EZ360_BACKUP_RETENTION_DAYS", 14)

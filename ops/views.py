@@ -36,7 +36,7 @@ from billing.stripe_service import fetch_and_sync_subscription_from_stripe
 from core.launch_checks import run_launch_checks
 from core.retention import get_retention_days, run_prune_jobs
 
-from .forms import ReleaseNoteForm, OpsChecksForm, OpsEmailTestForm, OpsAlertRoutingForm
+from .forms import ReleaseNoteForm, OpsChecksForm, OpsEmailTestForm, OpsAlertRoutingForm, QAIssueForm
 
 from .services_alerts import create_ops_alert
 
@@ -59,6 +59,8 @@ from .models import (
     OpsCheckRun,
     OpsCheckKind,
     SiteConfig,
+    QAIssue,
+    QAIssueStatus,
 )
 
 
@@ -303,6 +305,7 @@ def ops_dashboard(request: HttpRequest) -> HttpResponse:
             status__in=[SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING, SubscriptionStatus.PAST_DUE]
         ).count(),
         "open_alerts": OpsAlertEvent.objects.filter(is_resolved=False).count(),
+        "open_qa_issues": QAIssue.objects.filter(status__in=[QAIssueStatus.OPEN, QAIssueStatus.IN_PROGRESS]).count(),
     }
 
     # Phase 7H43: fast triage summary for open alerts grouped by source/company.
@@ -2625,3 +2628,140 @@ def ops_pii_export(request: HttpRequest) -> HttpResponse:
     resp = HttpResponse(buf.getvalue(), content_type="application/zip")
     resp["Content-Disposition"] = f'attachment; filename="{zip_name}"'
     return resp
+
+
+# --------------------------------------------------------------------------------------
+# Phase 8S2 — V1 Launch Manual + End-to-End QA Punchlist
+# --------------------------------------------------------------------------------------
+
+
+@staff_only
+def ops_qa_issues(request: HttpRequest) -> HttpResponse:
+    q = (request.GET.get("q") or "").strip()
+    status = (request.GET.get("status") or "").strip()
+    severity = (request.GET.get("severity") or "").strip()
+    area = (request.GET.get("area") or "").strip()
+
+    qs = QAIssue.objects.select_related("company").all()
+
+    if status:
+        qs = qs.filter(status=status)
+    if severity:
+        qs = qs.filter(severity=severity)
+    if area:
+        qs = qs.filter(area__icontains=area)
+    if q:
+        qs = qs.filter(
+            Q(title__icontains=q)
+            | Q(description__icontains=q)
+            | Q(steps_to_reproduce__icontains=q)
+            | Q(company__name__icontains=q)
+            | Q(discovered_by_email__icontains=q)
+            | Q(assigned_to_email__icontains=q)
+        )
+
+    counts = {
+        "open": QAIssue.objects.filter(status=QAIssueStatus.OPEN).count(),
+        "in_progress": QAIssue.objects.filter(status=QAIssueStatus.IN_PROGRESS).count(),
+        "resolved": QAIssue.objects.filter(status=QAIssueStatus.RESOLVED).count(),
+        "wont_fix": QAIssue.objects.filter(status=QAIssueStatus.WONT_FIX).count(),
+    }
+
+    paginator = Paginator(qs.order_by("-created_at"), 25)
+    page_obj = paginator.get_page(request.GET.get("page") or 1)
+
+    ctx = {
+        "q": q,
+        "status": status,
+        "severity": severity,
+        "area": area,
+        "counts": counts,
+        "page_obj": page_obj,
+        "statuses": QAIssueStatus.choices,
+        "severities": QAIssue._meta.get_field("severity").choices,
+    }
+    return render(request, "ops/qa_issues_list.html", ctx)
+
+
+@staff_only
+def ops_qa_issue_new(request: HttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        form = QAIssueForm(request.POST)
+        if form.is_valid():
+            obj: QAIssue = form.save(commit=False)
+            obj.created_at = timezone.now()
+            obj.updated_at = timezone.now()
+            if not obj.discovered_by_email:
+                obj.discovered_by_email = (getattr(request.user, "email", "") or "").strip()[:254]
+            obj.save()
+            messages.success(request, "QA issue created.")
+            return redirect("ops:qa_issue_detail", pk=obj.pk)
+    else:
+        initial = {
+            "discovered_by_email": (getattr(request.user, "email", "") or "").strip(),
+        }
+
+        # Optional prefill from querystring (used by the topbar "Report issue" shortcut).
+        # We keep this intentionally conservative to avoid surprise values.
+        related_url = (request.GET.get("related_url") or "").strip()
+        area = (request.GET.get("area") or "").strip()
+        company_id = (request.GET.get("company") or "").strip()
+
+        if related_url:
+            initial["related_url"] = related_url
+        if area:
+            initial["area"] = area[:64]
+        if company_id.isdigit():
+            initial["company"] = int(company_id)
+
+        form = QAIssueForm(initial=initial)
+
+    return render(request, "ops/qa_issue_form.html", {"form": form, "mode": "new"})
+
+
+@staff_only
+def ops_qa_issue_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    issue = get_object_or_404(QAIssue.objects.select_related("company"), pk=pk)
+    return render(request, "ops/qa_issue_detail.html", {"issue": issue})
+
+
+@staff_only
+def ops_qa_issue_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    issue = get_object_or_404(QAIssue.objects.select_related("company"), pk=pk)
+    if request.method == "POST":
+        form = QAIssueForm(request.POST, instance=issue)
+        if form.is_valid():
+            obj: QAIssue = form.save(commit=False)
+            obj.updated_at = timezone.now()
+            # Auto-set resolved_at when moving to resolved.
+            if obj.status in {QAIssueStatus.RESOLVED, QAIssueStatus.WONT_FIX} and obj.resolved_at is None:
+                obj.resolved_at = timezone.now()
+            if obj.status in {QAIssueStatus.OPEN, QAIssueStatus.IN_PROGRESS}:
+                obj.resolved_at = None
+            obj.save()
+            messages.success(request, "QA issue updated.")
+            return redirect("ops:qa_issue_detail", pk=issue.pk)
+    else:
+        form = QAIssueForm(instance=issue)
+
+    return render(request, "ops/qa_issue_form.html", {"form": form, "mode": "edit", "issue": issue})
+
+
+@staff_only
+@require_POST
+def ops_qa_issue_close(request: HttpRequest, pk: int) -> HttpResponse:
+    issue = get_object_or_404(QAIssue, pk=pk)
+    outcome = (request.POST.get("outcome") or "resolved").strip()
+    notes = (request.POST.get("notes") or "").strip()
+
+    if outcome == "wont_fix":
+        issue.status = QAIssueStatus.WONT_FIX
+    else:
+        issue.status = QAIssueStatus.RESOLVED
+    issue.resolved_at = timezone.now()
+    if notes:
+        issue.resolution_notes = notes
+    issue.updated_at = timezone.now()
+    issue.save(update_fields=["status", "resolved_at", "resolution_notes", "updated_at"])
+    messages.success(request, "QA issue closed.")
+    return redirect("ops:qa_issue_detail", pk=issue.pk)

@@ -69,14 +69,22 @@ or
 
 ## Dropbox (optional)
 
+- `DROPBOX_APP_KEY`
+- `DROPBOX_APP_SECRET`
+- `DROPBOX_REDIRECT_URI` (optional)
+
+## Bank feeds (optional; scaffold)
+
+- `PLAID_ENABLED` ("1"/"0"; default `0`)
+- `PLAID_CLIENT_ID`
+- `PLAID_SECRET`
+- `PLAID_ENV` (default `sandbox`)
+
 ## Development-only overrides
 
 - `DEV_SECURE_SSL_REDIRECT` (default: `0`)
   - If set to `1`, forces `SECURE_SSL_REDIRECT=True` in `config/settings/dev.py`.
   - Only use this if you run a local HTTPS-capable server; otherwise keep it `0` so local dev stays reachable via plain HTTP.
-- `DROPBOX_APP_KEY`
-- `DROPBOX_APP_SECRET`
-- `DROPBOX_REDIRECT_URI` (optional)
 
 
 ## Monitoring / Observability

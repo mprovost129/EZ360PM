@@ -11,7 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Q, Count
 from django.db.models.functions import TruncDate
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -168,6 +168,12 @@ def document_wizard(request, doc_type: str):
                     status=DocumentStatus.DRAFT,
                 )
 
+                # Composer defaults
+                try:
+                    doc.sales_tax_percent = getattr(company, "default_sales_tax_percent", Decimal("0.000")) or Decimal("0.000")
+                except Exception:
+                    doc.sales_tax_percent = Decimal("0.000")
+
                 # Phase 5B: sensible date defaults
                 today = timezone.localdate()
                 if doc_type == DocumentType.INVOICE:
@@ -189,7 +195,9 @@ def document_wizard(request, doc_type: str):
                 if template:
                     doc.title = template.name
                     doc.notes = template.notes_default or ""
-                    doc.save(update_fields=["title", "notes", "updated_at"])
+                    doc.header_text = template.header_text or ""
+                    doc.footer_text = template.footer_text or ""
+                    doc.save(update_fields=["title", "notes", "header_text", "footer_text", "updated_at"])
 
                 log_event(company=company, actor=employee, event_type=f"{doc_type}.created", object_type="Document", object_id=str(doc.id), summary=f"Created {_doc_label(doc_type)}")
                 messages.success(request, f"{_doc_label(doc_type)} draft created.")
@@ -249,7 +257,14 @@ def document_edit(request, doc_type: str, pk):
         # Email action: validate & save, then send to client.
         if request.POST.get("action") == "send_email":
             form = DocumentForm(request.POST, instance=doc, company=company, doc_type=doc_type)
-            formset = DocumentLineItemFormSet(request.POST, instance=doc, form_kwargs={'company_default_taxable': bool(getattr(company, 'default_line_items_taxable', False))})
+            formset = DocumentLineItemFormSet(
+                request.POST,
+                instance=doc,
+                form_kwargs={
+                    'company_default_taxable': bool(getattr(company, 'default_line_items_taxable', False)),
+                    'company': company,
+                },
+            )
             if form.is_valid() and formset.is_valid():
                 with transaction.atomic():
                     form.save()
@@ -309,6 +324,8 @@ def document_edit(request, doc_type: str, pk):
                     apply_credit_form = None
 
             ctx = {
+                "company": company,
+                "is_manager": employee and employee.role in {EmployeeRole.MANAGER, EmployeeRole.ADMIN, EmployeeRole.OWNER},
                 "doc_type": doc_type,
                 "doc_label": _doc_label(doc_type),
                 "doc": doc,
@@ -389,7 +406,14 @@ def document_edit(request, doc_type: str, pk):
         action = (request.POST.get("action") or "").strip()
 
         form = DocumentForm(request.POST, instance=doc, company=company, doc_type=doc_type)
-        formset = DocumentLineItemFormSet(request.POST, instance=doc, form_kwargs={'company_default_taxable': bool(getattr(company, 'default_line_items_taxable', False))})
+        formset = DocumentLineItemFormSet(
+            request.POST,
+            instance=doc,
+            form_kwargs={
+                'company_default_taxable': bool(getattr(company, 'default_line_items_taxable', False)),
+                'company': company,
+            },
+        )
         if form.is_valid() and formset.is_valid():
             with transaction.atomic():
                 form.save()
@@ -413,26 +437,18 @@ def document_edit(request, doc_type: str, pk):
 
                 recalc_document_totals(doc)
 
-                # Send-to-client action (save + send)
-                if action == "send_email":
-                    # If still draft, move to SENT so it's clearly issued.
-                    if doc.status == DocumentStatus.DRAFT:
-                        doc.status = DocumentStatus.SENT
-                        doc.save(update_fields=["status", "updated_at"])
-
-                    result = send_document_to_client(request, doc)
-                    if result.sent:
-                        messages.success(request, f"Email sent to {result.to}.")
-                    else:
-                        messages.error(request, result.message)
-                    return redirect("documents:%s_edit" % doc_type, pk=doc.pk)
-
                 log_event(company=company, actor=employee, event_type=f"{doc_type}.updated", object_type="Document", object_id=str(doc.id), summary=f"Updated {_doc_label(doc_type)}")
                 messages.success(request, f"{_doc_label(doc_type)} saved.")
                 return redirect("documents:%s_edit" % doc_type, pk=doc.pk)
     else:
         form = DocumentForm(instance=doc, company=company, doc_type=doc_type)
-        formset = DocumentLineItemFormSet(instance=doc, form_kwargs={'company_default_taxable': bool(getattr(company, 'default_line_items_taxable', False))})
+        formset = DocumentLineItemFormSet(
+            instance=doc,
+            form_kwargs={
+                'company_default_taxable': bool(getattr(company, 'default_line_items_taxable', False)),
+                'company': company,
+            },
+        )
 
         if is_locked:
             for f in form.fields.values():
@@ -440,7 +456,6 @@ def document_edit(request, doc_type: str, pk):
             for fform in formset.forms:
                 for f in fform.fields.values():
                     f.disabled = True
-
     # Invoice extras: credit notes + client credit application UI
     credit_notes = []
     apply_credit_form = None
@@ -466,6 +481,8 @@ def document_edit(request, doc_type: str, pk):
             apply_credit_form = None
 
     ctx = {
+        "company": company,
+        "is_manager": employee and employee.role in {EmployeeRole.MANAGER, EmployeeRole.ADMIN, EmployeeRole.OWNER},
         "doc_type": doc_type,
         "doc_label": _doc_label(doc_type),
         "doc": doc,
@@ -531,6 +548,96 @@ def invoice_apply_credit(request, pk):
 
 @company_context_required
 @require_min_role(EmployeeRole.MANAGER)
+
+
+def _render_document_pdf_bytes(request, html: str) -> tuple[bytes | None, str | None]:
+    """Best-effort HTML→PDF via optional WeasyPrint.
+
+    Uses request base_url so relative static/media assets resolve in PDFs.
+
+    Returns: (pdf_bytes, error_code)
+      - error_code is one of: "not_installed", "render_failed".
+    """
+    try:
+        from weasyprint import HTML  # type: ignore
+    except Exception:
+        return None, "not_installed"
+    try:
+        base_url = request.build_absolute_uri("/")
+        return HTML(string=html, base_url=base_url).write_pdf(), None
+    except Exception:
+        return None, "render_failed"
+
+
+@company_context_required
+def document_print(request, doc_type: str, pk):
+    """HTML print preview for a document (matches PDF layout)."""
+    company = request.active_company
+    employee = request.active_employee
+
+    doc = get_object_or_404(Document, id=pk, company=company, doc_type=doc_type, deleted_at__isnull=True)
+    doc = _staff_scoped_queryset(employee, Document.objects.filter(id=doc.id)).select_related("client", "project").first() or doc
+
+    items = DocumentLineItem.objects.filter(document=doc, deleted_at__isnull=True).order_by("sort_order", "created_at")
+    ctx = {
+        "doc": doc,
+        "doc_type": doc_type,
+        "doc_label": _doc_label(doc_type),
+        "company": company,
+        "client": doc.client,
+        "project": doc.project,
+        "items": items,
+        "is_pdf": False,
+        "generated_at": timezone.now(),
+    }
+    return render(request, "documents/document_pdf.html", ctx)
+
+
+@company_context_required
+def document_pdf(request, doc_type: str, pk):
+    """Download a customer-facing PDF for Invoice / Estimate / Proposal."""
+    company = request.active_company
+    employee = request.active_employee
+
+    doc = get_object_or_404(Document, id=pk, company=company, doc_type=doc_type, deleted_at__isnull=True)
+    doc = _staff_scoped_queryset(employee, Document.objects.filter(id=doc.id)).select_related("client", "project").first() or doc
+
+    items = DocumentLineItem.objects.filter(document=doc, deleted_at__isnull=True).order_by("sort_order", "created_at")
+
+    html = render_to_string(
+        "documents/document_pdf.html",
+        {
+            "doc": doc,
+            "doc_type": doc_type,
+            "doc_label": _doc_label(doc_type),
+            "company": company,
+            "client": doc.client,
+            "project": doc.project,
+            "items": items,
+            "is_pdf": True,
+            "generated_at": timezone.now(),
+        },
+        request=request,
+    )
+
+    pdf_bytes, pdf_err = _render_document_pdf_bytes(request, html)
+    if not pdf_bytes:
+        if pdf_err == "not_installed":
+            messages.error(
+                request,
+                "PDF export requires WeasyPrint. Install it in this environment (plus system deps like Cairo/Pango) to enable PDF output.",
+            )
+        else:
+            messages.error(
+                request,
+                "PDF export failed. This is usually caused by missing WeasyPrint system dependencies (Cairo/Pango) or an HTML/CSS rendering issue.",
+            )
+        return redirect(reverse(f"documents:{doc_type}_print", kwargs={"pk": doc.id}))
+
+    resp = HttpResponse(pdf_bytes, content_type="application/pdf")
+    safe_num = (doc.number or "draft").replace("/", "-")
+    resp["Content-Disposition"] = f'attachment; filename="{doc_type}_{safe_num}.pdf"'
+    return resp
 def document_delete(request, doc_type: str, pk):
     company = request.active_company
     employee = request.active_employee

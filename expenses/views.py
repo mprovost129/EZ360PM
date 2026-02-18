@@ -10,6 +10,9 @@ from audit.services import log_event
 from companies.decorators import require_min_role
 from companies.models import EmployeeRole
 
+from billing.decorators import tier_required
+from billing.models import PlanCode
+
 from .forms import ExpenseForm, MerchantForm
 from .models import Expense, ExpenseStatus, Merchant
 
@@ -17,6 +20,7 @@ from core.pagination import paginate
 from core.services.private_media import build_private_access_url
 
 
+@tier_required(PlanCode.PROFESSIONAL)
 @require_min_role(EmployeeRole.MANAGER)
 def merchant_list(request):
     company = request.active_company
@@ -29,6 +33,7 @@ def merchant_list(request):
     )
 
 
+@tier_required(PlanCode.PROFESSIONAL)
 @require_min_role(EmployeeRole.MANAGER)
 def merchant_create(request):
     company = request.active_company
@@ -49,6 +54,7 @@ def merchant_create(request):
     return render(request, "expenses/merchant_form.html", {"form": form})
 
 
+@tier_required(PlanCode.PROFESSIONAL)
 @require_min_role(EmployeeRole.MANAGER)
 def expense_list(request):
     company = request.active_company
@@ -91,6 +97,7 @@ def expense_list(request):
     )
 
 
+@tier_required(PlanCode.PROFESSIONAL)
 @require_min_role(EmployeeRole.MANAGER)
 def expense_create(request):
     company = request.active_company
@@ -120,6 +127,7 @@ def expense_create(request):
     return render(request, "expenses/expense_form.html", {"form": form, "mode": "new", "s3_direct_uploads": bool(getattr(settings, "USE_S3", False) and getattr(settings, "S3_DIRECT_UPLOADS", False))})
 
 
+@tier_required(PlanCode.PROFESSIONAL)
 @require_min_role(EmployeeRole.MANAGER)
 def expense_edit(request, pk):
     company = request.active_company
@@ -147,6 +155,7 @@ def expense_edit(request, pk):
     return render(request, "expenses/expense_form.html", {"form": form, "mode": "edit", "expense": exp, "s3_direct_uploads": bool(getattr(settings, "USE_S3", False) and getattr(settings, "S3_DIRECT_UPLOADS", False))})
 
 
+@tier_required(PlanCode.PROFESSIONAL)
 @require_min_role(EmployeeRole.MANAGER)
 def expense_delete(request, pk):
     company = request.active_company
@@ -164,6 +173,7 @@ def expense_delete(request, pk):
     return render(request, "expenses/expense_delete.html", {"expense": exp})
 
 
+@tier_required(PlanCode.PROFESSIONAL)
 @require_min_role(EmployeeRole.MANAGER)
 def expense_receipt_open(request, pk):
     """Open/download an expense receipt (private media).

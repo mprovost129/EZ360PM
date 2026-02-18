@@ -10,6 +10,8 @@ urlpatterns = [
     path("invoices/", views.document_list, {"doc_type": "invoice"}, name="invoice_list"),
     path("invoices/new/", views.document_wizard, {"doc_type": "invoice"}, name="invoice_wizard"),
     path("invoices/<uuid:pk>/", views.document_edit, {"doc_type": "invoice"}, name="invoice_edit"),
+    path("invoices/<uuid:pk>/print/", views.document_print, {"doc_type": "invoice"}, name="invoice_print"),
+    path("invoices/<uuid:pk>/pdf/", views.document_pdf, {"doc_type": "invoice"}, name="invoice_pdf"),
     path("invoices/<uuid:pk>/apply-credit/", views.invoice_apply_credit, name="invoice_apply_credit"),
     path("invoices/<uuid:pk>/delete/", views.document_delete, {"doc_type": "invoice"}, name="invoice_delete"),
 
@@ -17,12 +19,16 @@ urlpatterns = [
     path("estimates/", views.document_list, {"doc_type": "estimate"}, name="estimate_list"),
     path("estimates/new/", views.document_wizard, {"doc_type": "estimate"}, name="estimate_wizard"),
     path("estimates/<uuid:pk>/", views.document_edit, {"doc_type": "estimate"}, name="estimate_edit"),
+    path("estimates/<uuid:pk>/print/", views.document_print, {"doc_type": "estimate"}, name="estimate_print"),
+    path("estimates/<uuid:pk>/pdf/", views.document_pdf, {"doc_type": "estimate"}, name="estimate_pdf"),
     path("estimates/<uuid:pk>/delete/", views.document_delete, {"doc_type": "estimate"}, name="estimate_delete"),
 
     # Proposals
     path("proposals/", views.document_list, {"doc_type": "proposal"}, name="proposal_list"),
     path("proposals/new/", views.document_wizard, {"doc_type": "proposal"}, name="proposal_wizard"),
     path("proposals/<uuid:pk>/", views.document_edit, {"doc_type": "proposal"}, name="proposal_edit"),
+    path("proposals/<uuid:pk>/print/", views.document_print, {"doc_type": "proposal"}, name="proposal_print"),
+    path("proposals/<uuid:pk>/pdf/", views.document_pdf, {"doc_type": "proposal"}, name="proposal_pdf"),
     path("proposals/<uuid:pk>/delete/", views.document_delete, {"doc_type": "proposal"}, name="proposal_delete"),
 
     

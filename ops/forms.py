@@ -3,7 +3,7 @@ from __future__ import annotations
 from django import forms
 
 from companies.models import Company
-from .models import ReleaseNote, SiteConfig, OpsAlertLevel
+from .models import ReleaseNote, SiteConfig, OpsAlertLevel, QAIssue
 
 
 class ReleaseNoteForm(forms.ModelForm):
@@ -123,6 +123,41 @@ class OpsChecksForm(forms.Form):
             self.add_error("company", "Select a company to run the smoke test.")
         return cleaned
 
+
+class QAIssueForm(forms.ModelForm):
+    class Meta:
+        model = QAIssue
+        fields = [
+            "company",
+            "status",
+            "severity",
+            "area",
+            "title",
+            "description",
+            "related_url",
+            "steps_to_reproduce",
+            "expected_behavior",
+            "actual_behavior",
+            "discovered_by_email",
+            "assigned_to_email",
+            "resolution_notes",
+        ]
+        widgets = {
+            "company": forms.Select(attrs={"class": "form-select"}),
+            "status": forms.Select(attrs={"class": "form-select"}),
+            "severity": forms.Select(attrs={"class": "form-select"}),
+            "area": forms.TextInput(attrs={"class": "form-control", "placeholder": "Invoices / Banking / Time / …"}),
+            "title": forms.TextInput(attrs={"class": "form-control"}),
+            "description": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
+            "related_url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://..."}),
+            "steps_to_reproduce": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
+            "expected_behavior": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "actual_behavior": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "discovered_by_email": forms.EmailInput(attrs={"class": "form-control"}),
+            "assigned_to_email": forms.EmailInput(attrs={"class": "form-control"}),
+            "resolution_notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
+
 class OpsAlertRoutingForm(forms.ModelForm):
     class Meta:
         model = SiteConfig
@@ -137,6 +172,10 @@ class OpsAlertRoutingForm(forms.ModelForm):
             "ops_alert_noise_user_agents",
             "ops_alert_dedup_minutes",
             "ops_alert_prune_resolved_after_days",
+            "ops_snooze_prune_after_days",
+            "maintenance_mode_enabled",
+            "maintenance_message",
+            "maintenance_allow_staff",
         ]
         widgets = {
             "ops_alert_webhook_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
@@ -149,6 +188,10 @@ class OpsAlertRoutingForm(forms.ModelForm):
             "ops_alert_noise_user_agents": forms.Textarea(attrs={"class": "form-control", "rows": 4, "placeholder": "AhrefsBot\nSemrushBot\nMJ12bot"}),
             "ops_alert_dedup_minutes": forms.NumberInput(attrs={"class": "form-control", "min": 0, "max": 1440}),
             "ops_alert_prune_resolved_after_days": forms.NumberInput(attrs={"class": "form-control", "min": 1, "max": 365}),
+            "ops_snooze_prune_after_days": forms.NumberInput(attrs={"class": "form-control", "min": "0"}),
+            "maintenance_mode_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "maintenance_allow_staff": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "maintenance_message": forms.Textarea(attrs={"class": "form-control", "rows": 4, "placeholder": "Optional message shown during maintenance…"}),
         }
 
     def clean(self):

@@ -199,6 +199,57 @@ from companies.services import get_active_employee_profile
 from companies.models import EmployeeRole
 
 
+
+class MaintenanceModeMiddleware:
+    """If maintenance mode is enabled, show a 503 maintenance page to non-staff users.
+
+    This is a launch/ops safety switch. It is intentionally tolerant of missing tables
+    (fresh DBs / migrations not yet applied) to avoid breaking the site.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest):
+        # Always allow static/media, health checks, and error pages to render.
+        path = getattr(request, "path", "") or ""
+        if path.startswith("/static/") or path.startswith("/media/") or path.startswith("/favicon"):
+            return self.get_response(request)
+
+        # Allow ops probe endpoints to work even during maintenance.
+        if path.startswith("/ops/probe"):
+            return self.get_response(request)
+
+        # Load maintenance settings lazily to avoid import-time DB touches.
+        try:
+            from ops.models import SiteConfig  # local import to avoid circular deps
+        except Exception:
+            return self.get_response(request)
+
+        try:
+            cfg = SiteConfig.get_solo()
+        except Exception:
+            # Table may not exist yet (fresh DB) or migrations pending.
+            return self.get_response(request)
+
+        if not getattr(cfg, "maintenance_mode_enabled", False):
+            return self.get_response(request)
+
+        # Allow staff through (optional).
+        user = getattr(request, "user", None)
+        if getattr(cfg, "maintenance_allow_staff", True) and getattr(user, "is_authenticated", False) and getattr(user, "is_staff", False):
+            return self.get_response(request)
+
+        # If the user isn't staff, show the maintenance page.
+        from django.shortcuts import render
+
+        context = {
+            "maintenance_message": (getattr(cfg, "maintenance_message", "") or "").strip(),
+        }
+        response = render(request, "maintenance.html", context=context, status=503)
+        return response
+
+
 class EmailVerificationGateMiddleware(MiddlewareMixin):
     """Allow login, but gate access to company features until email is verified."""
 

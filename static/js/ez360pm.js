@@ -166,6 +166,20 @@
 
   initEzDropdown('companyDropdownToggle', 'companyDropdownMenu');
 
+  // Ensure <select> elements get Bootstrap styling even if a form widget
+  // forgot to apply the class.
+  (function initSelectStylingSweep(){
+    const selects = Array.from(document.querySelectorAll('select'));
+    if (!selects.length) return;
+    selects.forEach(function(sel){
+      // Skip if explicitly styled or intentionally unstyled.
+      if (sel.hasAttribute('data-ez-no-style')) return;
+      if (sel.classList.contains('form-select')) return;
+      if (sel.classList.contains('form-control')) return;
+      sel.classList.add('form-select');
+    });
+  })();
+
   // Sidebar active link highlighting (Phase 8 UI polish)
   (function markActiveSidebarLink(){
     const links = Array.from(document.querySelectorAll('.app-sidebar a.sidebar-link[href]'));

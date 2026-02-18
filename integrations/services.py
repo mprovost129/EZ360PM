@@ -4,6 +4,7 @@ import base64
 import json
 import hashlib
 import os
+import re
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Optional
@@ -30,8 +31,6 @@ class DropboxTokenResult:
     scope: str
     expires_in: Optional[int] = None
 
-
-
 def _slugify_part(value: str, max_len: int = 60) -> str:
     value = (value or "").strip()
     value = re.sub(r"[^A-Za-z0-9]+", "-", value).strip("-").lower()
@@ -46,6 +45,8 @@ def build_dropbox_project_folder(company, project) -> str:
     proj_label = project.project_number or project.name or str(project.id)
     proj_part = _slugify_part(proj_label, max_len=70)
     return f"/EZ360PM/{company_part}/projects/{proj_part}-{project.id}"
+
+
 def dropbox_is_configured() -> bool:
     return bool(getattr(settings, "DROPBOX_APP_KEY", "")) and bool(getattr(settings, "DROPBOX_APP_SECRET", ""))
 
@@ -204,3 +205,180 @@ def dropbox_create_shared_link(access_token: str, dropbox_path: str) -> str:
     resp.raise_for_status()
     payload = resp.json()
     return str(payload.get("url", ""))
+
+
+# -----------------------------------------------------------------------------
+# Bank feeds (scaffold)
+# -----------------------------------------------------------------------------
+
+
+def bank_feeds_is_configured() -> bool:
+    """Returns True when Plaid env vars are present.
+
+    This pack intentionally avoids hard dependency on Plaid SDK.
+    """
+
+    return bool(getattr(settings, "PLAID_CLIENT_ID", "")) and bool(getattr(settings, "PLAID_SECRET", ""))
+
+
+def bank_feeds_is_enabled() -> bool:
+    return bool(getattr(settings, "PLAID_ENABLED", False))
+
+# --------------------------------------------------------------------------------------
+# Plaid bank feeds (no SDK dependency)
+# --------------------------------------------------------------------------------------
+
+PLAID_ENV_URLS = {
+    "sandbox": "https://sandbox.plaid.com",
+    "development": "https://development.plaid.com",
+    "production": "https://production.plaid.com",
+}
+
+
+def _plaid_base_url() -> str:
+    env = (getattr(settings, "PLAID_ENV", "") or "sandbox").strip().lower()
+    return PLAID_ENV_URLS.get(env, PLAID_ENV_URLS["sandbox"])
+
+
+def _plaid_headers() -> dict[str, str]:
+    return {"Content-Type": "application/json"}
+
+
+def _plaid_auth_payload() -> dict[str, str]:
+    return {
+        "client_id": getattr(settings, "PLAID_CLIENT_ID", ""),
+        "secret": getattr(settings, "PLAID_SECRET", ""),
+    }
+
+
+def plaid_create_link_token(*, company, user) -> str:
+    """Create a Plaid Link token for the given company/user.
+
+    Uses Products: transactions. Add additional products later if needed.
+    """
+    url = f"{_plaid_base_url()}/link/token/create"
+    payload: dict[str, Any] = {
+        **_plaid_auth_payload(),
+        "client_name": "EZ360PM",
+        "language": "en",
+        "country_codes": ["US"],
+        "user": {
+            # Must be unique/stable per user. Use auth user id.
+            "client_user_id": str(getattr(user, "id", "")),
+        },
+        "products": ["transactions"],
+        "transactions": {
+            # keep modest to reduce initial payload size
+            "days_requested": 90,
+        },
+        # Tie this to the company for internal visibility.
+        "client_idempotency_key": f"ez360pm:{company.id}:linktoken:{getattr(user, 'id', '')}",
+    }
+    resp = requests.post(url, headers=_plaid_headers(), json=payload, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+    return str(data.get("link_token", ""))
+
+
+def plaid_exchange_public_token(*, public_token: str) -> dict[str, str]:
+    url = f"{_plaid_base_url()}/item/public_token/exchange"
+    payload = {**_plaid_auth_payload(), "public_token": public_token}
+    resp = requests.post(url, headers=_plaid_headers(), json=payload, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+    return {
+        "access_token": str(data.get("access_token", "")),
+        "item_id": str(data.get("item_id", "")),
+    }
+
+
+def plaid_fetch_accounts(*, access_token: str) -> dict[str, Any]:
+    url = f"{_plaid_base_url()}/accounts/get"
+    payload = {**_plaid_auth_payload(), "access_token": access_token}
+    resp = requests.post(url, headers=_plaid_headers(), json=payload, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def plaid_transactions_sync(*, access_token: str, cursor: str | None = None) -> dict[str, Any]:
+    """Incremental sync of transactions.
+
+    Returns a dict containing added/modified/removed plus next_cursor + has_more.
+    """
+    url = f"{_plaid_base_url()}/transactions/sync"
+    payload: dict[str, Any] = {**_plaid_auth_payload(), "access_token": access_token}
+    if cursor:
+        payload["cursor"] = cursor
+    resp = requests.post(url, headers=_plaid_headers(), json=payload, timeout=60)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def suggest_existing_expense_for_tx(*, company, tx):
+    """Return (expense, score) for a potential duplicate match.
+
+    This is intentionally conservative so we do not auto-link incorrectly.
+    The suggestion is used only in the Bank Review Queue UI.
+
+    Heuristic:
+    - same company
+    - same total cents
+    - expense date within +/- 1 day of posted_date
+    - merchant name matches (case-insensitive equals or containment)
+
+    Score is 0..100. 0 means no suggestion.
+    """
+
+    try:
+        from expenses.models import Expense
+    except Exception:
+        return (None, 0)
+
+    if not company or not tx:
+        return (None, 0)
+
+    if getattr(tx, "linked_expense_id", None):
+        return (None, 0)
+    if int(getattr(tx, "amount_cents", 0) or 0) <= 0:
+        return (None, 0)
+
+    posted = getattr(tx, "posted_date", None)
+    if not posted:
+        return (None, 0)
+
+    tx_name = (getattr(tx, "suggested_merchant_name", "") or getattr(tx, "name", "") or "").strip().lower()
+    if not tx_name:
+        return (None, 0)
+
+    date_min = posted - timedelta(days=1)
+    date_max = posted + timedelta(days=1)
+
+    qs = (
+        Expense.objects.filter(company=company, total_cents=int(tx.amount_cents), date__gte=date_min, date__lte=date_max)
+        .select_related("merchant")
+        .order_by("-id")
+    )
+
+    best = None
+    best_score = 0
+    for exp in qs[:25]:
+        m = (getattr(getattr(exp, "merchant", None), "name", "") or "").strip().lower()
+        if not m:
+            continue
+        if m == tx_name:
+            score = 95
+        elif m in tx_name or tx_name in m:
+            score = 75
+        else:
+            continue
+
+        if exp.date == posted:
+            score = min(100, score + 5)
+
+        if score > best_score:
+            best = exp
+            best_score = score
+            if best_score >= 95:
+                break
+
+    return (best, best_score)

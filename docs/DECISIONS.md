@@ -1,8 +1,27 @@
+## 2026-02-18 — Decision — Bank feed duplicate prevention UX (Phase 9)
+
+- When a bank transaction has a strong suggested duplicate expense (score >= 90), the UI should prefer linking to the existing expense rather than creating a new one.
+- We expose a one-click “Link suggested” action in the review queue. Creating a new expense is blocked in this scenario to prevent double-entry.
+
+## Documents — Composer + Output Parity (Phase 9)
+- Document create/edit screens should be a **paper-style composer** that mirrors the final customer-facing document.
+- Customer-facing output must be supported in two modes:
+  - **Print (HTML)**: always available.
+  - **PDF (WeasyPrint)**: best-effort; if WeasyPrint/deps are missing, fall back to Print with a clear message.
+- The PDF/print layout should be driven by the **same structure** as the composer (header/meta/line items/totals/notes/terms) to avoid divergence.
+
+
 ## UI — Mobile polish (Phase 8I)
 - On small screens, popovers/drawers must fit within the viewport (no off-screen menu clipping).
 - Timer dropdown should expand to a near full-width menu on phones to keep the form usable.
 - Data tables should remain horizontally scrollable with a sensible minimum width when wrapped in `.table-responsive`.
 - Sticky form footers must respect iOS safe-area insets.
+
+
+## Repo hygiene — shipping bundles vs dev environments (Phase 9)
+- The project bundle MUST NOT include `.venv/`, `__pycache__/`, or `*.pyc` artifacts.
+- Virtualenvs are per-developer/per-host and should be created from `requirements.txt`.
+- A project `.gitignore` is required to prevent accidental commits of env files, caches, and local media.
 
 
 ## UI / Launch Prep
@@ -58,6 +77,13 @@
 - The timer keeps the last selected **project/service/note** when stopped.
 - Clearing selections is an explicit user action via **Timer Clear** (not automatic).
 - This improves repeat workflow speed and reduces friction for staff users.
+
+## 2026-02-17 — Bank feeds approach (Phase 8S)
+
+- Use **Plaid-style** bank feed semantics (connection → accounts → transactions) to support importing transactions and mapping them to Expenses.
+- Ship v1 as **scaffolding only**: models + admin + UI page + env toggles.
+- Implement the secure Link/OAuth flow + transaction sync + “create expense from transaction” in a later pack.
+- Store provider tokens in DB for now; add encryption-at-rest and rotation policy later.
 
 ## 2026-02-16 — Ops checks must be runnable from UI (staff-only)
 - Corporate ops requires that evidence-producing checks are runnable from the Ops Console.
@@ -532,6 +558,16 @@ Decision:
 Rationale:
 - Django raises `EmptyPage` if those methods are called at the bounds (page 1 / last page).
 - “Disabled” pagination UI still evaluates template expressions; guarding prevents template-time exceptions.
+
+## 2026-02-17 — List pages should show range + total counts
+
+Decision:
+- List pages should display **both** a per-page range (start–end) and a total count when pagination context exists.
+- The shared pagination footer shows “Page N of M • Showing start–end of total” for multi-page lists.
+
+Rationale:
+- Users need confidence the list is complete (especially for accounting/CRM data).
+- Range+total reduces “did it load?” uncertainty and makes filters/search outcomes explicit.
 
 ## 2026-02-15 — Monitoring evidence as a launch gate when Sentry is enabled
 
@@ -1031,3 +1067,113 @@ Rationale:
 - Go-live evidence must be exportable as **CSV + PDF**.
 - PDF export uses **ReportLab** (not WeasyPrint) to avoid system dependency failures (Cairo/Pango) during launch.
 - The runbook is intentionally **first-party** (no external calls) and aggregates Launch Gate + pending migrations + manual verification checklist.
+
+
+## Maintenance mode (launch/ops)
+- Maintenance mode is controlled via Ops SiteConfig (singleton).
+- When enabled, non-staff users receive a 503 maintenance page.
+- Staff access is allowed when maintenance_allow_staff is true.
+- Middleware is tolerant of missing tables/migrations (fails open).
+
+
+## Ops Console UX (Phase 8R)
+- Ops Console navigation must not overflow off-screen.
+- Desktop: allow natural wrapping.
+- Mobile/tablet: use horizontal scroll (no tiny buttons; keep labels readable).
+- Templates may use Django's built-in `humanize` filters; enable `django.contrib.humanize` globally.
+### 2026-02-17 — Subscription gating: Expenses + Time Approval
+- **Expenses (including merchants and receipt access)** are treated as a **Professional+** capability.
+- **Time approval workflow** (`require_manager_approval`, submit→approved pipeline, and explicit approvals) is a **Professional+** capability.
+- Starter retains time tracking, but approval is disabled to avoid UX dead-ends.
+
+### 2026-02-17 — UI alignment: hide unavailable features
+- The sidebar must not show modules a company cannot access under its current plan.
+- Plan gating is enforced server-side (decorators/middleware). Navigation hiding is a UX layer to reduce confusion and upgrade bait-clicks.
+
+### 2026-02-17 — Dashboard tiering (single route, tiered widgets)
+- The Dashboard remains a single route, but **widgets are plan-scoped and role-scoped**.
+- Starter emphasizes core workflow KPIs (A/R, unbilled billable time, revenue).
+- Professional adds expense and payables visibility.
+- Premium adds an "Insights" layer (trends + alerts + integration status) and is intended for **managers/owners**.
+
+### 2026-02-17 — Premium custom dashboards (v1)
+- Premium adds **dashboard customization** for **Manager+**.
+- Customization is stored **per-company, per-role** in `core.DashboardLayout` to keep layout consistent across employees with the same role.
+- Stored layout is treated as **advisory**: the runtime view sanitizes it (drops unknown/disallowed widgets) so plan/role gating stays authoritative.
+
+## Bank feeds integration (Plaid)
+- Use Plaid HTTP API via `requests` (no SDK dependency) for Link token, token exchange, accounts/get, and transactions/sync.
+- Store Plaid access_token in `integrations.BankConnection.access_token` (DB). Recommend enabling encryption-at-rest and restricting admin exposure.
+- Use incremental sync cursor (`BankConnection.sync_cursor`) to avoid re-import.
+- Only positive (debit) transactions can be converted to Expenses in v1; income transactions are displayed but not convertible.
+- For ship-safety, only load Plaid Link JS on pages when Bank Feeds are enabled + configured; keep integration behind `PLAID_ENABLED` until production keys are available.
+
+### 2026-02-17 — Bank rules (categorization + triage)
+- Bank rules are **per-company** and evaluated in **priority order** (lower first).
+- **First match wins** to keep behavior predictable.
+- Rules can either suggest fields (merchant/category) or triage transactions (ignore/transfer) and may optionally auto-create a draft expense.
+- Transactions keep a durable `status` (new/ignored/transfer/expense_created) and store the `applied_rule` for auditability.
+
+### 2026-02-18 — QA punchlist lives in-app (Ops)
+- For V1 launch hardening, QA findings must be captured **in the app** (staff-only) so they can be reviewed in production without relying on external tooling.
+- The in-app punchlist is intentionally lightweight and does not replace a full issue tracker.
+
+### 2026-02-18 — Staff “Report issue” shortcut (Phase 8Y)
+- Staff should be able to file QA issues in-context while navigating the app.
+- A topbar shortcut is allowed to prefill the QA form with the current URL and an area guess.
+- This is convenience-only and must **never** break non-staff rendering (fails open).
+
+## UI controls — Select styling standard
+- All dropdowns must use Bootstrap's `.form-select` (or `.form-select-sm` where explicitly needed).
+- If a form/widget fails to apply the class, the UI layer may apply a safe client-side fallback to keep visuals consistent.
+
+## UI controls — Card + header styling standard
+- App UI cards must use `card shadow-sm` so the Phase 8 card system applies consistently.
+- Avoid `bg-white` on `.card-header` (it overrides the standardized card header styling).
+- Never nest `<form>` elements; actions must be separate sibling forms or use non-form controls.
+
+
+### 2026-02-18 — Reconciliation periods are lockable, but undoable
+- Bank reconciliation is modeled as explicit **period windows** per company.
+- Periods can be **locked** to save a transparent snapshot of reconciliation totals at that time.
+- Periods can be **unlocked (undo)** by Admin+ if a mistake is found; snapshots remain stored for transparency.
+- V1 export is CSV-first; PDF export can be added later once layout is finalized.
+
+
+## 2026-02-17 — V1 QA Decision Labels
+During Phase 9 we will label each feature with one of:
+- ✅ V1 Approved
+- 🟡 V1 Approved w/ Polish
+- 🔴 Must Fix Before Launch
+- 🔵 Defer
+
+These labels are recorded in `docs/QA_PLAN.md` (QA Ledger) and referenced in `docs/ROADMAP.md` for deferred work.
+
+### 2026-02-18 — Document Composer UX
+- Invoice/Estimate/Proposal editing uses a "paper" composer UI (single editing surface that resembles the client-facing document).
+- Document tax can be calculated either:
+  - Per-line (manual), or
+  - By a document-level tax rate applied to taxable lines (persisted back onto line items on save).
+- Deposit is modeled at the document level as none/percent/flat.
+- Invoice includes a dedicated Terms block; proposals/estimates treat scope/notes as the terms for v1.
+
+### 2026-02-18 — Index naming standard (cross-DB safe)
+- Custom index names must be kept **<= 30 characters** to avoid backend-specific name-length limits.
+- When an index name must change:
+  - Update the model `Meta.indexes` to the new name.
+  - Update the creating migration for fresh DBs.
+  - Add a follow-up migration using `RenameIndex` to safely migrate existing DBs.
+
+### 2026-02-18 — Backwards-compatible service aliases
+- When a refactor renames commonly-imported service helpers, keep a temporary alias (with a clear comment) to avoid breaking imports across modules.
+- Aliases can be removed once a future cleanup pack verifies no remaining imports.
+
+
+## 2026-02-18 — Template media URL safety
+- Templates must never directly access `.url` on a storage-backed FieldFile if it can raise due to env misconfig.
+- Use `|safe_media_url` and provide a static fallback for branding assets.
+
+## 2026-02-18 — Document template blocks are snapshotted onto the Document
+- `DocumentTemplate.header_text` / `footer_text` are **copied** into `Document.header_text` / `footer_text` when a document is created from a template.
+- Rationale: customer-facing output must remain historically stable even if templates are edited later.
+- Composer always edits the document’s own header/footer blocks (not the template).

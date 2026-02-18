@@ -1,9 +1,104 @@
+## 2026-02-18 — Phase 9 (P9-BANK-DUPE-LINK) — Bank Review Duplicate-Link Action (DONE)
+
+Goal: Prevent duplicate expenses during bank-feed review by making the “suggested existing expense” linkable in one click.
+
+Done:
+- Added a POST action to link a bank transaction to its suggested existing Expense (`/integrations/banking/tx/<id>/link-existing/`).
+- Exposed a “Link suggested” button in the Bank Review Queue when a duplicate suggestion exists.
+- Hardened single-transaction “Create expense” to refuse creation when there’s a strong duplicate suggestion (>=90 score) and direct users to link instead.
+
+Acceptance checks:
+- Review Queue shows “Link suggested” when a duplicate is detected.
+- Linking marks the transaction as processed and redirects to the linked Expense.
+- Creating an expense is blocked when a strong duplicate suggestion exists.
+
 ## 2026-02-16 — Phase 8C (DONE)
 Table modernization pass:
 - Standardized list tables to `table-hover` + `align-middle` + `ez-table`.
 - Standardized row action columns to **icon buttons + dropdown** (less noise, consistent placement).
 - Standardized document status badge styling via a shared template filter.
 
+## 2026-02-17 — Phase 9 (P9-UI2) — UI Consistency Sweep + Timer Bug Fix (DONE)
+
+- UI consistency:
+  - Standardized remaining list/detail pages to use `card shadow-sm` so the Phase 8 card system applies everywhere.
+  - Removed stray `bg-white` card headers where they override the standardized card header styling.
+- Bug fix (Timer):
+  - Fixed invalid nested `<form>` markup on the Timer page (prevents broken submits in some browsers).
+
+## 2026-02-18 — Phase 9 (P9-DOC-COMPOSER) — "Paper" Document Composer (DONE)
+
+Goal: Make Invoice / Estimate / Proposal creation and editing look and feel like an **editable version of the final document** (a clean paper surface), while keeping fields wired to real data (client/project/catalog).
+
+Done:
+- Restored/added the missing `documents/document_edit.html` template and replaced the editor with a centered **paper-style** composer.
+- Added a dedicated composer CSS + JS bundle:
+  - Live subtotal/tax/total and per-line totals.
+  - Optional invoice deposit guidance (percent or fixed) with live “balance after deposit”.
+  - Add-line button that correctly increments Django formset `TOTAL_FORMS`.
+- Kept dropdowns wired to real lists:
+  - Client dropdown → CRM clients
+  - Project dropdown → Projects
+  - Service dropdown → Catalog items (auto-fill via `catalog:item_json`)
+- Added base template extension points (`extra_css` / `extra_js`) so feature pages can include page-specific assets cleanly.
+
+Acceptance checks:
+- Create/Edit Invoice/Estimate/Proposal loads without TemplateDoesNotExist.
+- Catalog selection auto-fills name/description/rate/taxable and updates live totals.
+- Add line → save → line persists and totals recalc server-side.
+- Deposit type/value persists on invoice and live values update while editing.
+
+Next:
+- Align PDF templates (`*_pdf.html`) to match the composer layout more closely.
+- Optional: allow Terms block for proposals/estimates via per-doc-type setting.
+
+## 2026-02-18 — Phase 9 (P9-DOC-PDF) — Customer-facing Print/PDF Export (DONE)
+
+Goal: Make the customer-facing output match the paper-style composer and support **Print (HTML)** + **PDF download**.
+
+Done:
+- Added customer-facing template: `templates/documents/document_pdf.html` (Invoice / Estimate / Proposal).
+- Added print/PDF endpoints:
+  - `/documents/invoices/<id>/print/` + `/pdf/`
+  - `/documents/estimates/<id>/print/` + `/pdf/`
+  - `/documents/proposals/<id>/print/` + `/pdf/`
+- PDF generation is **best-effort** via optional WeasyPrint; when missing, the PDF route falls back to Print view with a friendly message.
+- Added document PDF styling: `static/css/document_pdf.css` (Letter page sizing + clean print rules).
+- Added **Print** + **PDF** buttons to the composer toolbar.
+
+Acceptance checks:
+- Print view renders cleanly and prints on Letter with correct margins.
+- PDF download works when WeasyPrint is installed; otherwise routes to Print view and shows a clear message.
+- Output shows company header, client block, document meta, line items, totals, notes, and invoice terms.
+
+## 2026-02-18 — Phase 9 (P9-DOC-PDF-PARITY) — Print/PDF Output Polish (DONE)
+
+Goal: Keep the customer-facing Print/PDF output resilient and visually aligned with the composer.
+
+Done:
+- Added a real **Print** button on the HTML preview toolbar.
+- Hardened branding logo rendering:
+  - Uses `|safe_media_url`.
+  - Falls back to the static EZ360PM logo when the media backend is misconfigured.
+
+Acceptance checks:
+- Print preview toolbar shows a working Print action.
+- Print/PDF never 500s due to media storage endpoint misconfiguration.
+
+## 2026-02-18 — Phase 9 (P9-DOC-TEMPLATE-BLOCKS) — Template Header/Footer Blocks (DONE)
+
+Goal: Support template-driven **header/footer text blocks** that render in customer-facing output and are editable in the composer.
+
+Done:
+- Added `Document.header_text` and `Document.footer_text` fields (TextField).
+- Wizard: when creating from a `DocumentTemplate`, copies `header_text` and `footer_text` into the new document.
+- Composer: added editable "Header text" and "Footer text" blocks on the paper editor.
+- Print/PDF output: renders the header block near the top and footer block near the bottom.
+
+Acceptance checks:
+- Create a document from a template and confirm header/footer populate.
+- Editing header/footer in the composer persists after Save.
+- Print/PDF shows header/footer blocks without layout breakage.
 
 ## 2026-02-16 — Phase 8D (DONE)
 Forms UX upgrade:
@@ -973,3 +1068,126 @@ Go-live runbook export + launch verification bundle:
 - Added CSV export (`/ops/runbook/export.csv`) for spreadsheet evidence.
 - Added PDF export (`/ops/runbook/export.pdf`) using **ReportLab** (no WeasyPrint system deps).
 - Linked from Ops dashboard for one-click access during launch.
+
+
+### Phase 8P — Maintenance Mode (Ops safety switch)
+- DONE: Ops SiteConfig maintenance mode toggle + 503 maintenance page middleware.
+
+### Phase 8Q — List UX Counts (DONE)
+- DONE: Clients list now shows **range + total** (e.g., “Showing 1–25 of 83 clients”).
+- DONE: Pagination footer (multi-page lists) now shows **page + range + total**.
+
+### Phase 8R — Ops Console + Runbook Hotfix (DONE)
+- DONE: Enabled `django.contrib.humanize` so Ops Runbook templates can safely `{% load humanize %}`.
+- DONE: Ops Console toolbar overflow fix (wrap on desktop, horizontal scroll on smaller screens).
+
+### Phase 8S — Bank Feeds Scaffold (DONE)
+- Added **Bank feeds** integration scaffold under Integrations (Professional+).
+- Added models: `BankConnection`, `BankAccount`, `BankTransaction`.
+- Added admin registration and a user-facing settings page (`/integrations/banking/`).
+- Added env toggles: `PLAID_ENABLED`, `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`.
+- Notes:
+  - This pack is intentionally **scaffold-only** (no Plaid SDK dependency yet).
+  - Next pack will implement secure Link flow + transaction sync + expense creation.
+
+### Phase 8S2 — V1 Launch Manual + End-to-End QA Punchlist (DONE)
+- DONE: Published **User Manual PDF** at `/static/docs/ez360pm_user_manual.pdf` and linked it from Help Center.
+- DONE: Added **Ops → QA Punchlist** (staff-only) to log bugs/dead-ends found during guided QA.
+- DONE: Added Ops Dashboard metric/badge for open QA issues.
+
+### Phase 8Y — V1 Launch Polish + QA Fix Sprint (DONE)
+- Added a **staff-only “Report issue”** shortcut button (bug icon) in the app topbar.
+  - Pre-fills QA form with the current page URL and an automatic area guess.
+  - Preserves tenant context (active company) when available.
+- QA issue form now supports safe querystring prefill (`related_url`, `area`, `company`).
+
+## 2026-02-17 — Phase 9 (DONE)
+Bank reconciliation hardening:
+- Added **Reconciliation Periods** (create period windows).
+- Added period **Detail** view with diffs: bank outflow vs expense totals, matched/unmatched counts.
+- Added **Lock / Undo lock** workflow with snapshot fields for audit clarity.
+- Added **CSV export** for the reconciliation window.
+
+### Next: Phase 10 — Reconciliation + Reporting polish
+- Improve matching UI (link/unlink from the reconciliation screen).
+- Add PDF reconciliation export (WeasyPrint when available).
+- Add multi-account reconciliation totals and better inflow/outflow handling.
+
+-- [x] Phase 8S: Fix subscription gating leaks
+  - [x] Gate Expenses module to Professional+
+  - [x] Gate Time Approval workflow to Professional+ (and prevent Starter dead-ends)
+
+- [x] Phase 8T: Hide unavailable modules in sidebar navigation
+  - [x] Expenses hidden unless Professional+
+  - [x] Accounting hidden unless Professional+
+  - [x] Integrations (Dropbox) hidden unless Premium
+
+- [x] Phase 8U: Tiered dashboard widgets
+  - [x] Starter: hide Expenses KPI + Payables card
+  - [x] Professional+: show Expenses KPI + Payables summary
+  - [x] Premium: add Insights card (trends + overdue alerts + Dropbox status) for managers
+
+- [x] Phase 8V: Premium custom dashboards (v1)
+  - [x] Per-company, per-role widget layout storage (`core.DashboardLayout`)
+  - [x] Premium Manager+ “Customize Dashboard” page (enable/disable, column, order)
+  - [x] Dashboard rendering refactored to widget/include layout driven by stored layout
+
+- [DONE] Phase 8T — Bank Feeds (Plaid) real integration: Link flow + token exchange + accounts + sync + create expense.
+- [DONE] Phase 8U — Bank rules & categorization: rule-based suggestions + ignore/transfer triage + safe expense creation.
+- [DONE] Phase 8X — Bank review queue + duplicate prevention: bulk actions, matching heuristics, reconciliation view.
+  - [x] Review queue page with status/account filters + pagination
+  - [x] Bulk actions: Ignore / Transfer / Create Expense / Link Suggested
+  - [x] Conservative duplicate suggestion heuristic (same amount + date window + merchant match)
+  - [x] Reconciliation summary view (windowed counts per status + per account)
+
+### Hotfixes
+- [DONE] Dropdown styling sweep — normalize select widgets (CSS + client-side fallback for missing `form-select`).
+
+- [DONE] Phase 8W — Plaid readiness hardening (ship-safe)
+  - [x] Only load Plaid Link JS when Bank Feeds are enabled + configured
+  - [x] Bank Feeds UI note clarifies sandbox vs production and Plaid verification expectations
+
+- [DONE] Phase 8U — Bank feed rules + transaction triage
+  - [x] Added `integrations.BankRule` (per-company) with priority ordering and actions (suggest/ignore/transfer/auto-create expense)
+  - [x] Enhanced `integrations.BankTransaction` with status + suggestions + linked expense + applied rule
+  - [x] Auto-apply rules after bank sync; manual “Apply rules” button
+  - [x] Banking UI shows status/suggestions and supports Ignore/Transfer/Create expense
+  - [x] Rule management UI (list/create/edit/delete) gated to Professional + Admin+
+  - [x] Admin registrations for BankRule and improved BankTransaction admin
+
+
+
+## 2026-02-17 — Phase 9 (IN PROGRESS) — Reconciliation + Hardening QA
+
+We are entering **Phase 9** with a strict **feature-by-feature QA + fix loop**.
+
+- QA plan and execution order: `docs/QA_PLAN.md`
+- As each feature is validated, we will:
+  - expand `docs/FEATURE_INVENTORY.md` with real “how it works” steps + acceptance checks
+  - log outcomes in the QA Ledger
+  - apply Fix Packs (`P9-*`) for any failures
+  - update `docs/MEMORY.md` with findings and decisions
+
+### Phase 9 focus areas
+- Company isolation + role enforcement
+- Timer dropdown + time state machine integrity
+- Invoices/payments correctness and immutability
+- Accounting posting idempotency + reconciliation views
+- Dead links, help/legal completeness, and launch gating
+
+### Next up
+- [DONE] P9-UI1: UI consistency sweep + boot fixes
+  - Fix Integrations import break (`get_active_employee` alias)
+  - Shorten Ops QA index names (cross-DB safe) + rename migration
+  - Standardize remaining straggler pages to `card shadow-sm`
+
+- [DONE] P9-UI2: UI baseline hardening + bundle hygiene
+  - Standardized **card styling** at the CSS level so every card matches even if a template forgot `shadow-sm`.
+  - Standardized **dropdown menu styling** (radius/shadow/spacing) so action menus feel consistent.
+  - Removed accidental shipped artifacts (`.venv/`, `__pycache__/`, `*.pyc`, `_insert_phase9_views.txt`) and added `.gitignore`.
+
+- Start QA Feature 0: Access + Company Context + Roles (launch blockers)
+
+
+### DONE — 2026-02-18
+- **P9-DOC-LOGO-SAFE:** Prevent document pages from 500ing when company logo storage is misconfigured; added safe media URL helper and template fallbacks.

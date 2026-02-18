@@ -114,6 +114,11 @@ def get_active_employee_profile(request: HttpRequest):
     return EmployeeProfile.objects.filter(company=company, user=user, deleted_at__isnull=True).first()
 
 
+# Backwards-compatible alias: some modules import `get_active_employee`.
+def get_active_employee(request: HttpRequest):
+    return get_active_employee_profile(request)
+
+
 # -------------------------
 # Invites
 # -------------------------

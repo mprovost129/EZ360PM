@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.db.models import Q
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from companies.decorators import require_min_role
 from companies.models import EmployeeRole
+from companies.decorators import company_context_required
 
 from .forms import CatalogItemForm
 from .models import CatalogItem, CatalogItemType
@@ -78,3 +79,20 @@ def catalog_item_delete(request: HttpRequest, pk: int) -> HttpResponse:
         return redirect("catalog:item_list")
 
     return render(request, "catalog/catalogitem_delete.html", {"object": obj})
+
+
+@company_context_required
+def catalog_item_json(request: HttpRequest, pk: int) -> JsonResponse:
+    """Lightweight JSON endpoint used by document composer for auto-fill."""
+    company = request.active_company
+    obj = get_object_or_404(CatalogItem, pk=pk, company=company, deleted_at__isnull=True)
+
+    payload = {
+        "id": obj.id,
+        "name": obj.name,
+        "description": obj.description or "",
+        "unit_price_cents": int(obj.unit_price_cents or 0),
+        "tax_behavior": obj.tax_behavior,
+        "is_taxable": obj.tax_behavior == "taxable",
+    }
+    return JsonResponse(payload)

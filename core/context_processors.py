@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import urlencode
+
 from django.conf import settings
 
 from companies.permissions import is_admin, is_manager, is_owner
@@ -130,7 +132,7 @@ def app_context(request):
         except Exception:
             onboarding = None
 
-    return {
+    ctx = {
         **public,
         "active_company": active_company,
         "active_employee": active_employee,
@@ -142,3 +144,22 @@ def app_context(request):
         "onboarding_progress_nav": onboarding,
         **_timer_context(request, active_company, active_employee),
     }
+
+    # Staff-only: quick “Report QA issue” link that pre-fills the QA form with the current URL.
+    # This supports the Phase 8Y QA burn-down workflow without impacting non-staff UX.
+    try:
+        if request.user.is_staff:
+            path = (getattr(request, "path", "") or "").strip() or "/"
+            area_guess = path.strip("/").split("/")[0][:64] if path.strip("/") else ""
+            params = {
+                "related_url": request.build_absolute_uri(),
+                "area": area_guess,
+            }
+            if active_company:
+                params["company"] = str(active_company.pk)
+            ctx["qa_report_href"] = f"/ops/qa/new/?{urlencode(params)}"
+    except Exception:
+        # Never break template rendering for a convenience feature.
+        pass
+
+    return ctx

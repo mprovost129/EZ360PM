@@ -15,6 +15,7 @@ from .models import (
     OpsEmailTest,
     OpsProbeEvent,
     SiteConfig,
+    QAIssue,
 )
 
 
@@ -113,3 +114,12 @@ class SiteConfigAdmin(admin.ModelAdmin):
         if SiteConfig.objects.exists():
             return False
         return super().has_add_permission(request)
+
+
+@admin.register(QAIssue)
+class QAIssueAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "status", "severity", "area", "company", "title", "assigned_to_email")
+    list_filter = ("status", "severity", "area")
+    search_fields = ("title", "description", "steps_to_reproduce", "company__name", "discovered_by_email", "assigned_to_email")
+    readonly_fields = ("created_at", "updated_at", "resolved_at")
+    ordering = ("-created_at",)

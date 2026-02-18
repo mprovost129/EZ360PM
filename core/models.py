@@ -7,6 +7,42 @@ from django.db import models
 from django.utils import timezone
 
 
+# -----------------------------------------------------------------------------
+# Dashboard customization (Premium)
+# -----------------------------------------------------------------------------
+
+
+class DashboardLayout(models.Model):
+    """Per-company, per-role dashboard widget layout (Premium-only)."""
+
+    company = models.ForeignKey(
+        "companies.Company",
+        on_delete=models.CASCADE,
+        related_name="dashboard_layouts",
+    )
+
+    role = models.CharField(max_length=20)
+
+    # schema (v1): {"left": ["kpis", ...], "right": ["subscription", ...]}
+    layout_json = models.JSONField(default=dict, blank=True)
+
+    updated_at = models.DateTimeField(default=timezone.now)
+    updated_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="updated_dashboardlayout_set",
+    )
+
+    class Meta:
+        unique_together = ("company", "role")
+        indexes = [models.Index(fields=["company", "role"]) ]
+
+    def __str__(self) -> str:
+        return f"DashboardLayout({self.company_id}, {self.role})"
+
+
 class SyncQuerySet(models.QuerySet):
     """QuerySet with sync-safe soft-delete semantics."""
 

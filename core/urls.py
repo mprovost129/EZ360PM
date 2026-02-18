@@ -10,6 +10,7 @@ app_name = "core"
 urlpatterns = [
     path("", views.home, name="home"),
     path("app/", views.app_dashboard, name="app_dashboard"),
+    path("app/dashboard/customize/", views.dashboard_customize, name="dashboard_customize"),
     path("getting-started/", views.getting_started, name="getting_started"),
     path("health/", views.health, name="health"),
 

@@ -1,6 +1,5 @@
 {% extends "base_app.html" %}
 {% load static %}
-{% load money %}
 
 {% block title %}Dashboard · EZ360PM{% endblock %}
 
@@ -11,6 +10,11 @@
       <div class="ez-page-subtitle">Your command center for clients, projects, time, billing, and reporting.</div>
     </div>
     <div class="d-flex gap-2">
+      {% if can_customize_dashboard %}
+        <a class="btn btn-outline-dark" href="{% url 'core:dashboard_customize' %}">
+          <i class="bi bi-sliders me-1"></i>Customize
+        </a>
+      {% endif %}
       <a class="btn btn-outline-secondary" href="{% url 'helpcenter:getting_started' %}">
         <i class="bi bi-question-circle me-1"></i>Help
       </a>
@@ -20,340 +24,25 @@
     </div>
   </div>
 
-  {# KPI row #}
-  <div class="row g-3 mb-3">
-    <div class="col-12 col-md-6 col-xl-3">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <div class="text-secondary small">Revenue · {{ kpi.month_label }}</div>
-          <div class="h3 mb-0">{{ kpi.revenue_net_cents|money }}</div>
-          <div class="text-secondary small mt-1">Succeeded payments (net of refunds)</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-md-6 col-xl-3">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <div class="text-secondary small">Expenses · {{ kpi.month_label }}</div>
-          <div class="h3 mb-0">{{ kpi.expenses_cents|money }}</div>
-          <div class="text-secondary small mt-1">Approved + reimbursed</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-md-6 col-xl-3">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <div class="text-secondary small">Accounts receivable</div>
-          <div class="h3 mb-0">{{ kpi.ar_cents|money }}</div>
-          <div class="text-secondary small mt-1">Sent + partially paid invoices</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-md-6 col-xl-3">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <div class="text-secondary small">Unbilled billable time</div>
-          <div class="h3 mb-0">{{ kpi.unbilled_hours }} <span class="fs-6 text-secondary">hrs</span></div>
-          <div class="text-secondary small mt-1">Approved & not yet billed</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {# Quick actions #}
-  <div class="card shadow-sm mb-3">
-    <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
-      <div>
-        <div class="fw-semibold">Quick actions</div>
-        <div class="text-secondary small">Jump into the most common workflows.</div>
-      </div>
-      <div class="d-flex flex-wrap gap-2">
-        <a class="btn btn-outline-dark" href="{% url 'timetracking:timer_panel' %}"><i class="bi bi-stopwatch me-1"></i>Track time</a>
-        {% if is_manager %}
-          <a class="btn btn-dark" href="{% url 'documents:invoice_wizard' %}"><i class="bi bi-receipt me-1"></i>New invoice</a>
-          <a class="btn btn-outline-dark" href="{% url 'expenses:expense_create' %}"><i class="bi bi-cash-coin me-1"></i>Add expense</a>
-          <a class="btn btn-outline-dark" href="{% url 'crm:client_create' %}"><i class="bi bi-person-plus me-1"></i>New client</a>
-          <a class="btn btn-outline-dark" href="{% url 'projects:project_create' %}"><i class="bi bi-kanban me-1"></i>New project</a>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
+  {# Render widgets based on the resolved layout #}
   <div class="row g-3">
     <div class="col-lg-7">
-      <div class="row g-3">
-        <div class="col-12">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                <div>
-                  <div class="fw-semibold">Recent invoices</div>
-                  <div class="text-secondary small">Latest activity across your company.</div>
-                </div>
-                <a class="btn btn-sm btn-outline-dark" href="{% url 'documents:invoice_list' %}"><i class="bi bi-arrow-right me-1"></i>All invoices</a>
-              </div>
-
-              {% if recent_invoices %}
-                <div class="table-responsive">
-                  <table class="table table-hover align-middle mb-0">
-                    <thead>
-                      <tr class="text-secondary small">
-                        <th scope="col">Invoice</th>
-                        <th scope="col">Client</th>
-                        <th scope="col" class="text-end">Total</th>
-                        <th scope="col" class="text-end">Balance</th>
-                        <th scope="col">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for inv in recent_invoices %}
-                        <tr>
-                          <td>
-                            <a class="text-decoration-none" href="{% url 'documents:invoice_edit' inv.id %}">
-                              {{ inv.number|default:"(unassigned)" }}
-                            </a>
-                          </td>
-                          <td class="text-secondary">{% if inv.client %}{{ inv.client.name }}{% else %}-{% endif %}</td>
-                          <td class="text-end">{{ inv.total_cents|money }}</td>
-                          <td class="text-end">{{ inv.balance_due_cents|money }}</td>
-                          <td>
-                            <span class="badge text-bg-light">{{ inv.get_status_display }}</span>
-                          </td>
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-              {% else %}
-                {% include "includes/empty_state.html" with icon="bi-receipt" title="No invoices yet" subtitle="Create your first invoice to start billing and collecting payments." %}
-                <div class="text-center pb-2">
-                  <a class="btn btn-sm btn-dark" href="{% url 'documents:invoice_wizard' %}"><i class="bi bi-plus-lg me-1"></i>Create invoice</a>
-                  <a class="btn btn-sm btn-outline-secondary ms-1" href="{% url 'documents:invoice_list' %}"><i class="bi bi-list-ul me-1"></i>Open invoices list</a>
-                </div>
-              {% endif %}
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                <div>
-                  <div class="fw-semibold">Recent time entries</div>
-                  <div class="text-secondary small">What’s been logged recently.</div>
-                </div>
-                <a class="btn btn-sm btn-outline-dark" href="{% url 'timetracking:entry_list' %}"><i class="bi bi-arrow-right me-1"></i>All time</a>
-              </div>
-
-              {% if recent_time %}
-                <div class="table-responsive">
-                  <table class="table table-hover align-middle mb-0">
-                    <thead>
-                      <tr class="text-secondary small">
-                        <th scope="col">Project</th>
-                        <th scope="col">Employee</th>
-                        <th scope="col" class="text-end">Minutes</th>
-                        <th scope="col">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for te in recent_time %}
-                        <tr>
-                          <td class="text-secondary">{% if te.project %}{{ te.project.number }} · {{ te.project.name }}{% elif te.client %}{{ te.client.name }}{% else %}-{% endif %}</td>
-                          <td class="text-secondary">{% if te.employee %}{{ te.employee.display_name }}{% else %}-{% endif %}</td>
-                          <td class="text-end">{{ te.duration_minutes }}</td>
-                          <td><span class="badge text-bg-light">{{ te.get_status_display }}</span></td>
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-              {% else %}
-                {% include "includes/empty_state.html" with icon="bi-stopwatch" title="No time entries yet" subtitle="Start a timer or add time manually to track billable work." %}
-                <div class="text-center pb-2">
-                  <a class="btn btn-sm btn-outline-dark" href="{% url 'timetracking:timer_panel' %}"><i class="bi bi-stopwatch me-1"></i>Start timer</a>
-                  <a class="btn btn-sm btn-dark ms-1" href="{% url 'timetracking:entry_create' %}"><i class="bi bi-plus-lg me-1"></i>Add time</a>
-                </div>
-              {% endif %}
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                <div>
-                  <div class="fw-semibold">Getting started</div>
-                  <div class="text-secondary small">Complete the checklist to finish your setup.</div>
-                </div>
-                {% if onboarding_progress and onboarding_progress.next %}
-                  <a class="btn btn-sm btn-dark" href="{% url onboarding_progress.next.url_name %}">
-                    Next: {{ onboarding_progress.next.title }}
-                  </a>
-                {% endif %}
-              </div>
-
-              {% if onboarding_progress %}
-                <div class="d-flex align-items-center gap-2 mb-3">
-                  <div class="w-100">
-                    <div class="progress" role="progressbar" aria-label="Onboarding progress" aria-valuenow="{{ onboarding_progress.pct }}" aria-valuemin="0" aria-valuemax="100" style="height: 10px;">
-                      <div class="progress-bar" style="width: {{ onboarding_progress.pct }}%"></div>
-                    </div>
-                  </div>
-                  <div class="text-secondary small" style="min-width: 92px; text-align: right;">
-                    {{ onboarding_progress.done }}/{{ onboarding_progress.total }}
-                  </div>
-                </div>
-
-                <div class="list-group list-group-flush">
-                  {% for s in onboarding_steps %}
-                    <div class="list-group-item px-0 d-flex align-items-start justify-content-between gap-3">
-                      <div>
-                        <div class="fw-semibold">
-                          {% if s.done %}
-                            <i class="bi bi-check-circle-fill text-success me-1"></i>
-                          {% else %}
-                            <i class="bi bi-circle text-secondary me-1"></i>
-                          {% endif %}
-                          {{ s.title }}
-                        </div>
-                        <div class="text-secondary small">{{ s.description }}</div>
-                      </div>
-                      <div class="text-end">
-                        {% if not s.done %}
-                          <a class="btn btn-sm btn-outline-dark" href="{% url s.url_name %}">Open</a>
-                        {% else %}
-                          <span class="badge text-bg-light">Done</span>
-                        {% endif %}
-                      </div>
-                    </div>
-                  {% endfor %}
-                </div>
-              {% endif %}
-            </div>
-          </div>
-        </div>
+      <div class="d-flex flex-column gap-3">
+        {% for key in dashboard_layout.left %}
+          {% with tpl="core/dashboard_widgets/"|add:key|add:".html" %}
+            {% include tpl %}
+          {% endwith %}
+        {% endfor %}
       </div>
     </div>
 
     <div class="col-lg-5">
-      <div class="row g-3">
-        <div class="col-12">
-          <div class="card shadow-sm">
-            <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
-              <div>
-                <div class="fw-semibold">Payables</div>
-                <div class="text-secondary small">Outstanding vendor bills and due-soon items.</div>
-              </div>
-              <div class="d-flex flex-wrap gap-4">
-                <div>
-                  <div class="text-secondary small">Outstanding</div>
-                  <div class="h4 mb-0">{{ outstanding_payables_cents|money }}</div>
-                </div>
-                <div>
-                  <div class="text-secondary small">Due soon (7d)</div>
-                  <div class="h4 mb-0">{{ payables_due_soon_count }}</div>
-                </div>
-              </div>
-              <div class="d-flex gap-2">
-                <a class="btn btn-sm btn-outline-dark" href="{% url 'payables:vendor_list' %}"><i class="bi bi-people me-1"></i>Vendors</a>
-                <a class="btn btn-sm btn-dark" href="{% url 'payables:bill_list' %}"><i class="bi bi-receipt me-1"></i>Bills</a>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                <div>
-                  <div class="fw-semibold">Due soon projects</div>
-                  <div class="text-secondary small">Upcoming deadlines (if set).</div>
-                </div>
-                <a class="btn btn-sm btn-outline-dark" href="{% url 'projects:project_list' %}"><i class="bi bi-arrow-right me-1"></i>All projects</a>
-              </div>
-
-              {% if due_soon_projects %}
-                <div class="table-responsive">
-                  <table class="table table-hover align-middle mb-0">
-                    <thead>
-                      <tr class="text-secondary small">
-                        <th scope="col">Project</th>
-                        <th scope="col">Client</th>
-                        <th scope="col" class="text-end">Due</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for p in due_soon_projects %}
-                        <tr>
-                          <td>
-                            <a class="text-decoration-none" href="{% url 'projects:project_detail' p.id %}">{{ p.number }} · {{ p.name }}</a>
-                          </td>
-                          <td class="text-secondary">{% if p.client %}{{ p.client.name }}{% else %}-{% endif %}</td>
-                          <td class="text-end text-secondary">{{ p.due_date }}</td>
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-              {% else %}
-                <div class="text-secondary small">No projects with upcoming due dates.</div>
-              {% endif %}
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <div class="fw-semibold">Active company</div>
-              <div class="text-secondary small mt-1">
-                {% if active_company %}{{ active_company.name }}{% else %}(none){% endif %}
-              </div>
-              <div class="mt-3">
-                <a class="btn btn-sm btn-outline-dark" href="{% url 'companies:switch' %}">
-                  <i class="bi bi-arrow-repeat me-1"></i>Switch company
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <div class="fw-semibold">Your role</div>
-              <div class="text-secondary small mt-1">
-                {% if active_employee %}{{ active_employee.get_role_display }}{% else %}(unknown){% endif %}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <div class="fw-semibold">Subscription</div>
-              {% if subscription_summary %}
-                <div class="text-secondary small mt-1">{{ subscription_summary.label }}</div>
-                {% if subscription_summary.detail %}
-                  <div class="text-secondary small">{{ subscription_summary.detail }}</div>
-                {% endif %}
-                <div class="mt-3">
-                  <a class="btn btn-sm btn-outline-dark" href="{% url 'billing:overview' %}">
-                    <i class="bi bi-credit-card me-1"></i>Billing
-                  </a>
-                </div>
-              {% else %}
-                <div class="text-secondary small mt-1">No subscription details available.</div>
-              {% endif %}
-            </div>
-          </div>
-        </div>
-
+      <div class="d-flex flex-column gap-3">
+        {% for key in dashboard_layout.right %}
+          {% with tpl="core/dashboard_widgets/"|add:key|add:".html" %}
+            {% include tpl %}
+          {% endwith %}
+        {% endfor %}
       </div>
     </div>
   </div>

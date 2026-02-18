@@ -6,6 +6,8 @@ from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
+from decimal import Decimal
+
 
 class InvoiceLockedError(ValidationError):
     """Raised when attempting to mutate a locked invoice."""
@@ -106,6 +108,48 @@ class Document(SyncModel):
     balance_due_cents = models.BigIntegerField(default=0)
 
     notes = models.TextField(blank=True, default="")
+
+    # Optional free-text blocks typically populated from a DocumentTemplate at creation.
+    # These are rendered in the customer-facing output and editable in the composer.
+    header_text = models.TextField(blank=True, default="")
+    footer_text = models.TextField(blank=True, default="")
+
+    # ------------------------------------------------------------------
+    # Phase 9 – Document Composer (paper-style editor)
+    # ------------------------------------------------------------------
+    sales_tax_percent = models.DecimalField(
+        max_digits=6,
+        decimal_places=3,
+        default=Decimal("0.000"),
+        help_text="Sales tax percentage used for real-time totals and PDF display.",
+    )
+
+    class DepositType(models.TextChoices):
+        NONE = "none", "None"
+        PERCENT = "percent", "Percent"
+        FIXED = "fixed", "Fixed"
+
+    deposit_type = models.CharField(
+        max_length=10,
+        choices=DepositType.choices,
+        default=DepositType.NONE,
+    )
+    deposit_value = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Percent (e.g., 25.00) or fixed amount (dollars) depending on deposit_type.",
+    )
+    deposit_cents = models.BigIntegerField(
+        default=0,
+        help_text="Computed deposit requested in cents at time of last save.",
+    )
+
+    terms = models.TextField(
+        blank=True,
+        default="",
+        help_text="Invoice terms shown on customer-facing document.",
+    )
 
     class Meta:
         indexes = [

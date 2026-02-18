@@ -13,6 +13,20 @@ Each section will be expanded with:
 - Edge cases / failure modes
 - Acceptance checks
 
+
+## Phase 9 QA Execution
+
+The Phase 9 feature-by-feature QA + fix process is documented in **`docs/QA_PLAN.md`**.
+
+- Start here for the QA loop, execution order, and the QA Ledger.
+- This file remains the detailed per-feature “how it works” manual. As we validate each feature, we expand the corresponding sections with:
+  - expected behavior
+  - step-by-step flows
+  - permissions
+  - settings
+  - audit events
+  - edge cases
+
 ---
 
 ## 0) Product Overview

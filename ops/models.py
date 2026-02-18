@@ -138,6 +138,81 @@ class LaunchGateItem(models.Model):
         return f"{self.key}: {self.title}"
 
 
+class QAIssueSeverity(models.TextChoices):
+    LOW = "low", "Low"
+    MEDIUM = "medium", "Medium"
+    HIGH = "high", "High"
+    CRITICAL = "critical", "Critical"
+
+
+class QAIssueStatus(models.TextChoices):
+    OPEN = "open", "Open"
+    IN_PROGRESS = "in_progress", "In progress"
+    RESOLVED = "resolved", "Resolved"
+    WONT_FIX = "wont_fix", "Won't fix"
+
+
+class QAIssue(models.Model):
+    """Staff QA punchlist issue tracking (V1 launch hardening).
+
+    Goals:
+    - Central place to log dead ends / bugs / UX gaps found during end-to-end QA.
+    - Lightweight; does not replace a full issue tracker, but is available in-prod.
+    - Optional company scoping for tenant-specific issues.
+    """
+
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    updated_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    company = models.ForeignKey(Company, null=True, blank=True, on_delete=models.SET_NULL, related_name="qa_issues")
+
+    status = models.CharField(max_length=24, choices=QAIssueStatus.choices, default=QAIssueStatus.OPEN, db_index=True)
+    severity = models.CharField(max_length=16, choices=QAIssueSeverity.choices, default=QAIssueSeverity.MEDIUM, db_index=True)
+
+    area = models.CharField(max_length=64, blank=True, default="", db_index=True, help_text="Module/area (e.g., Invoices, Banking, Time).")
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+
+    discovered_by_email = models.EmailField(blank=True, default="")
+    assigned_to_email = models.EmailField(blank=True, default="")
+
+    related_url = models.URLField(blank=True, default="")
+    steps_to_reproduce = models.TextField(blank=True, default="")
+    expected_behavior = models.TextField(blank=True, default="")
+    actual_behavior = models.TextField(blank=True, default="")
+
+    resolution_notes = models.TextField(blank=True, default="")
+    resolved_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            # Keep index names <= 30 chars for maximum cross-DB compatibility.
+            models.Index(fields=["status", "severity", "created_at"], name="ops_qai_st_sev_cr_idx"),
+            models.Index(fields=["company", "status", "created_at"], name="ops_qai_co_st_cr_idx"),
+            models.Index(fields=["area", "status", "created_at"], name="ops_qai_ar_st_cr_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"[{self.severity}] {self.title}"
+
+    def touch(self, *, save: bool = True) -> None:
+        self.updated_at = timezone.now()
+        if save:
+            self.save(update_fields=["updated_at"])
+
+    def mark_resolved(self, *, notes: str = "", by_email: str | None = None, save: bool = True) -> None:
+        self.status = QAIssueStatus.RESOLVED
+        self.resolved_at = timezone.now()
+        if notes:
+            self.resolution_notes = notes
+        if by_email:
+            self.assigned_to_email = (by_email or "").strip()[:254]
+        self.updated_at = timezone.now()
+        if save:
+            self.save(update_fields=["status", "resolved_at", "resolution_notes", "assigned_to_email", "updated_at"])
+
+
 
 
 class OpsCheckKind(models.TextChoices):
@@ -459,6 +534,21 @@ class SiteConfig(models.Model):
         help_text="Expired snoozes older than this many days may be pruned (for audit cleanliness).",
     )
 
+
+    # Maintenance mode (launch/ops): when enabled, non-staff users see a maintenance page.
+    maintenance_mode_enabled = models.BooleanField(
+        default=False,
+        help_text="When enabled, the site shows a maintenance notice to non-staff users.",
+    )
+    maintenance_message = models.TextField(
+        blank=True,
+        default="",
+        help_text="Optional message displayed on the maintenance page.",
+    )
+    maintenance_allow_staff = models.BooleanField(
+        default=True,
+        help_text="If enabled, staff users may continue to use the app during maintenance.",
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

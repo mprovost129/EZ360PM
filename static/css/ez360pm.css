@@ -34,6 +34,12 @@
   --bs-border-color: var(--ez-border);
   --bs-body-color: var(--ez-text);
   --bs-body-bg: var(--ez-bg);
+
+  /* Card baseline (Phase 9 UI consistency)
+     Many templates already use `card shadow-sm`, but we want every card
+     (even ones missing `shadow-sm`) to feel consistent and intentional.
+  */
+  --ez-card-shadow: 0 .125rem .25rem rgba(0,0,0,.075);
 }
 
 /* Dark theme */
@@ -56,6 +62,8 @@ html[data-theme="dark"]{
   --bs-border-color: var(--ez-border);
   --bs-body-color: var(--ez-text);
   --bs-body-bg: var(--ez-bg);
+
+  --ez-card-shadow: 0 .125rem .25rem rgba(0,0,0,.35);
 }
 
 body{
@@ -90,6 +98,25 @@ a:hover{ color: var(--ez-link-hover); }
 .input-group-text{
   border-radius: .75rem;
   border-color: var(--ez-border);
+}
+
+/* Selects: make dropdowns feel intentional across browsers */
+.form-select{
+  min-height: 2.5rem;
+  padding-top: .55rem;
+  padding-bottom: .55rem;
+  padding-left: .95rem;
+  padding-right: 2.35rem;
+  background-color: #fff;
+  transition: border-color .15s ease, box-shadow .15s ease;
+  background-position: right .85rem center;
+  background-size: 14px 10px;
+}
+html[data-theme="dark"] .form-select{
+  background-color: rgba(255,255,255,.03);
+}
+.form-select:disabled{
+  opacity: .75;
 }
 .form-control:focus,
 .form-select:focus{
@@ -186,14 +213,57 @@ html[data-theme="dark"] .sidebar-link:hover{ background: rgba(148,163,184,.12); 
   background: linear-gradient(180deg, var(--ez-blue), var(--ez-green));
 }
 
-/* Phase 8 UI foundation: card standardization */
-.card.shadow-sm{
+/* Card system (Phase 8/9): baseline card consistency across the app */
+.card{
   border: 0 !important;
   border-radius: 1rem !important;
+  box-shadow: var(--ez-card-shadow);
+  background: var(--ez-surface);
 }
-.card.shadow-sm .card-header{
+.card .card-header{
   background: transparent;
   border-bottom-color: var(--ez-border);
+}
+
+/* Keep legacy `shadow-sm` markup harmless (many templates still include it) */
+.card.shadow-sm{ box-shadow: var(--ez-card-shadow); }
+
+/* Document Composer (Phase 9): "paper" editing surface */
+.ez-paper-wrap{
+  display: flex;
+  justify-content: center;
+}
+.ez-paper{
+  width: 100%;
+  max-width: 940px;
+  background: var(--ez-surface);
+  border-radius: 1rem;
+  box-shadow: var(--ez-card-shadow);
+  padding: 1.5rem;
+}
+@media (min-width: 992px){
+  .ez-paper{ padding: 2rem; }
+}
+/* Make inputs feel like editable text */
+.ez-paper .form-control,
+.ez-paper .form-select,
+.ez-paper textarea{
+  border-radius: .75rem;
+}
+.ez-paper .ez-inline-input{
+  border: 1px solid transparent;
+  background: transparent;
+  padding-left: .35rem;
+  padding-right: .35rem;
+}
+.ez-paper .ez-inline-input:focus{
+  border-color: var(--ez-border);
+  background: rgba(31,95,191,.04);
+  box-shadow: none;
+}
+.ez-paper .ez-totals{
+  border-top: 1px solid var(--ez-border);
+  padding-top: 1rem;
 }
 
 /* Page headers */
@@ -224,6 +294,23 @@ html[data-theme="dark"] .sidebar-link:hover{ background: rgba(148,163,184,.12); 
   align-items: center;
   justify-content: center;
   padding: 0;
+}
+
+/* Dropdown menus: consistent radius + shadow regardless of page */
+.dropdown-menu{
+  border-radius: .85rem;
+  border-color: var(--ez-border);
+  box-shadow: 0 16px 40px rgba(0,0,0,.10);
+}
+html[data-theme="dark"] .dropdown-menu{
+  box-shadow: 0 16px 40px rgba(0,0,0,.45);
+}
+.dropdown-item{
+  padding: .55rem .9rem;
+}
+.dropdown-item:active{
+  background: rgba(31,95,191,.12);
+  color: var(--ez-text);
 }
 
 .badge-soft{
@@ -397,4 +484,21 @@ body.no-scroll{ overflow: hidden; }
 }
 html[data-theme="dark"] .ez-form-footer{
   background: rgba(15,23,42,.88);
+}
+
+/* Phase 8R: Ops Console toolbar overflow handling */
+.ez-ops-toolbar{
+  align-items: center;
+}
+
+@media (max-width: 992px){
+  .ez-ops-toolbar{
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    padding-bottom: .25rem;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ez-ops-toolbar .btn{
+    white-space: nowrap;
+  }
 }

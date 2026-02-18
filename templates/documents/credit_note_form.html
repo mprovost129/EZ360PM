@@ -13,7 +13,7 @@
     <a class="btn btn-outline-secondary" href="{% url 'documents:invoice_edit' invoice.id %}">Back to Invoice</a>
   </div>
 
-  <div class="card">
+  <div class="card shadow-sm">
     <div class="card-body">
       <form method="post" novalidate>
         {% csrf_token %}

@@ -12,6 +12,10 @@ from django.utils import timezone
 from audit.services import log_event
 from companies.decorators import company_context_required, require_min_role
 from companies.models import EmployeeRole
+
+from billing.decorators import tier_required
+from billing.models import PlanCode
+from billing.services import build_subscription_summary, plan_meets
 from projects.models import Project
 from crm.models import Client
 
@@ -271,6 +275,11 @@ def time_entry_submit(request, pk):
         settings = TimeTrackingSettings.objects.filter(company=company, employee=employee).first()
         require_approval = bool(settings.require_manager_approval) if settings else False
 
+        # Manager approval workflow is a Professional+ feature.
+        summary = build_subscription_summary(company)
+        if not plan_meets(summary.plan, min_plan=PlanCode.PROFESSIONAL):
+            require_approval = False
+
         if require_approval:
             entry.status = TimeStatus.SUBMITTED
         else:
@@ -298,6 +307,7 @@ def time_entry_submit(request, pk):
     return redirect("timetracking:entry_detail", pk=entry.pk)
 
 
+@tier_required(PlanCode.PROFESSIONAL)
 @require_min_role(EmployeeRole.MANAGER)
 def time_entry_approve(request, pk):
     company = request.active_company
@@ -332,16 +342,25 @@ def time_settings(request):
     employee = request.active_employee
 
     settings_obj, _ = TimeTrackingSettings.objects.get_or_create(company=company, employee=employee)
+
+    summary = build_subscription_summary(company)
+    can_require_approval = plan_meets(summary.plan, min_plan=PlanCode.PROFESSIONAL)
     if request.method == "POST":
         form = TimeSettingsForm(request.POST, instance=settings_obj)
+        if not can_require_approval:
+            form.fields.pop("require_manager_approval", None)
         if form.is_valid():
             s = form.save(commit=False)
+            if not can_require_approval:
+                s.require_manager_approval = False
             s.updated_by_user = request.user
             s.save()
             messages.success(request, "Time tracking settings saved.")
             return redirect("timetracking:settings")
     else:
         form = TimeSettingsForm(instance=settings_obj)
+        if not can_require_approval:
+            form.fields.pop("require_manager_approval", None)
 
     return render(request, "timetracking/time_settings.html", {"form": form})
 

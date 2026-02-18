@@ -17,6 +17,18 @@ from payables.models import Bill, BillStatus
 from projects.models import Project
 from timetracking.models import TimeEntry, TimeStatus
 
+from billing.models import PlanCode
+from billing.services import build_subscription_summary, plan_meets
+from integrations.models import DropboxConnection
+
+from companies.permissions import has_min_role
+from core.dashboard_registry import default_dashboard_layout, get_dashboard_widgets
+from core.forms.dashboard import DashboardLayoutForm
+from core.models import DashboardLayout
+from billing.decorators import tier_required
+from companies.decorators import require_min_role
+from companies.models import EmployeeRole
+
 
 def home(request: HttpRequest):
     """Logged-out marketing page (root path)."""
@@ -32,6 +44,14 @@ def app_dashboard(request: HttpRequest):
         return redirect("companies:switch")
 
     company = get_active_company(request)
+
+    sub = build_subscription_summary(company) if company else None
+    plan = sub.plan if sub else PlanCode.STARTER
+    is_professional = plan_meets(plan, min_plan=PlanCode.PROFESSIONAL)
+    is_premium = plan_meets(plan, min_plan=PlanCode.PREMIUM)
+
+    active_employee = getattr(request, "active_employee", None)
+    employee_role = getattr(active_employee, "role", EmployeeRole.STAFF)
 
     # ------------------------------------------------------------------
     # Onboarding
@@ -70,17 +90,19 @@ def app_dashboard(request: HttpRequest):
     )
     revenue_net_cents = max(revenue_cents - refunded_cents, 0)
 
-    # Expenses = approved/reimbursed expenses in current month
-    expenses_cents = int(
-        Expense.objects.filter(
-            company=company,
-            deleted_at__isnull=True,
-            status__in=[ExpenseStatus.APPROVED, ExpenseStatus.REIMBURSED],
-            date__gte=month_start,
-            date__lt=month_end,
-        ).aggregate(s=Sum("total_cents"))["s"]
-        or 0
-    )
+    # Expenses = approved/reimbursed expenses in current month (Professional+)
+    expenses_cents = 0
+    if is_professional:
+        expenses_cents = int(
+            Expense.objects.filter(
+                company=company,
+                deleted_at__isnull=True,
+                status__in=[ExpenseStatus.APPROVED, ExpenseStatus.REIMBURSED],
+                date__gte=month_start,
+                date__lt=month_end,
+            ).aggregate(s=Sum("total_cents"))["s"]
+            or 0
+        )
 
     # A/R = balance due on sent/partially-paid invoices
     ar_cents = int(
@@ -107,29 +129,109 @@ def app_dashboard(request: HttpRequest):
     unbilled_hours = round(unbilled_minutes / 60.0, 1)
 
     # ------------------------------------------------------------------
-    # Payables summary
+    # Payables summary (Professional+)
     # ------------------------------------------------------------------
-    outstanding_payables_cents = int(
-        Bill.objects.filter(
-            company=company,
-            deleted_at__isnull=True,
-            status__in=[BillStatus.POSTED, BillStatus.PARTIALLY_PAID],
-        ).aggregate(s=Sum("balance_cents"))["s"]
-        or 0
-    )
+    outstanding_payables_cents = 0
+    payables_due_soon_count = 0
+    if is_professional:
+        outstanding_payables_cents = int(
+            Bill.objects.filter(
+                company=company,
+                deleted_at__isnull=True,
+                status__in=[BillStatus.POSTED, BillStatus.PARTIALLY_PAID],
+            ).aggregate(s=Sum("balance_cents"))["s"]
+            or 0
+        )
 
-    due_soon_to = today + datetime.timedelta(days=7)
-    payables_due_soon_count = int(
-        Bill.objects.filter(
+        due_soon_to = today + datetime.timedelta(days=7)
+        payables_due_soon_count = int(
+            Bill.objects.filter(
+                company=company,
+                deleted_at__isnull=True,
+                status__in=[BillStatus.POSTED, BillStatus.PARTIALLY_PAID],
+                due_date__isnull=False,
+                due_date__gte=today,
+                due_date__lte=due_soon_to,
+                balance_cents__gt=0,
+            ).count()
+        )
+
+    # ------------------------------------------------------------------
+    # Premium dashboard insights (Premium; role-gated in template)
+    # ------------------------------------------------------------------
+    premium_insights = None
+    if is_premium:
+        prev_month_end = month_start
+        prev_month_start = (month_start - datetime.timedelta(days=1)).replace(day=1)
+
+        prev_rev_cents = int(
+            Payment.objects.filter(
+                company=company,
+                deleted_at__isnull=True,
+                status=PaymentStatus.SUCCEEDED,
+                payment_date__gte=prev_month_start,
+                payment_date__lt=prev_month_end,
+            ).aggregate(s=Sum("amount_cents"))["s"]
+            or 0
+        )
+
+        prev_refunded_cents = int(
+            Payment.objects.filter(
+                company=company,
+                deleted_at__isnull=True,
+                status__in=[PaymentStatus.REFUNDED, PaymentStatus.SUCCEEDED],
+                payment_date__gte=prev_month_start,
+                payment_date__lt=prev_month_end,
+            ).aggregate(s=Sum("refunded_cents"))["s"]
+            or 0
+        )
+        prev_rev_net_cents = max(prev_rev_cents - prev_refunded_cents, 0)
+
+        prev_expenses_cents = 0
+        if is_professional:
+            prev_expenses_cents = int(
+                Expense.objects.filter(
+                    company=company,
+                    deleted_at__isnull=True,
+                    status__in=[ExpenseStatus.APPROVED, ExpenseStatus.REIMBURSED],
+                    date__gte=prev_month_start,
+                    date__lt=prev_month_end,
+                ).aggregate(s=Sum("total_cents"))["s"]
+                or 0
+            )
+
+        def _pct_change(cur: int, prev: int) -> float | None:
+            if prev <= 0:
+                return None
+            return round(((cur - prev) / float(prev)) * 100.0, 1)
+
+        rev_change_pct = _pct_change(revenue_net_cents, prev_rev_net_cents)
+        exp_change_pct = _pct_change(expenses_cents, prev_expenses_cents)
+
+        overdue_qs = Document.objects.filter(
             company=company,
             deleted_at__isnull=True,
-            status__in=[BillStatus.POSTED, BillStatus.PARTIALLY_PAID],
+            doc_type=DocumentType.INVOICE,
+            status__in=[DocumentStatus.SENT, DocumentStatus.PARTIALLY_PAID],
             due_date__isnull=False,
-            due_date__gte=today,
-            due_date__lte=due_soon_to,
-            balance_cents__gt=0,
-        ).count()
-    )
+            due_date__lt=today,
+            balance_due_cents__gt=0,
+        )
+        overdue_count = int(overdue_qs.count())
+        overdue_cents = int(overdue_qs.aggregate(s=Sum("balance_due_cents"))["s"] or 0)
+
+        dropbox = DropboxConnection.objects.filter(company=company).first()
+        dropbox_connected = bool(dropbox and dropbox.is_active)
+
+        premium_insights = {
+            "rev_last_month_net_cents": prev_rev_net_cents,
+            "rev_change_pct": rev_change_pct,
+            "expenses_last_month_cents": prev_expenses_cents,
+            "expenses_change_pct": exp_change_pct,
+            "overdue_count": overdue_count,
+            "overdue_cents": overdue_cents,
+            "dropbox_connected": dropbox_connected,
+        }
 
     # ------------------------------------------------------------------
     # Recent activity panels
@@ -181,6 +283,138 @@ def app_dashboard(request: HttpRequest):
             "recent_payments": recent_payments,
             "recent_time": recent_time,
             "due_soon_projects": due_soon_projects,
+            "tier_flags": {
+                "is_professional": is_professional,
+                "is_premium": is_premium,
+            },
+            "premium_insights": premium_insights,
+            "dashboard_layout": _build_dashboard_layout_json(
+                company=company,
+                plan=plan,
+                employee_role=employee_role,
+            ),
+            "can_customize_dashboard": bool(
+                is_premium and has_min_role(active_employee, EmployeeRole.MANAGER)
+            ),
+        },
+    )
+
+
+def _build_dashboard_layout_json(*, company, plan: str, employee_role: str) -> dict[str, list[str]]:
+    """Return a sanitized layout for the current user."""
+
+    widgets = get_dashboard_widgets()
+
+    # Allowed widgets for this user
+    allowed: set[str] = set()
+    for key, w in widgets.items():
+        if not plan_meets(plan, min_plan=w.min_plan):
+            continue
+        # has_min_role expects an employee-like object with .role
+        if not has_min_role(type("E", (), {"role": employee_role})(), w.min_role):
+            continue
+        allowed.add(key)
+
+    layout = default_dashboard_layout()
+
+    if plan_meets(plan, min_plan=PlanCode.PREMIUM):
+        try:
+            obj = DashboardLayout.objects.filter(company=company, role=employee_role).first()
+            if obj and isinstance(obj.layout_json, dict):
+                layout = {
+                    "left": list(obj.layout_json.get("left", []) or []),
+                    "right": list(obj.layout_json.get("right", []) or []),
+                }
+        except Exception:
+            # Never break dashboard due to layout issues.
+            layout = default_dashboard_layout()
+
+    # Sanitize: remove unknown/disallowed; keep order.
+    left = [k for k in layout.get("left", []) if k in allowed]
+    right = [k for k in layout.get("right", []) if k in allowed]
+
+    used = set(left + right)
+    # Add missing allowed widgets into their default columns.
+    for k in [x for x in widgets.keys() if x in allowed and x not in used]:
+        if widgets[k].default_column == "left":
+            left.append(k)
+        else:
+            right.append(k)
+
+    # Ensure basics are always present.
+    for required in ["kpis", "quick_actions"]:
+        if required in allowed and required not in left and required not in right:
+            left.insert(0, required)
+
+    return {"left": left, "right": right}
+
+
+@tier_required(PlanCode.PREMIUM)
+@require_min_role(EmployeeRole.MANAGER)
+def dashboard_customize(request: HttpRequest):
+    """Premium-only dashboard customization (per-company, per-role)."""
+
+    company = get_active_company(request)
+    if not company:
+        return redirect("companies:switch")
+
+    sub = build_subscription_summary(company)
+    plan = sub.plan
+
+    active_employee = getattr(request, "active_employee", None)
+    employee_role = getattr(active_employee, "role", EmployeeRole.MANAGER)
+
+    existing = DashboardLayout.objects.filter(company=company, role=employee_role).first()
+    initial_layout = None
+    if existing and isinstance(existing.layout_json, dict):
+        initial_layout = {
+            "left": list(existing.layout_json.get("left", []) or []),
+            "right": list(existing.layout_json.get("right", []) or []),
+        }
+
+    if request.method == "POST":
+        form = DashboardLayoutForm(
+            data=request.POST,
+            plan=plan,
+            employee_role=employee_role,
+            initial_layout=initial_layout or default_dashboard_layout(),
+        )
+        if form.is_valid():
+            layout_json = form.build_layout_json()
+            if not existing:
+                existing = DashboardLayout(company=company, role=employee_role)
+            existing.layout_json = layout_json
+            existing.updated_at = timezone.now()
+            existing.updated_by_user = getattr(request, "user", None)
+            existing.save()
+            return redirect("core:app_dashboard")
+    else:
+        form = DashboardLayoutForm(
+            plan=plan,
+            employee_role=employee_role,
+            initial_layout=initial_layout or default_dashboard_layout(),
+        )
+
+    widgets = get_dashboard_widgets()
+    keys = getattr(form, "allowed_widget_keys", [])
+    rows = []
+    for key in keys:
+        rows.append(
+            {
+                "key": key,
+                "label": widgets[key].label,
+                "enabled": form[f"{key}__enabled"],
+                "column": form[f"{key}__column"],
+                "order": form[f"{key}__order"],
+            }
+        )
+
+    return render(
+        request,
+        "core/dashboard_customize.html",
+        {
+            "form": form,
+            "rows": rows,
         },
     )
 

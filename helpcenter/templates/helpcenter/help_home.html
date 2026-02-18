@@ -1,9 +1,20 @@
 {% extends "helpcenter/_help_base.html" %}
+{% load static %}
 
 {% block help_h1 %}Help Center{% endblock %}
 
 {% block help_body %}
 <p class="mb-3">Use this section as the in-app manual. It mirrors the PDF under <code>docs/</code> and is designed to prevent dead ends before launch.</p>
+
+<div class="alert alert-light border d-flex flex-wrap align-items-center justify-content-between gap-2">
+  <div>
+    <div class="fw-semibold">User Manual (PDF)</div>
+    <div class="text-secondary small">Printable walkthrough of roles, workflows, and settings.</div>
+  </div>
+  <a class="btn btn-sm btn-outline-dark" href="{% static 'docs/ez360pm_user_manual.pdf' %}" target="_blank" rel="noopener">
+    <i class="bi bi-filetype-pdf me-1"></i>Open manual
+  </a>
+</div>
 
 <div class="row g-3">
   <div class="col-12 col-md-6">

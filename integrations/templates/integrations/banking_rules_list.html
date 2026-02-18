@@ -1,0 +1,70 @@
+{% extends "core/_app_shell.html" %}
+
+{% block app_title %}Bank rules{% endblock %}
+
+{% block app_content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h4 mb-1">Bank rules</h1>
+    <div class="text-muted">Rules to categorize and triage imported transactions for {{ company.name }}.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'integrations:banking_settings' %}">Back</a>
+    <a class="btn btn-dark" href="{% url 'integrations:banking_rule_create' %}">+ New rule</a>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    {% if rules %}
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th style="width: 72px;">On</th>
+              <th style="width: 90px;">Priority</th>
+              <th>Match</th>
+              <th style="width: 200px;">Action</th>
+              <th style="width: 160px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rules %}
+            <tr>
+              <td>
+                {% if r.is_active %}
+                  <span class="badge text-bg-success">On</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">Off</span>
+                {% endif %}
+              </td>
+              <td>{{ r.priority }}</td>
+              <td>
+                <div class="fw-semibold">{{ r.match_field|title }} · {{ r.match_type|title }}</div>
+                <div class="text-muted small">"{{ r.match_text }}"{% if r.min_amount_cents or r.max_amount_cents %} · amount guardrails{% endif %}</div>
+              </td>
+              <td>
+                <div class="fw-semibold">{{ r.get_action_display }}</div>
+                <div class="text-muted small">
+                  {% if r.expense_category %}Category: {{ r.expense_category }}{% endif %}
+                  {% if r.merchant_name %}{% if r.expense_category %} · {% endif %}Merchant: {{ r.merchant_name }}{% endif %}
+                </div>
+              </td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'integrations:banking_rule_edit' r.id %}">Edit</a>
+                <form method="post" action="{% url 'integrations:banking_rule_delete' r.id %}" class="d-inline">
+                  {% csrf_token %}
+                  <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this rule?')">Delete</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-muted">No rules yet. Create your first rule to auto-categorize common merchants.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

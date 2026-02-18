@@ -51,6 +51,13 @@ urlpatterns = [
     path("backups/record-run/", views.ops_backup_record_run, name="backup_record_run"),
     path("backups/record-restore-test/", views.ops_backup_record_restore_test, name="backup_record_restore_test"),
     path("releases/", views.ops_releases, name="releases"),
+
+    # QA punchlist (Phase 8S2)
+    path("qa/", views.ops_qa_issues, name="qa_issues"),
+    path("qa/new/", views.ops_qa_issue_new, name="qa_issue_new"),
+    path("qa/<int:pk>/", views.ops_qa_issue_detail, name="qa_issue_detail"),
+    path("qa/<int:pk>/edit/", views.ops_qa_issue_edit, name="qa_issue_edit"),
+    path("qa/<int:pk>/close/", views.ops_qa_issue_close, name="qa_issue_close"),
     # Company primary keys are UUIDs.
     path("companies/<uuid:company_id>/", views.ops_company_detail, name="company_detail"),
     path("companies/<uuid:company_id>/timeline/", views.ops_company_timeline, name="company_timeline"),

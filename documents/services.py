@@ -80,10 +80,51 @@ def allocate_document_number(company, doc_type: str) -> str:
 
 
 def recalc_document_totals(doc: Document) -> None:
+    from decimal import Decimal
+    from .models import DocumentLineItem
+
     subtotal = 0
     tax = 0
     total = 0
-    for li in doc.line_items.filter(deleted_at__isnull=True).order_by("sort_order", "created_at"):
+
+    items = list(doc.line_items.filter(deleted_at__isnull=True).order_by("sort_order", "created_at"))
+
+    # If the document is set to tax-by-rate, compute tax per taxable line and persist onto the line.
+    use_rate = False
+    try:
+        use_rate = getattr(doc, "tax_mode", None) == Document.TaxMode.RATE
+    except Exception:
+        use_rate = False
+
+    rate = Decimal("0")
+    if use_rate:
+        try:
+            rate = Decimal(getattr(doc, "tax_rate_percent", 0) or 0)
+        except Exception:
+            rate = Decimal("0")
+
+    if use_rate and rate > 0:
+        changed = []
+        now = timezone.now()
+        for li in items:
+            line_sub = int(li.line_subtotal_cents or 0)
+            if bool(li.is_taxable):
+                line_tax = int((Decimal(line_sub) * (rate / Decimal("100"))).quantize(Decimal("1")))
+            else:
+                line_tax = 0
+            line_total = line_sub + line_tax
+
+            if int(li.tax_cents or 0) != line_tax or int(li.line_total_cents or 0) != line_total:
+                li.tax_cents = line_tax
+                li.line_total_cents = line_total
+                li.updated_at = now
+                changed.append(li)
+
+        if changed:
+            DocumentLineItem.objects.bulk_update(changed, ["tax_cents", "line_total_cents", "updated_at"])
+
+    # Roll up totals
+    for li in items:
         subtotal += int(li.line_subtotal_cents or 0)
         tax += int(li.tax_cents or 0)
         total += int(li.line_total_cents or 0)
@@ -92,8 +133,26 @@ def recalc_document_totals(doc: Document) -> None:
     doc.tax_cents = tax
     doc.total_cents = total
 
+    # Deposit requested (composer)
+    deposit_cents = 0
+    try:
+        dtype = getattr(doc, "deposit_type", "none") or "none"
+        dval = Decimal(getattr(doc, "deposit_value", 0) or 0)
+        if dtype == getattr(Document.DepositType, "PERCENT", "percent"):
+            if dval > 0:
+                deposit_cents = int((Decimal(total) * (dval / Decimal("100"))).quantize(Decimal("1")))
+        elif dtype == getattr(Document.DepositType, "FIXED", "fixed"):
+            if dval > 0:
+                deposit_cents = int((dval.quantize(Decimal("0.01")) * Decimal("100")).quantize(Decimal("1")))
+        else:
+            deposit_cents = 0
+    except Exception:
+        deposit_cents = 0
+
+    doc.deposit_cents = int(deposit_cents or 0)
+
     # invoice balance fields
     if doc.doc_type == DocumentType.INVOICE:
         paid = int(doc.amount_paid_cents or 0)
         doc.balance_due_cents = max(0, total - paid)
-    doc.save(update_fields=["subtotal_cents", "tax_cents", "total_cents", "balance_due_cents", "updated_at"])
+    doc.save(update_fields=["subtotal_cents", "tax_cents", "total_cents", "deposit_cents", "balance_due_cents", "updated_at"])

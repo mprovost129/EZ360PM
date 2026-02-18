@@ -19,7 +19,7 @@
 
 <div class="row g-3">
   <div class="col-12 col-lg-6">
-    <div class="card">
+    <div class="card shadow-sm">
       <div class="card-body">
         <div class="d-flex align-items-center justify-content-between mb-2">
           <div class="fw-semibold">Current state</div>
@@ -72,17 +72,23 @@
               <label class="form-label">Note</label>
               {{ form.note }}
             </div>
-            <button class="btn btn-dark">
-              <i class="bi bi-play-circle me-1"></i>Start timer
-            </button>
+
+            <div class="d-flex align-items-center gap-2">
+              <button class="btn btn-dark" type="submit">
+                <i class="bi bi-play-circle me-1"></i>Start timer
+              </button>
+
+              {% if timer_state.project_id or timer_state.service_catalog_item_id or timer_state.service_name or timer_state.note %}
+                <form method="post" action="{% url 'timetracking:timer_clear' %}" class="m-0">
+                  {% csrf_token %}
+                  <button class="btn btn-outline-secondary" type="submit">
+                    <i class="bi bi-x-circle me-1"></i>Clear
+                  </button>
+                </form>
+              {% endif %}
+            </div>
 
             {% if timer_state.project_id or timer_state.service_catalog_item_id or timer_state.service_name or timer_state.note %}
-              <form method="post" action="{% url 'timetracking:timer_clear' %}" class="d-inline">
-                {% csrf_token %}
-                <button class="btn btn-outline-secondary ms-2" type="submit">
-                  <i class="bi bi-x-circle me-1"></i>Clear
-                </button>
-              </form>
               <div class="form-text mt-2">Tip: your last selections are remembered after stopping.</div>
             {% endif %}
           </form>
@@ -92,8 +98,8 @@
   </div>
 
   <div class="col-12 col-lg-6">
-    <div class="card">
-      <div class="card-header bg-white"><strong>How it works</strong></div>
+    <div class="card shadow-sm">
+      <div class="card-header"><strong>How it works</strong></div>
       <div class="card-body text-secondary">
         <ul class="mb-0">
           <li>Stopping the timer creates a new Draft time entry.</li>
