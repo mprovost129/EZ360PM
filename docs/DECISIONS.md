@@ -856,9 +856,9 @@ Rationale:
 - Client Statements default to **open invoices only** (exclude Paid/Void) for the initial collections workflow.
 - Statement PDF export is **optional** and only enabled when WeasyPrint is installed (lazy import / graceful fallback).
 
-## 2026-02-16 — Statements links + APP_BASE_URL
+## 2026-02-16 — Statements links + SITE_BASE_URL
 
-- Introduced `APP_BASE_URL` (env-driven) to build absolute links in outbound emails and generated PDFs. If unset, emails/PDFs omit deep links.
+- Introduced `SITE_BASE_URL` (env-driven) to build absolute links in outbound emails and generated PDFs. If unset, emails/PDFs omit deep links.
 - Client Statements support optional date-range filtering by invoice `issue_date` (fallback to `created_at` date when `issue_date` is missing). Exports honor the same filter.
 - Ops alerts now have a staff detail view and a dashboard-driven “test alert” source (`ops_dashboard`) for routing verification.
 
@@ -877,7 +877,7 @@ Rationale:
 ## 2026-02-16 — Phase 7H34: Statements + Help Center + Ops triage affordances
 
 - Statements page must surface **inline warnings** when:
-  - `APP_BASE_URL` is not set (deep links in emails/PDFs are omitted).
+  - `SITE_BASE_URL` is not set (deep links in emails/PDFs are omitted).
   - WeasyPrint is not installed (PDF export / attachments unavailable).
   Rationale: prevent staff from assuming a broken workflow when it is an environment limitation.
 

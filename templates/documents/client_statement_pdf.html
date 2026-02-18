@@ -43,7 +43,7 @@
         <div class="company">{{ company.name }}</div>
         <div class="muted">Generated {{ generated_at|date:"Y-m-d H:i" }}</div>
         {% if date_from or date_to %}<div class="muted">Period: {{ date_from|date:"Y-m-d"|default:"" }}{% if date_from and date_to %} → {% endif %}{{ date_to|date:"Y-m-d"|default:"" }}</div>{% endif %}
-        {% if app_base_url %}<div class="muted">View online: {{ app_base_url }}{{ statement_path }}</div>{% endif %}
+        {% if site_base_url %}<div class="muted">View online: {{ site_base_url }}{{ statement_path }}</div>{% endif %}
       </div>
     </div>
 

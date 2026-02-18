@@ -87,7 +87,7 @@
 - Help Center: added Profit & Loss, Balance Sheet, and Trial Balance pages; linked from Help Home + sidebar.
 - Accounting report pages now include contextual Help links to these Help Center articles.
 
-## 2026-02-16 — Phase 7H32 (Statements PDF/email hardening + APP_BASE_URL readiness + Ops copy JSON)
+## 2026-02-16 — Phase 7H32 (Statements PDF/email hardening + SITE_BASE_URL readiness + Ops copy JSON)
 
 **Shipped:**
 - Statements:
@@ -95,7 +95,7 @@
   - Improved statement PDF styling for print (Letter sizing, margins, page numbers, cleaner header/table layout).
   - Fixed statement PDF/email redirect flows and querystring handling.
 - Readiness:
-  - Added `APP_BASE_URL` check (warns when blank with DEBUG=False) so email deep links remain reliable.
+  - Added `SITE_BASE_URL` check (warns when blank with DEBUG=False) so email deep links remain reliable.
 - Ops:
   - Added alert detail links in the Ops Alerts list table.
   - Added “Copy JSON” button on alert detail page.
@@ -1144,7 +1144,7 @@ Next:
 - Statements polish:
   - Added optional statement **date-range filter** (issue date; falls back to created date when issue date missing).
   - CSV/PDF exports honor the same date range.
-  - Added `APP_BASE_URL` setting so statement emails/PDFs can include a **“View statement”** link back into the app.
+  - Added `SITE_BASE_URL` setting so statement emails/PDFs can include a **“View statement”** link back into the app.
 - Ops:
   - Added **alert detail** page and deep links from Ops dashboard “Recent alerts”.
   - Added **Send test alert** panel on Ops dashboard to exercise alert routing.
@@ -1153,7 +1153,7 @@ Next:
   - Replaced placeholder text with actual placeholder images under `static/images/helpcenter/` (ready to swap with real screenshots).
 
 **Notes:**
-- `APP_BASE_URL` should be set in production (ex: `https://ez360pm.com`). If blank, emails/PDFs simply omit the link.
+- `SITE_BASE_URL` should be set in production (ex: `https://ez360pm.com`). If blank, emails/PDFs simply omit the link.
 
 
 ## 2026-02-16 — Phase 7H33 (Statement email preview + PDF error hints + Ops JSON download + Help screenshots)
@@ -1171,18 +1171,18 @@ Next:
 
 **NEXT:**
 - Continue swapping screenshot placeholders for the Accounting pages.
-- Inline warning UI on Statements page for missing `APP_BASE_URL` and missing WeasyPrint.
+- Inline warning UI on Statements page for missing `SITE_BASE_URL` and missing WeasyPrint.
 
 ## 2026-02-16 — Phase 7H34 (Help Center Accounting screenshots + Statement inline warnings + Ops alert quick-filters)
 
 **Shipped:**
 - Help Center: finished removing remaining "[Screenshot: ...]" text blocks and replaced Accounting screenshots with placeholder screenshot cards (CoA, Journal Entries, Reports index, General Ledger).
-- Statements: added inline warning banner on the Statement page when `APP_BASE_URL` is missing and/or WeasyPrint is not installed (so staff know why PDF / deep links may not work).
+- Statements: added inline warning banner on the Statement page when `SITE_BASE_URL` is missing and/or WeasyPrint is not installed (so staff know why PDF / deep links may not work).
 - Ops Alerts: KPI cards (Open/Webhooks/Email/Slow) now act as one-click quick-filters using querystring parameters.
 
 **Why:**
 - Help Center needs consistent, professional screenshot sections (even as placeholders) to serve as a launch manual.
-- Statements should communicate environment limitations up-front (missing `APP_BASE_URL` or WeasyPrint) to prevent “dead-end” actions.
+- Statements should communicate environment limitations up-front (missing `SITE_BASE_URL` or WeasyPrint) to prevent “dead-end” actions.
 - Ops quick-filters reduce time-to-triage while staying compatible with existing URL/querystring filtering.
 
 
@@ -1233,7 +1233,7 @@ Next:
   - Statement page now shows a **Failed attempts** table (attempt time + last error) and supports **one-click reschedule (+7 days)**.
 - Ops:
   - Ops Dashboard now includes copy/paste cron commands.
-  - Added scheduler/env sanity warnings (APP_BASE_URL + email backend/SMTP placeholder checks).
+  - Added scheduler/env sanity warnings (SITE_BASE_URL + email backend/SMTP placeholder checks).
 
 **Notes:**
 - Attempt metadata is intentionally lightweight (timestamp + counter) and is updated even when the underlying send fails.
@@ -1247,7 +1247,7 @@ Next:
   - Failed reminders UI now supports **reschedule-to-date** (date input) instead of only “+7 days”. Blank date still defaults to +7 days.
   - Added **Retry now** action (staff-only) to attempt sending a single reminder immediately, recording attempt metadata and updating status.
 - Ops:
-  - Expanded production scheduler/env sanity warnings to include **Stripe key presence**, **S3/storage readiness**, **backup S3 readiness**, and **APP_BASE_URL domain alignment** against ALLOWED_HOSTS + CSRF_TRUSTED_ORIGINS.
+  - Expanded production scheduler/env sanity warnings to include **Stripe key presence**, **S3/storage readiness**, **backup S3 readiness**, and **SITE_BASE_URL domain alignment** against ALLOWED_HOSTS + CSRF_TRUSTED_ORIGINS.
 
 **Notes:**
 - “Retry now” is synchronous and intended for support workflows; scheduled sending still uses the management command.

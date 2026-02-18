@@ -163,15 +163,15 @@ def run_launch_checks() -> List[Dict[str, Any]]:
     )
 
     # --- App base URL (used in outbound emails for deep links)
-    app_base_url = (getattr(settings, "APP_BASE_URL", "") or "").strip()
+    site_base_url = (getattr(settings, "SITE_BASE_URL", "") or "").strip()
     out.append(
         _result(
-            check_id="app_base_url",
-            title="APP_BASE_URL configured (for email links)",
-            ok=bool(app_base_url) or debug,
+            check_id="site_base_url",
+            title="SITE_BASE_URL configured (for email links)",
+            ok=bool(site_base_url) or debug,
             level="warn",
-            message=f"APP_BASE_URL={app_base_url or '(blank)'}",
-            hint="Set APP_BASE_URL (e.g. https://ez360pm.com) so statement and notification emails can link back to the app.",
+            message=f"SITE_BASE_URL={site_base_url or '(blank)'}",
+            hint="Set SITE_BASE_URL (e.g. https://ez360pm.com) so statement and notification emails can link back to the app.",
         )
     )
 

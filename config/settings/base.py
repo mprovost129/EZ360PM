@@ -126,9 +126,8 @@ INSTALLED_APPS = [
 ]
 
 # Optional dependency for S3 media storage
-if _getenv_bool("USE_S3", False):
-    if "storages" not in INSTALLED_APPS:
-        INSTALLED_APPS.append("storages")
+if _getenv_bool("USE_S3", False) and "storages" not in INSTALLED_APPS:
+    INSTALLED_APPS.append("storages")
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -185,16 +184,12 @@ ASGI_APPLICATION = "config.asgi.application"
 # --------------------------------------------------------------------------------------
 # Database
 # --------------------------------------------------------------------------------------
-#
 # Priority order:
 #  1) DATABASE_URL (Render recommended)
 #  2) POSTGRES_* vars
 #  3) legacy NAME/USER/PASSWORD/HOST/PORT vars
 #  4) sqlite fallback (local boot convenience)
-#
-DATABASE_URL = _getenv("DATABASE_URL", "").strip()
-
-if DATABASE_URL:
+if DATABASE_URL := _getenv("DATABASE_URL", "").strip():
     if IS_RENDER:
         DATABASE_URL = _ensure_sslmode_require(DATABASE_URL)
 
@@ -302,7 +297,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # --------------------------------------------------------------------------------------
 
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = _getenv("TIME_ZONE", "UTC")
+TIME_ZONE = _getenv("TIME_ZONE", "America/New_York")
 USE_I18N = True
 USE_TZ = True
 
@@ -413,7 +408,7 @@ LOGOUT_REDIRECT_URL = "/"
 SITE_NAME = _getenv("SITE_NAME", "EZ360PM")
 
 # Absolute public base URL for building links in emails/PDFs (e.g. https://ez360pm.com)
-APP_BASE_URL = _getenv("APP_BASE_URL", "").strip()
+SITE_BASE_URL = _getenv("SITE_BASE_URL", "").strip()
 
 
 # --------------------------------------------------------------------------------------
@@ -584,9 +579,8 @@ def apply_runtime_defaults() -> None:
     else:
         EZ360_ALERT_ON_EMAIL_FAILURE = not DEBUG
 
-    _raw_admins = _getenv("EZ360_ADMINS", "").strip()
     ADMINS = []
-    if _raw_admins:
+    if (_raw_admins := _getenv("EZ360_ADMINS", "").strip()):
         for part in _raw_admins.split(","):
             part = part.strip()
             if not part:

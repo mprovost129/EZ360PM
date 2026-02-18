@@ -39,18 +39,21 @@ def _lookup_key_for_base(plan: str, interval: str) -> str:
     if interval not in {BillingInterval.MONTH, BillingInterval.YEAR}:
         raise ValueError("Invalid interval.")
 
-    if plan == PlanCode.STARTER and interval == BillingInterval.MONTH:
-        return "ez360pm_starter_monthly"
-    if plan == PlanCode.STARTER and interval == BillingInterval.YEAR:
-        return "ez360pm_starter_annual"
-    if plan == PlanCode.PROFESSIONAL and interval == BillingInterval.MONTH:
-        return "ez360pm_pro_monthly"
-    if plan == PlanCode.PROFESSIONAL and interval == BillingInterval.YEAR:
-        return "ez360pm_pro_annual"
-    if plan == PlanCode.PREMIUM and interval == BillingInterval.MONTH:
-        return "ez360pm_premium_monthly"
-    if plan == PlanCode.PREMIUM and interval == BillingInterval.YEAR:
-        return "ez360pm_premium_annual"
+    if plan == PlanCode.STARTER:
+        if interval == BillingInterval.MONTH:
+            return "ez360pm_starter_monthly"
+        if interval == BillingInterval.YEAR:
+            return "ez360pm_starter_yearly"
+    elif plan == PlanCode.PROFESSIONAL:
+        if interval == BillingInterval.MONTH:
+            return "ez360pm_pro_monthly"
+        if interval == BillingInterval.YEAR:
+            return "ez360pm_pro_yearly"
+    elif plan == PlanCode.PREMIUM:
+        if interval == BillingInterval.MONTH:
+            return "ez360pm_premium_monthly"
+        if interval == BillingInterval.YEAR:
+            return "ez360pm_premium_yearly"
 
     raise ValueError("Invalid plan/interval.")
 
@@ -59,7 +62,7 @@ def _lookup_key_for_seat(interval: str) -> str:
     if interval == BillingInterval.MONTH:
         return "ez360pm_seat_monthly"
     if interval == BillingInterval.YEAR:
-        return "ez360pm_seat_annual"
+        return "ez360pm_seat_yearly"
     raise ValueError("Invalid interval.")
 
 

@@ -213,8 +213,8 @@ Table modernization pass:
 - Statements polish:
   - Added optional date-range filter (issue date; falls back to created date when issue date missing).
   - CSV/PDF exports honor the same date range.
-  - Statement email now includes an optional “View statement” link back into the app (requires `APP_BASE_URL`).
-  - PDF includes optional period + “View online” link (requires `APP_BASE_URL`).
+  - Statement email now includes an optional “View statement” link back into the app (requires `SITE_BASE_URL`).
+  - PDF includes optional period + “View online” link (requires `SITE_BASE_URL`).
 - Ops:
   - Added per-alert detail page and deep links from Ops Dashboard recent alerts list.
   - Added “Send test alert” panel on Ops Dashboard to exercise routing.
@@ -229,7 +229,7 @@ Table modernization pass:
   - Improved statement PDF styling for print (Letter sizing, margins, page numbers, cleaner header/table layout).
   - Fixed statement PDF/email redirect flows and querystring handling.
 - Readiness:
-  - Added `APP_BASE_URL` check (warns when blank with DEBUG=False) so email deep links are reliable.
+  - Added `SITE_BASE_URL` check (warns when blank with DEBUG=False) so email deep links are reliable.
 - Ops:
   - Added alert detail links in the Ops Alerts list table.
   - Added “Copy JSON” button on alert detail page.
@@ -250,7 +250,7 @@ Table modernization pass:
 ## Phase 7H34 — Help Center Accounting screenshots + Statement inline warnings + Ops alert filter affordances (DONE)
 
 - Help Center: replaced remaining Accounting screenshot text with placeholder screenshot cards (Chart of Accounts, Journal Entries, Reports, General Ledger) and removed all "[Screenshot: ...]" text blocks.
-- Statements: added inline warning banner on the Statement page when `APP_BASE_URL` is missing and/or WeasyPrint is not installed.
+- Statements: added inline warning banner on the Statement page when `SITE_BASE_URL` is missing and/or WeasyPrint is not installed.
 - Ops: made alert KPI cards clickable quick-filters (open + source) while preserving querystring-based filters.
 
 ## Phase 7H35 — Ops alert pagination + bulk resolve + statement recipient defaults + finance help permissions (DONE)
@@ -296,7 +296,7 @@ Table modernization pass:
   - Statement page now shows a **Failed attempts** table (with last error) and a **one-click reschedule** action.
 - Ops:
   - Ops Dashboard now includes copy/paste cron commands (same list as Ops Checks).
-  - Added scheduler/env sanity warnings (APP_BASE_URL + email backend/SMTP placeholder checks).
+  - Added scheduler/env sanity warnings (SITE_BASE_URL + email backend/SMTP placeholder checks).
 - Help Center:
   - No content changes in this phase (still pending real screenshots once UI is stable).
 

@@ -997,7 +997,7 @@ def client_statement(request, client_pk):
         qs_params.append(f"date_to={date_to.isoformat()}")
     querystring = ("?" + "&".join(qs_params)) if qs_params else ""
 
-    app_base_url = getattr(settings, "APP_BASE_URL", "").strip()
+    site_base_url = getattr(settings, "SITE_BASE_URL", "").strip()
     weasyprint_installed = _weasyprint_is_installed()
 
     # Phase 7H35/7H38: default recipient comes from (1) last-used session value,
@@ -1073,7 +1073,7 @@ def client_statement(request, client_pk):
             "rows": rows,
             "total_due_cents": total_due,
             "total_due": _money(total_due),
-            "app_base_url_missing": not bool(app_base_url),
+            "site_base_url_missing": not bool(site_base_url),
             "weasyprint_missing": not bool(weasyprint_installed),
             "date_from": date_from,
             "date_to": date_to,
@@ -1205,7 +1205,7 @@ def client_statement_pdf(request, client_pk):
             "generated_at": timezone.now(),
             "date_from": date_from,
             "date_to": date_to,
-            "app_base_url": getattr(settings, "APP_BASE_URL", "").strip(),
+            "site_base_url": getattr(settings, "SITE_BASE_URL", "").strip(),
             "statement_path": reverse("documents:client_statement", kwargs={"client_pk": client.id}),
         },
     )

@@ -231,9 +231,9 @@ def ops_dashboard(request: HttpRequest) -> HttpResponse:
 
     scheduler_warnings: list[str] = []
     if not bool(getattr(settings, "DEBUG", False)):
-        app_base_url = (getattr(settings, "APP_BASE_URL", "") or "").strip()
-        if not app_base_url:
-            scheduler_warnings.append("APP_BASE_URL is not set. Scheduled emails will omit deep links.")
+        site_base_url = (getattr(settings, "SITE_BASE_URL", "") or "").strip()
+        if not site_base_url:
+            scheduler_warnings.append("SITE_BASE_URL is not set. Scheduled emails will omit deep links.")
 
         email_backend = (getattr(settings, "EMAIL_BACKEND", "") or "")
         if "console" in email_backend.lower():
@@ -277,26 +277,26 @@ def ops_dashboard(request: HttpRequest) -> HttpResponse:
             if not b:
                 scheduler_warnings.append("BACKUP_ENABLED is true with BACKUP_STORAGE=s3, but BACKUP_S3_BUCKET is not set.")
 
-        # Domain readiness: APP_BASE_URL should align with ALLOWED_HOSTS + CSRF_TRUSTED_ORIGINS
-        if app_base_url:
+        # Domain readiness: SITE_BASE_URL should align with ALLOWED_HOSTS + CSRF_TRUSTED_ORIGINS
+        if site_base_url:
             try:
-                parsed = urlparse(app_base_url)
+                parsed = urlparse(site_base_url)
                 host = (parsed.hostname or "").strip()
                 scheme = (parsed.scheme or "").strip()
 
                 if not host:
-                    scheduler_warnings.append("APP_BASE_URL is set but could not parse a hostname.")
+                    scheduler_warnings.append("SITE_BASE_URL is set but could not parse a hostname.")
                 else:
                     allowed_hosts = set(getattr(settings, "ALLOWED_HOSTS", []) or [])
                     if host not in allowed_hosts and f".{host}" not in allowed_hosts:
-                        scheduler_warnings.append("APP_BASE_URL host is not present in ALLOWED_HOSTS.")
+                        scheduler_warnings.append("SITE_BASE_URL host is not present in ALLOWED_HOSTS.")
 
                     csrf = set(getattr(settings, "CSRF_TRUSTED_ORIGINS", []) or [])
                     expected_origin = f"{scheme or 'https'}://{host}"
                     if expected_origin not in csrf:
-                        scheduler_warnings.append("APP_BASE_URL origin is not present in CSRF_TRUSTED_ORIGINS.")
+                        scheduler_warnings.append("SITE_BASE_URL origin is not present in CSRF_TRUSTED_ORIGINS.")
             except Exception:
-                scheduler_warnings.append("APP_BASE_URL parsing failed. Verify it is a full URL like https://ez360pm.com")
+                scheduler_warnings.append("SITE_BASE_URL parsing failed. Verify it is a full URL like https://ez360pm.com")
 
     metrics = {
         "companies_total": Company.objects.count(),

@@ -14,7 +14,7 @@ DEFAULT_LAUNCH_GATE_ITEMS = [
     {
         "key": "env-prod-ready",
         "title": "Production environment configured",
-        "description": "DEBUG=False, APP_BASE_URL set, ALLOWED_HOSTS/CSRF trusted origins correct, secret keys present.",
+        "description": "DEBUG=False, SITE_BASE_URL set, ALLOWED_HOSTS/CSRF trusted origins correct, secret keys present.",
     },
     {
         "key": "email-delivery",

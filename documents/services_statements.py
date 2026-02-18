@@ -209,12 +209,12 @@ def build_statement_email_preview(
                 "PDF attachment requires WeasyPrint and system dependencies (Cairo/Pango). Install WeasyPrint to enable attachments."
             )
 
-    app_base_url = (getattr(settings, "APP_BASE_URL", "") or "").strip()
-    if not app_base_url:
-        warnings.append("APP_BASE_URL is not set. The email will not include a 'View statement' link.")
+    site_base_url = (getattr(settings, "SITE_BASE_URL", "") or "").strip()
+    if not site_base_url:
+        warnings.append("SITE_BASE_URL is not set. The email will not include a 'View statement' link.")
 
     return StatementEmailPreview(
-        ok=(len(errors) == 0),
+        ok=not errors,
         to=to_addr or None,
         subject=spec.subject,
         html=html,
@@ -320,7 +320,7 @@ def _render_statement_pdf_for_email(*, company: Company, client: Client, date_fr
 
     rows, total_due = _statement_rows(company, client, date_from=date_from, date_to=date_to)
 
-    app_base_url = (getattr(settings, "APP_BASE_URL", "") or "").strip()
+    site_base_url = (getattr(settings, "SITE_BASE_URL", "") or "").strip()
     statement_path = reverse("documents:client_statement", kwargs={"client_pk": client.id})
 
     html = render_to_string(
@@ -334,7 +334,7 @@ def _render_statement_pdf_for_email(*, company: Company, client: Client, date_fr
             "date_from": date_from,
             "date_to": date_to,
             "generated_at": timezone.now(),
-            "app_base_url": app_base_url,
+            "site_base_url": site_base_url,
             "statement_path": statement_path,
         },
     )
