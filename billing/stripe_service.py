@@ -130,10 +130,13 @@ def create_billing_portal_session(
 
     log_event(
         company=company,
-        actor=getattr(request, "user", None),
-        action="billing.stripe.portal_started",
-        message="Stripe customer portal opened.",
-        metadata={"stripe_portal_session_id": str(session.get("id", ""))},
+        actor=getattr(request, "active_employee", None),
+        event_type="billing.stripe.portal_started",
+        object_type="company",
+        object_id=company.id,
+        summary="Stripe customer portal opened.",
+        payload={"stripe_portal_session_id": str(session.get("id", ""))},
+        request=request,
     )
     return PortalSessionResult(url=str(session["url"]))
 
@@ -189,10 +192,13 @@ def create_subscription_checkout_session(
 
     log_event(
         company=company,
-        actor=getattr(request, "user", None),
-        action="billing.stripe.checkout_started",
-        message=f"Stripe checkout started ({plan}/{interval}).",
-        metadata={"stripe_session_id": str(session.get("id", ""))},
+        actor=getattr(request, "active_employee", None),
+        event_type="billing.stripe.checkout_started",
+        object_type="company",
+        object_id=company.id,
+        summary=f"Stripe checkout started ({plan}/{interval}).",
+        payload={"stripe_session_id": str(session.get("id", ""))},
+        request=request,
     )
 
     return CheckoutSessionResult(id=str(session["id"]), url=str(session["url"]))

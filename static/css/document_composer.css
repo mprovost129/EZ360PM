@@ -1,7 +1,12 @@
 .ez-paper-wrap {
   display: flex;
   justify-content: center;
-  /* Keep the sticky save/footer bar aligned with the paper width */
+}
+
+/* Keep the sticky save/footer bar aligned with the paper width.
+   The footer sits *outside* .ez-paper-wrap but inside .ez-form.
+*/
+.ez-form[data-doc-form="1"]{
   --ez-form-max-width: 920px;
 }
 

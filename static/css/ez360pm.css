@@ -13,7 +13,7 @@
   --ez-bg: #ffffff;
   --ez-surface: #ffffffbb;
   --ez-muted-bg: #ffffff;
-  --ez-border: #1f5fbf;
+  --ez-border: #e5e7eb;
 
   --ez-text: #0f172a;
   --ez-text-muted: #64748b;
@@ -43,9 +43,9 @@
 
 /* UI layer surfaces */
   --ez-nav-bg: #F3F6FB;
-  --ez-sidebar-bg: #F3F6FB;
-  --ez-card-bg: #F3F6FB;
-  --ez-card-border: #1f5fbf;
+  --ez-sidebar-bg: #F8FAFC;
+  --ez-card-bg: #F9FBFD;
+  --ez-card-border: #E5EAF1;
   --ez-input-bg: #FFFFFF;
 }
 
@@ -56,8 +56,8 @@ html[data-theme="dark"]{
   --ez-muted-bg: #0b1220;
   --ez-border: #243244;
 
-  --ez-text: white;
-  --ez-text-muted: rgba(255, 255, 255, 0.801);
+  --ez-text: #e5e7eb;
+  --ez-text-muted: #9ca3af;
 
   --ez-link: #7fb3ff;
   --ez-link-hover: #a6c9ff;
@@ -85,19 +85,19 @@ a:hover{ color: var(--ez-link-hover); }
 
 /* Buttons (brand-aligned without re-theming Bootstrap) */
 .btn-ez{
-  background: linear-gradient(180deg, var(--ez-blue), var(--ez-blue-2));
-  border-color: #1f5fbf;
+  background: linear-gradient(180deg, var(--ez-blue), var(--ez-blue-2))
+  border-color: rgba(0,0,0,.02)
 }
 .btn-ez:hover,
 .btn-ez:focus{
   background: linear-gradient(180deg, var(--ez-blue-2), #123a78)
 }
 .btn-outline-primary{
-  border-color: rgba(31,95,191,.35);
-  color: var(--ez-blue);
+  border-color: rgba(31,95,191,.35)
+  color: var(--ez-blue)
 }
 .btn-outline-primary:hover{
-  background: rgba(31,95,191,.10);
+  background: rgba(31,95,191,.10)
   color: var(--ez-blue-2)
 }
 
@@ -142,12 +142,12 @@ html[data-theme="dark"] .input-group-text{
 /* Subtle divider styling for headers/footers */
 .card .card-footer{
   background: transparent;
-  border-top-color: var(--ez-card-border);
+  border-top-color: var(--ez-border);
 }
 
 .navbar{
-  background: var(--ez-nav-bg) !important;
-  border-bottom-color: var(--ez-card-border) !important;
+  background: var(--ez-surface) !important;
+  border-bottom-color: var(--ez-border) !important;
 }
 
 /* Topbar sizing + iOS safe-area support */
@@ -179,7 +179,7 @@ html[data-theme="dark"] .input-group-text{
 .app-sidebar{
   width: var(--sidebar-w);
   border-right: 1px solid var(--ez-border);
-  background: var(--ez-sidebar-bg);
+  background: var(--ez-surface);
   height: calc(100vh - var(--topbar-h));
   overflow-y: auto; /* allow scroll when too many items */
   overflow-x: hidden;
@@ -544,7 +544,7 @@ body{
 
 /* Cards: light surface + border for hierarchy */
 .card{
-  background: var(--ez-card-bg) !important;
+  background: var(--ez-nav-bg) !important;
   border: 1px solid var(--ez-card-border) !important;
   border-radius: 1rem !important;
 }
