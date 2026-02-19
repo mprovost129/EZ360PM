@@ -125,24 +125,48 @@ def help_trial_balance(request):
 
 
 def legal_terms(request):
-    return render(request, "helpcenter/legal_terms.html", {"shell": _shell_template(request)})
+    return render(
+        request,
+        "helpcenter/legal_terms.html",
+        {"shell": _shell_template(request), "legal_last_updated": "February 18, 2026"},
+    )
 
 
 def legal_privacy(request):
-    return render(request, "helpcenter/legal_privacy.html", {"shell": _shell_template(request)})
+    return render(
+        request,
+        "helpcenter/legal_privacy.html",
+        {"shell": _shell_template(request), "legal_last_updated": "February 18, 2026"},
+    )
 
 
 def legal_cookies(request):
-    return render(request, "helpcenter/legal_cookies.html", {"shell": _shell_template(request)})
+    return render(
+        request,
+        "helpcenter/legal_cookies.html",
+        {"shell": _shell_template(request), "legal_last_updated": "February 18, 2026"},
+    )
 
 
 def legal_acceptable_use(request):
-    return render(request, "helpcenter/legal_acceptable_use.html", {"shell": _shell_template(request)})
+    return render(
+        request,
+        "helpcenter/legal_acceptable_use.html",
+        {"shell": _shell_template(request), "legal_last_updated": "February 18, 2026"},
+    )
 
 
 def legal_security(request):
-    return render(request, "helpcenter/legal_security.html", {"shell": _shell_template(request)})
+    return render(
+        request,
+        "helpcenter/legal_security.html",
+        {"shell": _shell_template(request), "legal_last_updated": "February 18, 2026"},
+    )
 
 
 def legal_refund_policy(request):
-    return render(request, "helpcenter/legal_refund_policy.html", {"shell": _shell_template(request)})
+    return render(
+        request,
+        "helpcenter/legal_refund_policy.html",
+        {"shell": _shell_template(request), "legal_last_updated": "February 18, 2026"},
+    )

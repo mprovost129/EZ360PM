@@ -11,8 +11,8 @@
   --ez-green-2: #2a8a55;
 
   --ez-bg: #ffffff;
-  --ez-surface: #ffffff;
-  --ez-muted-bg: #f8fafc;
+  --ez-surface: #ffffffbb;
+  --ez-muted-bg: #ffffff;
   --ez-border: #e5e7eb;
 
   --ez-text: #0f172a;
@@ -40,6 +40,13 @@
      (even ones missing `shadow-sm`) to feel consistent and intentional.
   */
   --ez-card-shadow: 0 .125rem .25rem rgba(0,0,0,.075);
+
+/* UI layer surfaces */
+  --ez-nav-bg: #F3F6FB;
+  --ez-sidebar-bg: #F8FAFC;
+  --ez-card-bg: #F9FBFD;
+  --ez-card-border: #E5EAF1;
+  --ez-input-bg: #FFFFFF;
 }
 
 /* Dark theme */
@@ -64,11 +71,13 @@ html[data-theme="dark"]{
   --bs-body-bg: var(--ez-bg);
 
   --ez-card-shadow: 0 .125rem .25rem rgba(0,0,0,.35);
-}
 
-body{
-  background: var(--ez-bg) !important;
-  color: var(--ez-text);
+/* UI layer surfaces (dark) */
+  --ez-nav-bg: var(--ez-surface);
+  --ez-sidebar-bg: var(--ez-muted-bg);
+  --ez-card-bg: var(--ez-surface);
+  --ez-card-border: var(--ez-border);
+  --ez-input-bg: var(--ez-surface);
 }
 
 a{ color: var(--ez-link); }
@@ -501,4 +510,81 @@ html[data-theme="dark"] .ez-form-footer{
   .ez-ops-toolbar .btn{
     white-space: nowrap;
   }
+}
+
+
+/* ==========================================================
+   PHASE: UI LAYER CONSISTENCY (Navbar/Sidebar/Cards/Inputs)
+   - Adds subtle structural contrast for a premium SaaS feel.
+   - IMPORTANT: Does NOT change active sidebar item styling.
+   ========================================================== */
+
+body{
+  background-color: var(--ez-bg);
+  color: var(--ez-text);
+}
+
+/* Navbar: subtle tint + divider + soft shadow */
+.navbar{
+  background: var(--ez-nav-bg) !important;
+  border-bottom: 1px solid var(--ez-border) !important;
+  box-shadow: 0 2px 6px rgba(31, 95, 191, 0.04);
+}
+
+/* Sidebar surface (active item styles remain controlled by existing rules) */
+.sidebar,
+#sidebar{
+  background: var(--ez-sidebar-bg);
+  border-right: 1px solid var(--ez-border);
+}
+
+/* Cards: light surface + border for hierarchy */
+.card{
+  background: var(--ez-nav-bg) !important;
+  border: 1px solid var(--ez-card-border) !important;
+  border-radius: 1rem !important;
+}
+
+/* Card headers remain clean but separated */
+.card .card-header{
+  background: transparent;
+  border-bottom: 1px solid var(--ez-card-border);
+  font-weight: 600;
+}
+
+/* Inputs: white on cards + branded focus ring */
+.form-control,
+.form-select{
+  background-color: var(--ez-input-bg);
+  border: 1px solid #D6DEE8;
+  border-radius: .75rem;
+}
+
+.form-control:focus,
+.form-select:focus{
+  border-color: var(--ez-blue);
+  box-shadow: 0 0 0 .2rem rgba(31, 95, 191, 0.12);
+}
+
+/* Tables: subtle header tint + row hover */
+.table thead{
+  background-color: var(--ez-nav-bg);
+}
+
+.table-hover tbody tr:hover{
+  background-color: rgba(15, 23, 42, 0.03);
+}
+
+/* Dropdowns: consistent elevation */
+.dropdown-menu{
+  border-radius: .9rem;
+  border: 1px solid var(--ez-card-border);
+  box-shadow: 0 8px 24px rgba(31, 95, 191, 0.08);
+}
+
+/* Modals: match dropdown elevation */
+.modal-content{
+  border-radius: 1rem;
+  border: 1px solid var(--ez-card-border);
+  box-shadow: 0 16px 40px rgba(31, 95, 191, 0.10);
 }

@@ -37,267 +37,164 @@ def home(request: HttpRequest):
     return render(request, "core/home.html")
 
 
+
+
 @login_required
 def app_dashboard(request: HttpRequest):
-    """Logged-in dashboard. Requires an active company context."""
+    # Ensure an active company is selected (auto-select if possible).
     if not ensure_active_company_for_user(request):
         return redirect("companies:switch")
 
     company = get_active_company(request)
+    user = request.user
 
-    sub = build_subscription_summary(company) if company else None
-    plan = sub.plan if sub else PlanCode.STARTER
-    is_professional = plan_meets(plan, min_plan=PlanCode.PROFESSIONAL)
-    is_premium = plan_meets(plan, min_plan=PlanCode.PREMIUM)
+    subscription = build_subscription_summary(company)
+    plan_key = subscription.plan
 
     active_employee = getattr(request, "active_employee", None)
-    employee_role = getattr(active_employee, "role", EmployeeRole.STAFF)
+    employee_role = getattr(active_employee, "role", "staff")
 
     # ------------------------------------------------------------------
-    # Onboarding
+    # Dashboard period filter (Revenue/Expenses KPIs)
     # ------------------------------------------------------------------
-    steps = build_onboarding_checklist(company) if company else []
-    progress = onboarding_progress(steps) if company else None
-
-    # ------------------------------------------------------------------
-    # KPI window
-    # ------------------------------------------------------------------
+    # Values: month | last30 | last90 | ytd
     today = timezone.localdate()
-    month_start = today.replace(day=1)
-    month_end = (month_start + datetime.timedelta(days=32)).replace(day=1)
+    range_key = (request.GET.get("range") or "month").strip().lower()
+    if range_key not in {"month", "last30", "last90", "ytd"}:
+        range_key = "month"
 
-    # Revenue = succeeded payments in current month (net of refunds)
-    revenue_cents = int(
+    if range_key == "month":
+        start_date = today.replace(day=1)
+        if start_date.month == 12:
+            next_month = start_date.replace(year=start_date.year + 1, month=1, day=1)
+        else:
+            next_month = start_date.replace(month=start_date.month + 1, day=1)
+        end_date = next_month - datetime.timedelta(days=1)
+        kpi_period_label = start_date.strftime("%b %Y")
+    elif range_key == "last30":
+        start_date = today - datetime.timedelta(days=29)
+        end_date = today
+        kpi_period_label = "Last 30 days"
+    elif range_key == "last90":
+        start_date = today - datetime.timedelta(days=89)
+        end_date = today
+        kpi_period_label = "Last 90 days"
+    else:  # ytd
+        start_date = today.replace(month=1, day=1)
+        end_date = today
+        kpi_period_label = "Year to date"
+
+    start_dt = timezone.make_aware(datetime.datetime.combine(start_date, datetime.time.min))
+    end_dt = timezone.make_aware(datetime.datetime.combine(end_date, datetime.time.max))
+
+    # ------------------------------------------------------------------
+    # KPIs + lists
+    # ------------------------------------------------------------------
+    from payments.models import Payment
+    from expenses.models import Expense
+    from timetracking.models import TimeEntry
+    from documents.models import Document
+    from projects.models import Project
+
+    revenue_cents = (
         Payment.objects.filter(
             company=company,
-            deleted_at__isnull=True,
             status=PaymentStatus.SUCCEEDED,
-            payment_date__gte=month_start,
-            payment_date__lt=month_end,
-        ).aggregate(s=Sum("amount_cents"))["s"]
+            created_at__gte=start_dt,
+            created_at__lte=end_dt,
+        ).aggregate(total=Sum("amount_cents"))["total"]
         or 0
     )
 
-    refunded_cents = int(
-        Payment.objects.filter(
+    expenses_cents = (
+        Expense.objects.filter(
             company=company,
-            deleted_at__isnull=True,
-            status__in=[PaymentStatus.REFUNDED, PaymentStatus.SUCCEEDED],
-            payment_date__gte=month_start,
-            payment_date__lt=month_end,
-        ).aggregate(s=Sum("refunded_cents"))["s"]
+            date__gte=start_date,
+            date__lte=end_date,
+        ).aggregate(total=Sum("amount_cents"))["total"]
         or 0
     )
-    revenue_net_cents = max(revenue_cents - refunded_cents, 0)
 
-    # Expenses = approved/reimbursed expenses in current month (Professional+)
-    expenses_cents = 0
-    if is_professional:
-        expenses_cents = int(
-            Expense.objects.filter(
-                company=company,
-                deleted_at__isnull=True,
-                status__in=[ExpenseStatus.APPROVED, ExpenseStatus.REIMBURSED],
-                date__gte=month_start,
-                date__lt=month_end,
-            ).aggregate(s=Sum("total_cents"))["s"]
-            or 0
-        )
-
-    # A/R = balance due on sent/partially-paid invoices
-    ar_cents = int(
+    ar_cents = (
         Document.objects.filter(
             company=company,
-            deleted_at__isnull=True,
             doc_type=DocumentType.INVOICE,
             status__in=[DocumentStatus.SENT, DocumentStatus.PARTIALLY_PAID],
-        ).aggregate(s=Sum("balance_due_cents"))["s"]
+        ).aggregate(total=Sum("balance_due_cents"))["total"]
         or 0
     )
 
-    # Unbilled (billable, approved) time
-    unbilled_minutes = int(
+    unbilled_minutes = (
         TimeEntry.objects.filter(
             company=company,
-            deleted_at__isnull=True,
             billable=True,
-            status=TimeStatus.APPROVED,
             billed_document__isnull=True,
-        ).aggregate(s=Sum("duration_minutes"))["s"]
+            status__in=[TimeStatus.APPROVED, TimeStatus.SUBMITTED],
+        ).aggregate(total=Sum("duration_minutes"))["total"]
         or 0
     )
-    unbilled_hours = round(unbilled_minutes / 60.0, 1)
+    unbilled_hours = float(unbilled_minutes) / 60.0
 
-    # ------------------------------------------------------------------
-    # Payables summary (Professional+)
-    # ------------------------------------------------------------------
-    outstanding_payables_cents = 0
-    payables_due_soon_count = 0
-    if is_professional:
-        outstanding_payables_cents = int(
-            Bill.objects.filter(
-                company=company,
-                deleted_at__isnull=True,
-                status__in=[BillStatus.POSTED, BillStatus.PARTIALLY_PAID],
-            ).aggregate(s=Sum("balance_cents"))["s"]
-            or 0
-        )
-
-        due_soon_to = today + datetime.timedelta(days=7)
-        payables_due_soon_count = int(
-            Bill.objects.filter(
-                company=company,
-                deleted_at__isnull=True,
-                status__in=[BillStatus.POSTED, BillStatus.PARTIALLY_PAID],
-                due_date__isnull=False,
-                due_date__gte=today,
-                due_date__lte=due_soon_to,
-                balance_cents__gt=0,
-            ).count()
-        )
-
-    # ------------------------------------------------------------------
-    # Premium dashboard insights (Premium; role-gated in template)
-    # ------------------------------------------------------------------
-    premium_insights = None
-    if is_premium:
-        prev_month_end = month_start
-        prev_month_start = (month_start - datetime.timedelta(days=1)).replace(day=1)
-
-        prev_rev_cents = int(
-            Payment.objects.filter(
-                company=company,
-                deleted_at__isnull=True,
-                status=PaymentStatus.SUCCEEDED,
-                payment_date__gte=prev_month_start,
-                payment_date__lt=prev_month_end,
-            ).aggregate(s=Sum("amount_cents"))["s"]
-            or 0
-        )
-
-        prev_refunded_cents = int(
-            Payment.objects.filter(
-                company=company,
-                deleted_at__isnull=True,
-                status__in=[PaymentStatus.REFUNDED, PaymentStatus.SUCCEEDED],
-                payment_date__gte=prev_month_start,
-                payment_date__lt=prev_month_end,
-            ).aggregate(s=Sum("refunded_cents"))["s"]
-            or 0
-        )
-        prev_rev_net_cents = max(prev_rev_cents - prev_refunded_cents, 0)
-
-        prev_expenses_cents = 0
-        if is_professional:
-            prev_expenses_cents = int(
-                Expense.objects.filter(
-                    company=company,
-                    deleted_at__isnull=True,
-                    status__in=[ExpenseStatus.APPROVED, ExpenseStatus.REIMBURSED],
-                    date__gte=prev_month_start,
-                    date__lt=prev_month_end,
-                ).aggregate(s=Sum("total_cents"))["s"]
-                or 0
-            )
-
-        def _pct_change(cur: int, prev: int) -> float | None:
-            if prev <= 0:
-                return None
-            return round(((cur - prev) / float(prev)) * 100.0, 1)
-
-        rev_change_pct = _pct_change(revenue_net_cents, prev_rev_net_cents)
-        exp_change_pct = _pct_change(expenses_cents, prev_expenses_cents)
-
-        overdue_qs = Document.objects.filter(
-            company=company,
-            deleted_at__isnull=True,
-            doc_type=DocumentType.INVOICE,
-            status__in=[DocumentStatus.SENT, DocumentStatus.PARTIALLY_PAID],
-            due_date__isnull=False,
-            due_date__lt=today,
-            balance_due_cents__gt=0,
-        )
-        overdue_count = int(overdue_qs.count())
-        overdue_cents = int(overdue_qs.aggregate(s=Sum("balance_due_cents"))["s"] or 0)
-
-        dropbox = DropboxConnection.objects.filter(company=company).first()
-        dropbox_connected = bool(dropbox and dropbox.is_active)
-
-        premium_insights = {
-            "rev_last_month_net_cents": prev_rev_net_cents,
-            "rev_change_pct": rev_change_pct,
-            "expenses_last_month_cents": prev_expenses_cents,
-            "expenses_change_pct": exp_change_pct,
-            "overdue_count": overdue_count,
-            "overdue_cents": overdue_cents,
-            "dropbox_connected": dropbox_connected,
-        }
-
-    # ------------------------------------------------------------------
-    # Recent activity panels
-    # ------------------------------------------------------------------
-    recent_invoices = (
+    # Outstanding invoices: earliest due first. Include undated at bottom.
+    outstanding_base = (
         Document.objects.filter(
             company=company,
-            deleted_at__isnull=True,
             doc_type=DocumentType.INVOICE,
+            status__in=[DocumentStatus.SENT, DocumentStatus.PARTIALLY_PAID],
         )
-        .select_related("client", "project")
-        .order_by("-created_at")[:6]
-    )
-
-    recent_payments = (
-        Payment.objects.filter(company=company, deleted_at__isnull=True)
-        .select_related("client", "invoice")
-        .order_by("-created_at")[:6]
-    )
-
-    recent_time = (
-        TimeEntry.objects.filter(company=company, deleted_at__isnull=True)
-        .select_related("project", "client", "employee")
-        .order_by("-started_at", "-created_at")[:6]
-    )
-
-    due_soon_projects = (
-        Project.objects.filter(company=company, deleted_at__isnull=True, due_date__isnull=False)
         .select_related("client")
-        .order_by("due_date")[:6]
+        .order_by("due_date", "created_at")
+    )
+    outstanding_invoices = list(outstanding_base.filter(due_date__isnull=False)[:8])
+    if len(outstanding_invoices) < 8:
+        outstanding_invoices += list(outstanding_base.filter(due_date__isnull=True)[: (8 - len(outstanding_invoices))])
+
+    recent_open_projects = (
+        Project.objects.filter(company=company, is_active=True)
+        .select_related("client")
+        .order_by("-updated_at")[:8]
     )
 
-    return render(
-        request,
-        "core/app_dashboard.html",
-        {
-            "onboarding_steps": steps,
-            "onboarding_progress": progress,
-            "kpi": {
-                "revenue_net_cents": revenue_net_cents,
-                "expenses_cents": expenses_cents,
-                "ar_cents": ar_cents,
-                "unbilled_hours": unbilled_hours,
-                "month_label": month_start.strftime("%b %Y"),
-            },
-            "outstanding_payables_cents": outstanding_payables_cents,
-            "payables_due_soon_count": payables_due_soon_count,
-            "recent_invoices": recent_invoices,
-            "recent_payments": recent_payments,
-            "recent_time": recent_time,
-            "due_soon_projects": due_soon_projects,
-            "tier_flags": {
-                "is_professional": is_professional,
-                "is_premium": is_premium,
-            },
-            "premium_insights": premium_insights,
-            "dashboard_layout": _build_dashboard_layout_json(
-                company=company,
-                plan=plan,
-                employee_role=employee_role,
-            ),
-            "can_customize_dashboard": bool(
-                is_premium and has_min_role(active_employee, EmployeeRole.MANAGER)
-            ),
-        },
+    recent_expenses = (
+        Expense.objects.filter(company=company)
+        .select_related("vendor")
+        .order_by("-date", "-created_at")[:8]
     )
+
+    # Onboarding / getting started (right sidebar widget)
+    onboarding_steps = build_onboarding_checklist(company)
+    onboarding_progress_data = onboarding_progress(onboarding_steps)
+
+    dashboard_layout = _build_dashboard_layout_json(
+        company=company,
+        plan=plan_key,
+        employee_role=employee_role,
+    )
+
+    ctx = {
+        "company": company,
+        "user": user,
+        "subscription": subscription,
+        "dashboard_layout": dashboard_layout,
+        "onboarding_steps": onboarding_steps,
+        "onboarding_progress": onboarding_progress_data,
+        "kpi_period_key": range_key,
+        "kpi_period_label": kpi_period_label,
+        "kpis": {
+            "revenue_cents": revenue_cents,
+            "expenses_cents": expenses_cents,
+            "ar_cents": ar_cents,
+            "unbilled_hours": unbilled_hours,
+            "ar_as_of": today,
+            "unbilled_as_of": today,
+        },
+        # widget datasets
+        "outstanding_invoices": outstanding_invoices,
+        "recent_open_projects": recent_open_projects,
+        "recent_expenses": recent_expenses,
+    }
+
+    return render(request, "core/app_dashboard.html", ctx)
 
 
 def _build_dashboard_layout_json(*, company, plan: str, employee_role: str) -> dict[str, list[str]]:
@@ -344,7 +241,10 @@ def _build_dashboard_layout_json(*, company, plan: str, employee_role: str) -> d
     # Ensure basics are always present.
     for required in ["kpis", "quick_actions"]:
         if required in allowed and required not in left and required not in right:
-            left.insert(0, required)
+            if widgets.get(required) and widgets[required].default_column == "right":
+                right.insert(0, required)
+            else:
+                left.insert(0, required)
 
     return {"left": left, "right": right}
 

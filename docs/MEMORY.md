@@ -1,3 +1,20 @@
+## 2026-02-18 — Phase 9 Pack: P9-DASH-RIGHT-ACTIONS (DONE)
+
+## 2026-02-19 — UI Layer Consistency Sweep
+
+Updated `static/css/ez360pm.css` to introduce a structured surface system:
+- Navbar uses a subtle brand-tinted background with divider + soft shadow
+- Sidebar gets a light surface and divider (active item styling intentionally unchanged)
+- Cards use light gray surfaces with borders for hierarchy
+- Inputs remain white with branded focus ring
+- Tables/dropdowns/modals get consistent elevation and spacing cues
+
+
+- 2026-02-18: Dashboard refresh pack: added KPI Period filter (month/30/90/YTD), clarified KPI time-basis, and updated dashboard to focus on three monitoring lists (Outstanding invoices by due date, Recent open projects, Recent expenses). Removed time-entry panel from dashboard.
+
+- Dashboard UX polish: moved **Quick actions** into the right rail by default so the main column reads as a report while actions remain always available.
+- Updated layout resolver to place required widgets into their configured default column (prevents forced-left placement).
+
 ## 2026-02-18 — Phase 9 Pack: P9-DOC-TAX-SERVER (DONE)
 
 - Hardened server-side document totals by recomputing taxable line tax from `sales_tax_percent` in `recalc_document_totals`.
@@ -8,6 +25,17 @@
 
 - Added automated smoke tests to ensure all public legal pages render (prevents `TemplateDoesNotExist` regressions in production).
 - Target pages: Terms, Privacy, Cookies, Acceptable Use, Security, Refund Policy.
+
+## 2026-02-18 — Phase 9 — Legal policies content (P9-LEGAL-POLICIES)
+
+- Replaced placeholder legal text with full production-ready policies aligned to EZ360PM features:
+  - Terms of Service (includes seats/trials/Stripe billing, refund/proration rules, export responsibility)
+  - Privacy Policy (includes Stripe/Plaid/Dropbox/Sentry/AWS/Render, retention, transfers, rights)
+  - Cookies Policy (necessary/preferences/optional analytics, DNT note)
+  - Security page (safeguards + account security responsibilities)
+  - Acceptable Use Policy
+  - Refund Policy (summary page)
+- Standardized legal “Last updated” date via `legal_last_updated` context on helpcenter legal views.
 
 ## 2026-02-18 — Phase 9 — P9-BANK-DUPE-LINK shipped
 
@@ -1639,3 +1667,39 @@ Next:
 ## P9-LEGAL-PAGES (2026-02-18)
 - Fixed footer legal links (Terms/Privacy/Cookies/Security/Acceptable Use/Refund Policy) by adding missing templates under helpcenter.
 - Added smoke tests to ensure legal pages render (HTTP 200).
+
+
+## Phase 9 – P9-SCANNER-SHIELD
+- Added ScannerShieldMiddleware to short-circuit common bot/scanner endpoints (e.g. /webhook-test, /.env) and reduce log noise.
+- Added core tests for blocked probe paths.
+- Added helpcenter to INSTALLED_APPS to ensure legal/help pages render in production.
+
+## 2026-02-18 — Phase 9 (P9-NAV-SMOKE)
+- Added navigation smoke tests (`core/tests/test_nav_smoke.py`) covering:
+  - Public landing + footer legal links
+  - Public legal pages (Terms/Privacy/Cookies/Security)
+  - Key authenticated entry points (dashboard, clients, projects, invoices, expenses, help center)
+- Purpose: catch TemplateDoesNotExist/NoReverseMatch and other dead-end navigation regressions before deploy.
+
+
+## 2026-02-18 — P9-TESTING-GUIDE
+
+- Added `docs/TESTING.md` as the canonical testing guide (local + pre-deploy workflow, common failures, and Phase 9 must-pass targets).
+
+## 2026-02-18 — Phase 9 (P9-OPS-HEALTH-ENDPOINTS)
+
+- Added safe health endpoints for monitoring:
+  - `GET /health/` (public, minimal, returns 200/503)
+  - `GET /health/details/` (token-protected; disabled unless `HEALTHCHECK_TOKEN` is set)
+- Added docs:
+  - `docs/PRODUCTION_BASELINE.md`
+  - `docs/LAUNCH_GATE_CHECKLIST.md`
+- Updated `docs/ENV_VARS.md` with `HEALTHCHECK_TOKEN`.
+
+## 2026-02-18 — Phase 9 QA1 Manual Checklist + Seed
+- Added `docs/MANUAL_QA_CHECKLIST.md` as the launch-gate, click-by-click verification list (staging then production).
+- Added `python manage.py seed_qa` management command to quickly seed demo company/client/project/service/invoice/expense data for local/manual testing.
+- Added missing `__init__.py` for `core.management` packages (stability across environments).
+
+## 2026-02-18 — Phase 9 (P9-FOOTER-IN-APP)
+- Added the same legal footer links to **logged-in** pages by introducing a shared footer partial and including it in both `base_public.html` and `base_app.html`.

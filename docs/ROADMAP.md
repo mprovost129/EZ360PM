@@ -1,3 +1,44 @@
+## 2026-02-18 — Phase 9 (P9-DASH-FOCUS-LISTS) — Dashboard Focus Lists + KPI Period Filter (DONE)
+
+## 2026-02-19 — DONE: UI Layer Consistency (CSS)
+
+Applied an app-wide CSS layer consistency pass (navbar/sidebar/cards/inputs) without altering the active sidebar menu item color.
+Acceptance: dashboard + key CRUD pages show clear hierarchy; forms have white inputs on soft card surfaces; nav + sidebar visually separated.
+
+
+Goal: Make the dashboard read like a **financial + operations cockpit**: KPIs first, then the three lists that should be monitored daily.
+
+What's included
+- Added a **Period** filter (This month / Last 30 / Last 90 / YTD) that drives Revenue + Expenses KPIs.
+- KPI cards now clearly display their **time basis** (Revenue/Expenses = selected period; A/R + Unbilled = "as of" today).
+- Replaced the dashboard list panels with three high-signal sections:
+  - **Outstanding invoices** (ordered by due date, earliest first; limited list)
+  - **Recent open projects** (active only; completed excluded)
+  - **Recent expenses** (latest spend activity)
+- Updated dashboard widget registry defaults to match the new reading order.
+
+Acceptance checks
+- Dashboard loads with no errors; changing Period updates Revenue/Expenses card labels + totals.
+- Outstanding invoices list orders correctly by due date.
+- Open projects excludes inactive projects.
+- Dashboard no longer shows the time-tracking panel.
+
+---
+
+## 2026-02-18 — Phase 9 (P9-DASH-RIGHT-ACTIONS) — Dashboard Right-Rail Quick Actions (DONE)
+
+Goal: Move “Quick actions” into the right rail so the dashboard reads as a report on the left with actions always available.
+
+Done:
+- Updated dashboard widget registry: `quick_actions` now defaults to the **right** column with higher priority ordering.
+- Updated dashboard layout resolver so “required” widgets are inserted into their widget-defined default column (prevents forced-left placement).
+
+Acceptance checks:
+- Dashboard renders with KPIs on the left and Quick actions in the right rail by default (new layouts).
+- Existing custom layouts remain unchanged.
+
+---
+
 ## 2026-02-18 — Phase 9 (P9-DOC-TAX-SERVER) — Server-side Tax Recalc for Composer (DONE)
 
 Goal: Ensure document tax totals are correct even if JS is disabled and remain consistent when tax percent changes.
@@ -9,6 +50,20 @@ Done:
 Acceptance checks:
 - Creating/saving a document with `sales_tax_percent > 0` recomputes taxable line `tax_cents` and `line_total_cents`.
 - `python manage.py test documents` passes.
+
+## 2026-02-18 — Phase 9 (P9-NAV-SMOKE) — Navigation + Legal Page Smoke Tests (DONE)
+
+Goal: Prevent launch-blocking regressions (dead nav/footer links, missing templates, missing installed apps) by adding high-level smoke tests that load core public + authenticated entry points.
+
+Done:
+- Added `core/tests/test_nav_smoke.py`:
+  - Public landing renders (including footer legal links).
+  - Public legal pages return 200: Terms / Privacy / Cookies / Security.
+  - Authenticated entry points load (or redirect when gating applies): dashboard, clients, projects, invoices, expenses, help center.
+
+Acceptance checks:
+- `python manage.py test core helpcenter` passes.
+- Public footer links no longer regress silently (TemplateDoesNotExist / NoReverseMatch caught by tests).
 
 ## 2026-02-18 — Phase 9 (P9-BANK-DUPE-LINK) — Bank Review Duplicate-Link Action (DONE)
 
@@ -1231,3 +1286,28 @@ We are entering **Phase 9** with a strict **feature-by-feature QA + fix loop**.
 - Ensure all public legal routes render successfully in production.
 - Templates present for: terms, privacy, cookies, acceptable use, security, refund policy.
 - Smoke tests added in helpcenter app.
+
+### P9-LEGAL-POLICIES (DONE)
+- Replaced placeholder legal templates with full Terms/Privacy/Cookies/Security/AUP/Refund Policy content.
+- Added `legal_last_updated` context to standardize the “Last updated” date.
+
+
+## Phase 9 – P9-SCANNER-SHIELD
+
+- [x] P9-TESTING-GUIDE — Add `docs/TESTING.md` as canonical test workflow and must-pass targets.
+- Added ScannerShieldMiddleware to short-circuit common bot/scanner endpoints (e.g. /webhook-test, /.env) and reduce log noise.
+- Added core tests for blocked probe paths.
+- Added helpcenter to INSTALLED_APPS to ensure legal/help pages render in production.
+
+## Phase 9 – P9-OPS-HEALTH-ENDPOINTS
+
+- [x] Add `GET /health/` (safe public healthcheck) and `GET /health/details/` (token-protected; disabled unless configured).
+- [x] Document the production baseline + launch gate checklist.
+- [x] Add env var docs for `HEALTHCHECK_TOKEN`.
+
+## Phase 9 (QA) — QA1 Manual Checklist + Seed (DONE)
+- Added docs/MANUAL_QA_CHECKLIST.md and local seed_qa command.
+- Next: QA2 — permission matrix verification + billing trial/seat flows end-to-end + PDF parity spot-checks on staging/prod.
+
+### DONE — 2026-02-18
+- **P9-FOOTER-IN-APP:** Logged-in pages now show the same footer legal links as the public site (shared footer partial included in `base_app.html`).

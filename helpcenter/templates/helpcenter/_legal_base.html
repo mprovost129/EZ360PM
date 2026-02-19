@@ -6,7 +6,14 @@
   <div class="card shadow-sm">
     <div class="card-body p-4">
       <h1 class="h3 mb-3">{% block legal_title %}{% endblock %}</h1>
-      <p class="text-muted small mb-4">Last updated: {% now "F j, Y" %}</p>
+      <p class="text-muted small mb-4">
+        Last updated:
+        {% if legal_last_updated %}
+          {{ legal_last_updated }}
+        {% else %}
+          {% now "F j, Y" %}
+        {% endif %}
+      </p>
       {% block legal_body %}{% endblock %}
     </div>
   </div>

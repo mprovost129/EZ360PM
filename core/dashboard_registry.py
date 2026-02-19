@@ -18,7 +18,7 @@ class DashboardWidget:
 def get_dashboard_widgets() -> dict[str, DashboardWidget]:
     """Registry of widgets available on the dashboard."""
 
-    # NOTE: role comparisons are enforced elsewhere (template + decorators).
+    # NOTE: Role comparisons are enforced elsewhere (template + decorators).
     # This registry primarily drives customization UI and layout defaults.
     return {
         "kpis": DashboardWidget(
@@ -34,20 +34,30 @@ def get_dashboard_widgets() -> dict[str, DashboardWidget]:
             label="Quick actions",
             min_plan=PlanCode.STARTER,
             min_role="staff",
+            # Prefer quick actions in the right rail so the dashboard reads like a
+            # report on the left with actions always available.
+            default_column="right",
+            default_order=5,
+        ),
+        "outstanding_invoices": DashboardWidget(
+            key="outstanding_invoices",
+            label="Outstanding invoices (due date)",
+            min_plan=PlanCode.STARTER,
+            min_role="staff",
             default_column="left",
             default_order=20,
         ),
-        "recent_invoices": DashboardWidget(
-            key="recent_invoices",
-            label="Recent invoices",
+        "recent_open_projects": DashboardWidget(
+            key="recent_open_projects",
+            label="Recent open projects",
             min_plan=PlanCode.STARTER,
             min_role="staff",
             default_column="left",
             default_order=30,
         ),
-        "recent_time": DashboardWidget(
-            key="recent_time",
-            label="Recent time entries",
+        "recent_expenses": DashboardWidget(
+            key="recent_expenses",
+            label="Recent expenses",
             min_plan=PlanCode.STARTER,
             min_role="staff",
             default_column="left",
@@ -58,8 +68,8 @@ def get_dashboard_widgets() -> dict[str, DashboardWidget]:
             label="Getting started checklist",
             min_plan=PlanCode.STARTER,
             min_role="staff",
-            default_column="left",
-            default_order=50,
+            default_column="right",
+            default_order=70,
         ),
         "premium_insights": DashboardWidget(
             key="premium_insights",
@@ -76,14 +86,6 @@ def get_dashboard_widgets() -> dict[str, DashboardWidget]:
             min_role="manager",
             default_column="right",
             default_order=20,
-        ),
-        "due_soon_projects": DashboardWidget(
-            key="due_soon_projects",
-            label="Due soon projects",
-            min_plan=PlanCode.STARTER,
-            min_role="staff",
-            default_column="right",
-            default_order=30,
         ),
         "active_company": DashboardWidget(
             key="active_company",

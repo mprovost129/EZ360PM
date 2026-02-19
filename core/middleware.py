@@ -478,3 +478,54 @@ class SupportModeReadOnlyMiddleware(MiddlewareMixin):
             messages.error(request, "Support mode is read-only. Exit support mode to make changes.")
             return redirect("core:support_mode_status")
         return None
+
+
+
+class ScannerShieldMiddleware(MiddlewareMixin):
+    """Fast-path 404/410 for common internet scanner endpoints.
+
+    Render logs get noisy from bots probing for known paths (e.g. /webhook-test, /.env).
+    This middleware short-circuits those requests before URL resolution and view execution.
+
+    We intentionally keep this conservative: only obviously malicious/probe paths.
+    """
+
+    # Prefixes are matched case-sensitively against request.path.
+    BLOCK_PREFIXES = (
+        "/webhook-test",
+        "/.env",
+        "/.git",
+        "/wp-admin",
+        "/wp-login",
+        "/xmlrpc.php",
+        "/phpmyadmin",
+        "/pma",
+        "/cgi-bin",
+        "/vendor/phpunit",
+    )
+
+    # Exact paths that are common probes.
+    BLOCK_EXACT = (
+        "/.env",
+        "/.git/config",
+        "/.git/HEAD",
+    )
+
+    def process_request(self, request: HttpRequest):
+        path = request.path or "/"
+
+        # Never block static/media; let whitenoise/storage handle.
+        if path.startswith(settings.STATIC_URL) or path.startswith(getattr(settings, "MEDIA_URL", "/media/")):
+            return None
+
+        if path in self.BLOCK_EXACT:
+            from django.http import HttpResponseGone
+            return HttpResponseGone("Gone")
+
+        for pref in self.BLOCK_PREFIXES:
+            if path.startswith(pref):
+                # 404 is fine; 410 is also acceptable. Use 404 to avoid signaling too much.
+                from django.http import HttpResponseNotFound
+                return HttpResponseNotFound("Not Found")
+
+        return None

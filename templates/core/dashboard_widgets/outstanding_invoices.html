@@ -1,0 +1,54 @@
+{% load money %}
+
+<div class="card ez-card">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div>
+        <div class="fw-semibold">Outstanding invoices</div>
+        <div class="text-muted small">Earliest due first. Monitor this list to get paid.</div>
+      </div>
+      <a class="btn btn-sm btn-outline-dark" href="{% url 'documents:invoice_list' %}?type=invoice&amp;status=open">All invoices</a>
+    </div>
+
+    {% if outstanding_invoices %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr class="text-muted small">
+              <th style="width: 16%">Due</th>
+              <th>Invoice</th>
+              <th>Client</th>
+              <th class="text-end" style="width: 16%">Balance</th>
+              <th style="width: 12%">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inv in outstanding_invoices %}
+              <tr>
+                <td class="text-muted small">
+                  {% if inv.due_date %}{{ inv.due_date|date:"M j" }}{% else %}—{% endif %}
+                </td>
+                <td>
+                  <a href="{% url 'documents:document_detail' inv.id %}">
+                    {{ inv.number|default:"(unassigned)" }}
+                  </a>
+                </td>
+                <td class="text-muted small">
+                  {{ inv.client.name|default:"—" }}
+                </td>
+                <td class="text-end">
+                  {{ inv.balance_due_cents|money }}
+                </td>
+                <td class="text-muted small">
+                  {{ inv.get_status_display }}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-muted small">No outstanding invoices.</div>
+    {% endif %}
+  </div>
+</div>

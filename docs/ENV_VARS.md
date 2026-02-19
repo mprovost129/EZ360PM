@@ -107,6 +107,12 @@ or
 - SENTRY_TRACES_SAMPLE_RATE (optional; default 0.05)
 - SENTRY_PROFILES_SAMPLE_RATE (optional; default 0.0)
 
+## Ops / Health
+
+- `HEALTHCHECK_TOKEN` (optional)
+  - If set, enables `GET /health/details/` which requires the token.
+  - Provide token via `X-Health-Token` header or `?token=` query.
+
 ## Ops Retention / Pruning
 
 - `EZ360_AUDIT_RETENTION_DAYS` — prune `audit.AuditEvent` older than this (default 365)

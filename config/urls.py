@@ -6,11 +6,17 @@ from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from ops import views as ops_views
+from core import views_health
 
 
 urlpatterns = [
     path("healthz/", ops_views.healthz, name="healthz"),
     path("version/", ops_views.version, name="version"),
+
+    # Health checks (safe for monitors)
+    path("health/", views_health.health, name="health"),
+    path("health/details/", views_health.health_details, name="health_details"),
+
     # Public + app pages
     path("", include("core.urls")),
     path("", include("helpcenter.urls")),

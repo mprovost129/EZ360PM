@@ -1194,3 +1194,17 @@ These labels are recorded in `docs/QA_PLAN.md` (QA Ledger) and referenced in `do
 
 ## P9-LEGAL-PAGES
 Legal and help pages must be treated as production routes. Missing-template regressions are prevented via smoke tests covering all public legal URLs.
+
+
+## Phase 9 – P9-SCANNER-SHIELD
+- Added ScannerShieldMiddleware to short-circuit common bot/scanner endpoints (e.g. /webhook-test, /.env) and reduce log noise.
+- Added core tests for blocked probe paths.
+- Added helpcenter to INSTALLED_APPS to ensure legal/help pages render in production.
+
+## 2026-02-18 — Ops health endpoints design
+- `GET /health/` is intentionally **public** and **minimal** (process + DB connectivity) so uptime monitors can check liveness without secrets.
+- `GET /health/details/` is **disabled by default** and only enabled when `HEALTHCHECK_TOKEN` is set; it requires a token via header or query.
+
+## Phase 9 — Manual QA is the Launch Gate
+- Launch readiness is proven by executing the Manual QA Checklist on staging and production.
+- Optional seed data exists for local verification only; staging/prod should be tested with realistic data.

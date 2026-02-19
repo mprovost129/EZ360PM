@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
@@ -88,6 +89,9 @@ BUILD_DATE = _getenv("BUILD_DATE", "")
 ENVIRONMENT = os.getenv("EZ360_ENV", "dev")
 RELEASE_SHA = os.getenv("EZ360_RELEASE_SHA", "")
 
+# Optional token for /health/details/ (leave empty to disable the endpoint)
+HEALTHCHECK_TOKEN = _getenv("HEALTHCHECK_TOKEN", "")
+
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -122,8 +126,8 @@ INSTALLED_APPS = [
     "integrations",
     "sync",
     "timetracking",
-    "ops",
     "helpcenter",
+    "ops",
 ]
 
 # Optional dependency for S3 media storage
@@ -140,6 +144,7 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "core.middleware.ScannerShieldMiddleware",
     "core.middleware.RequestIDMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -358,6 +363,12 @@ WHITENOISE_USE_FINDERS = True
 # In CI/first deploy, a missing manifest can hard-fail if collectstatic didn't run.
 # We keep strict by default, but allow opt-out via env for emergency recovery.
 WHITENOISE_MANIFEST_STRICT = _getenv_bool("WHITENOISE_MANIFEST_STRICT", True)
+
+# Tests run without collectstatic and therefore do not have a manifest. Using a manifest-based
+# staticfiles storage during tests causes "Missing staticfiles manifest entry" errors.
+if "test" in sys.argv:
+    WHITENOISE_MANIFEST_STRICT = False
+    STORAGES["staticfiles"] = {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"}
 
 if USE_S3:
     public_bucket = S3_PUBLIC_MEDIA_BUCKET or AWS_STORAGE_BUCKET_NAME
