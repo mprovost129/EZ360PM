@@ -21,7 +21,7 @@
           <input class="form-control" type="text" name="q" value="{{ q }}" placeholder="client or note…" />
         </div>
         <div class="col-md-3 d-flex gap-2">
-          <button class="btn btn-dark w-100" type="submit">Filter</button>
+          <button class="btn btn-ez w-100" type="submit">Filter</button>
           <a class="btn btn-outline-dark w-100" href="{% url 'documents:collections_followups_due' %}">Reset</a>
         </div>
       </form>
@@ -58,7 +58,7 @@
                 <form class="d-inline" method="post" action="{% url 'documents:client_statement_collections_note_done' n.client.id n.id %}">
                   {% csrf_token %}
                   <input type="hidden" name="next" value="{% url 'documents:collections_followups_due' %}?q={{ q|urlencode }}{% if page_obj.number %}&page={{ page_obj.number }}{% endif %}">
-                  <button class="btn btn-sm btn-dark" type="submit">Mark done</button>
+                  <button class="btn btn-sm btn-ez" type="submit">Mark done</button>
                 </form>
               </td>
             </tr>

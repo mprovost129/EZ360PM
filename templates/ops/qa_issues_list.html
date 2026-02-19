@@ -10,7 +10,7 @@
     </div>
     <div class="d-flex flex-wrap gap-2">
       <a class="btn btn-outline-dark" href="{% url 'ops:dashboard' %}"><i class="bi bi-arrow-left me-1"></i>Back to Ops</a>
-      <a class="btn btn-dark" href="{% url 'ops:qa_issue_new' %}"><i class="bi bi-plus-lg me-1"></i>New issue</a>
+      <a class="btn btn-ez" href="{% url 'ops:qa_issue_new' %}"><i class="bi bi-plus-lg me-1"></i>New issue</a>
     </div>
   </div>
 
@@ -79,7 +79,7 @@
           <input class="form-control" name="area" value="{{ area }}" placeholder="Invoices…">
         </div>
         <div class="col-12 d-flex gap-2 mt-2">
-          <button class="btn btn-dark" type="submit">Filter</button>
+          <button class="btn btn-ez" type="submit">Filter</button>
           <a class="btn btn-outline-secondary" href="{% url 'ops:qa_issues' %}">Reset</a>
         </div>
       </form>

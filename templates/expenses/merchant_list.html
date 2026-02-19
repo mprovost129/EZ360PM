@@ -11,7 +11,7 @@
     <div class="ez-page-subtitle">Saved merchants help categorize expenses.</div>
   </div>
   <div class="d-flex gap-2">
-    <a class="btn btn-dark" href="{% url 'expenses:merchant_create' %}">
+    <a class="btn btn-ez" href="{% url 'expenses:merchant_create' %}">
       <i class="bi bi-plus-lg me-1"></i>New Merchant
     </a>
     <a class="btn btn-outline-dark" href="{% url 'expenses:expense_list' %}">Back to Expenses</a>
@@ -39,7 +39,7 @@
             <td colspan="2">
               {% include "includes/empty_state.html" with icon="bi-shop" title="No merchants yet" subtitle="Add merchants to speed up expense entry and reporting." %}
               <div class="text-center pb-4">
-                <a class="btn btn-sm btn-dark" href="{% url 'expenses:merchant_create' %}">
+                <a class="btn btn-sm btn-ez" href="{% url 'expenses:merchant_create' %}">
                   <i class="bi bi-plus-lg me-1"></i>Add your first merchant
                 </a>
               </div>

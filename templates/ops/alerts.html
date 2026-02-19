@@ -93,7 +93,7 @@
           <input class="form-control" name="q" value="{{ q }}" placeholder="title/message/company">
         </div>
         <div class="col-md-12 d-flex gap-2 mt-2">
-          <button class="btn btn-dark" type="submit">Apply</button>
+          <button class="btn btn-ez" type="submit">Apply</button>
           <a class="btn btn-outline-secondary" href="{% url 'ops:alerts' %}">Reset</a>
           {% if status == 'open' %}
           <a class="btn btn-outline-dark" href="{% url 'ops:alerts_export_csv' %}?{{ qs_no_page }}"><i class="bi bi-download me-1"></i>Export CSV</a>
@@ -122,7 +122,7 @@
             <label class="form-check-label small" for="selectAllAlerts">Select all on page</label>
           </div>
           <div class="vr"></div>
-          <button class="btn btn-sm btn-dark" type="submit" id="bulkResolveBtn" disabled>
+          <button class="btn btn-sm btn-ez" type="submit" id="bulkResolveBtn" disabled>
             <i class="bi bi-check2-circle me-1"></i>Resolve selected
           </button>
           <button class="btn btn-sm btn-outline-secondary" type="submit" name="resolve_filtered" value="1">
@@ -237,7 +237,7 @@
                     {% if not a.is_resolved %}
                       <form method="post" action="{% url 'ops:alert_resolve' a.id %}">
                         {% csrf_token %}
-                        <button class="btn btn-sm btn-dark" type="submit">Resolve</button>
+                        <button class="btn btn-sm btn-ez" type="submit">Resolve</button>
                       </form>
                     {% else %}
                       <span class="text-secondary small align-self-center">Resolved</span>

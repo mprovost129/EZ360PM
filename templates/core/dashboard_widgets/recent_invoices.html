@@ -44,7 +44,7 @@
     {% else %}
       {% include "includes/empty_state.html" with icon="bi-receipt" title="No invoices yet" subtitle="Create your first invoice to start billing and collecting payments." %}
       <div class="text-center pb-2">
-        <a class="btn btn-sm btn-dark" href="{% url 'documents:invoice_wizard' %}"><i class="bi bi-plus-lg me-1"></i>Create invoice</a>
+        <a class="btn btn-sm btn-ez" href="{% url 'documents:invoice_wizard' %}"><i class="bi bi-plus-lg me-1"></i>Create invoice</a>
         <a class="btn btn-sm btn-outline-secondary ms-1" href="{% url 'documents:invoice_list' %}"><i class="bi bi-list-ul me-1"></i>Open invoices list</a>
       </div>
     {% endif %}

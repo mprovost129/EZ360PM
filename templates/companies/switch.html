@@ -16,7 +16,7 @@
             <form method="post" action="{% url 'companies:set_active' %}">
               {% csrf_token %}
               <input type="hidden" name="company_id" value="{{ c.id }}">
-              <button class="btn {% if c.id|stringformat:'s' == active_company_id %}btn-dark{% else %}btn-outline-dark{% endif %} w-100" type="submit">
+              <button class="btn {% if c.id|stringformat:'s' == active_company_id %}btn-ez{% else %}btn-outline-dark{% endif %} w-100" type="submit">
                 {% if c.id|stringformat:'s' == active_company_id %}Active{% else %}Use this company{% endif %}
               </button>
             </form>

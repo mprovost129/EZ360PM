@@ -881,7 +881,7 @@ Next (Phase 4C):
 - **Phase 6M (Email diagnostics):** Ops “Send test email” button + Launch Check for SMTP/provider config + webhook success.
 
 ## Next UI shell items
-- Apply theme tokens to buttons/badges across all templates (replace hardcoded `btn-dark` where appropriate).
+- Apply theme tokens to buttons/badges across all templates (replace hardcoded `btn-ez` where appropriate).
 - Add “collapsed sidebar” (icon-only) option for desktop if needed.
 - Add per-user preference storage in DB (future) to sync theme across devices.
 

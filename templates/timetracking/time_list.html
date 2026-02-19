@@ -22,7 +22,7 @@
       <i class="bi bi-stopwatch me-1"></i>Timer
       {% if timer_running %}<span class="badge text-bg-success ms-1">Running</span>{% endif %}
     </a>
-    <a class="btn btn-dark" href="{% url 'timetracking:entry_create' %}">
+    <a class="btn btn-ez" href="{% url 'timetracking:entry_create' %}">
       <i class="bi bi-plus-lg me-1"></i>New entry
     </a>
   </div>
@@ -137,7 +137,7 @@
               {% include "includes/empty_state.html" with title="No time entries yet" subtitle="Track time against projects to invoice accurately and report profitability." %}
               {% if can_track %}
                 <div class="text-center pb-4">
-                  <a class="btn btn-sm btn-dark" href="{% url 'timetracking:time_create' %}">
+                  <a class="btn btn-sm btn-ez" href="{% url 'timetracking:time_create' %}">
                     <i class="bi bi-plus-lg me-1"></i>Add time entry
                   </a>
                 </div>

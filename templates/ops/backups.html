@@ -50,7 +50,7 @@
             <form method="post" action="{% url 'ops:backup_run_now' %}">
               {% csrf_token %}
               <input type="hidden" name="storage" value="{{ cfg.backup_storage }}">
-              <button class="btn btn-dark btn-sm" type="submit"><i class="bi bi-play-circle me-1"></i>Run backup now</button>
+              <button class="btn btn-ez btn-sm" type="submit"><i class="bi bi-play-circle me-1"></i>Run backup now</button>
             </form>
             <form method="post" action="{% url 'ops:backup_prune' %}">
               {% csrf_token %}

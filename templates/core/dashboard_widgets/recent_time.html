@@ -35,7 +35,7 @@
       {% include "includes/empty_state.html" with icon="bi-stopwatch" title="No time entries yet" subtitle="Start a timer or add time manually to track billable work." %}
       <div class="text-center pb-2">
         <a class="btn btn-sm btn-outline-dark" href="{% url 'timetracking:timer_panel' %}"><i class="bi bi-stopwatch me-1"></i>Start timer</a>
-        <a class="btn btn-sm btn-dark ms-1" href="{% url 'timetracking:entry_create' %}"><i class="bi bi-plus-lg me-1"></i>Add time</a>
+        <a class="btn btn-sm btn-ez ms-1" href="{% url 'timetracking:entry_create' %}"><i class="bi bi-plus-lg me-1"></i>Add time</a>
       </div>
     {% endif %}
   </div>

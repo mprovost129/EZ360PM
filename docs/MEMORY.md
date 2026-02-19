@@ -68,7 +68,7 @@ Updated `static/css/ez360pm.css` to introduce a structured surface system:
 
 ## 2026-02-17 — Phase 8H (Brand pass)
 - UI tokens: aligned Bootstrap primary/success/link/border/body CSS variables to EZ360PM brand tokens.
-- Buttons: brand-aligned `.btn-primary` and `.btn-outline-primary` styling (Bootstrap-compatible).
+- Buttons: brand-aligned `.btn-ez` and `.btn-outline-primary` styling (Bootstrap-compatible).
 - Forms: standardized form control radius + focus ring (light/dark), improving consistency across all CRUD flows.
 
 ## 2026-02-16 — Phase 8G (Help Center UX)

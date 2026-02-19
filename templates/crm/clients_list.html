@@ -18,7 +18,7 @@
       <a class="btn btn-outline-secondary" href="{% url 'crm:client_export' %}">
         <i class="bi bi-download me-1"></i>Export clients
       </a>
-      <a class="btn btn-dark" href="{% url 'crm:client_create' %}">
+      <a class="btn btn-ez" href="{% url 'crm:client_create' %}">
         <i class="bi bi-plus-lg me-1"></i>New client
       </a>
     {% endif %}
@@ -132,7 +132,7 @@
               {% include "includes/empty_state.html" with title="No clients yet" subtitle="Create a client to start tracking projects, invoices, and payments." %}
               {% if can_manage %}
                 <div class="text-center pb-4">
-                  <a class="btn btn-sm btn-dark" href="{% url 'crm:client_create' %}">
+                  <a class="btn btn-sm btn-ez" href="{% url 'crm:client_create' %}">
                     <i class="bi bi-plus-lg me-1"></i>Create your first client
                   </a>
                   <a class="btn btn-sm btn-outline-secondary ms-1" href="{% url 'crm:client_import' %}">

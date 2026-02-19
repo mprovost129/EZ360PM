@@ -12,7 +12,7 @@
       <a class="btn btn-outline-secondary" href="{% url 'ops:qa_issues' %}"><i class="bi bi-arrow-left me-1"></i>Back</a>
       <a class="btn btn-outline-dark" href="{% url 'ops:qa_issue_edit' issue.pk %}"><i class="bi bi-pencil me-1"></i>Edit</a>
       {% if issue.status != 'resolved' and issue.status != 'wont_fix' %}
-        <button class="btn btn-dark" type="button" data-bs-toggle="collapse" data-bs-target="#closePanel" aria-expanded="false">
+        <button class="btn btn-ez" type="button" data-bs-toggle="collapse" data-bs-target="#closePanel" aria-expanded="false">
           <i class="bi bi-check2-circle me-1"></i>Close
         </button>
       {% endif %}
@@ -68,7 +68,7 @@
                 <input class="form-control" name="notes" placeholder="What changed / why it’s closed…">
               </div>
               <div class="col-12 d-flex gap-2">
-                <button class="btn btn-dark" type="submit">Close issue</button>
+                <button class="btn btn-ez" type="submit">Close issue</button>
                 <button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#closePanel">Cancel</button>
               </div>
             </div>

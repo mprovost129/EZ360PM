@@ -12,7 +12,7 @@
       <a class="btn btn-outline-dark" href="{% url 'ops:dashboard' %}"><i class="bi bi-arrow-left me-1"></i>Ops</a>
       <form method="post" action="{% url 'ops:storage_smoke_run' %}">
         {% csrf_token %}
-        <button class="btn btn-dark"><i class="bi bi-play-fill me-1"></i>Run smoke tests</button>
+        <button class="btn btn-ez"><i class="bi bi-play-fill me-1"></i>Run smoke tests</button>
       </form>
     </div>
   </div>
@@ -174,7 +174,7 @@
                         <form method="post" action="{% url 'ops:storage_posture_toggle' %}">
                           {% csrf_token %}
                           <input type="hidden" name="key" value="{{ item.key }}">
-                          <button class="btn btn-sm {% if item.is_complete %}btn-outline-secondary{% else %}btn-dark{% endif %}">
+                          <button class="btn btn-sm {% if item.is_complete %}btn-outline-secondary{% else %}btn-ez{% endif %}">
                             {% if item.is_complete %}Mark incomplete{% else %}Mark complete{% endif %}
                           </button>
                         </form>

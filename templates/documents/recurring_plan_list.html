@@ -10,7 +10,7 @@
     <div class="text-secondary small">Create invoices automatically on a schedule.</div>
   </div>
   <div class="d-flex gap-2">
-    <a class="btn btn-dark" href="{% url 'documents:recurring_plan_create' %}">
+    <a class="btn btn-ez" href="{% url 'documents:recurring_plan_create' %}">
       <i class="bi bi-plus-lg me-1"></i>New recurring plan
     </a>
   </div>
@@ -69,7 +69,7 @@
                     </a>
                     <form method="post" action="{% url 'documents:recurring_plan_run_now' p.pk %}">
                       {% csrf_token %}
-                      <button class="btn btn-dark btn-sm" type="submit">
+                      <button class="btn btn-ez btn-sm" type="submit">
                         Run now
                       </button>
                     </form>
@@ -91,7 +91,7 @@
         <div class="mb-2"><i class="bi bi-arrow-repeat" style="font-size: 2rem;"></i></div>
         <div class="fw-semibold mb-1">No recurring plans yet</div>
         <div class="text-secondary small mb-3">Create a plan to generate invoices automatically.</div>
-        <a class="btn btn-dark" href="{% url 'documents:recurring_plan_create' %}">
+        <a class="btn btn-ez" href="{% url 'documents:recurring_plan_create' %}">
           <i class="bi bi-plus-lg me-1"></i>New recurring plan
         </a>
       </div>

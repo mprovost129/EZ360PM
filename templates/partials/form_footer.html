@@ -20,10 +20,10 @@
   <a class="btn btn-outline-secondary" href="{{ cancel_url }}">Cancel</a>
 
   {% if disabled %}
-    <button class="btn btn-dark" type="button" disabled {% if disabled_title %}title="{{ disabled_title }}"{% endif %}>
+    <button class="btn btn-ez" type="button" disabled {% if disabled_title %}title="{{ disabled_title }}"{% endif %}>
       {{ primary_label|default:"Save" }}
     </button>
   {% else %}
-    <button class="btn btn-dark" type="submit">{{ primary_label|default:"Save" }}</button>
+    <button class="btn btn-ez" type="submit">{{ primary_label|default:"Save" }}</button>
   {% endif %}
 </div>

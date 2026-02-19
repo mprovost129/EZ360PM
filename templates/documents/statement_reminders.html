@@ -33,7 +33,7 @@
           <input class="form-control" name="q" value="{{ q }}" placeholder="client name / email / recipient">
         </div>
         <div class="col-md-3 d-flex gap-2">
-          <button class="btn btn-dark w-100" type="submit">Apply</button>
+          <button class="btn btn-ez w-100" type="submit">Apply</button>
           <a class="btn btn-outline-secondary w-100" href="{% url 'documents:statement_reminders' %}">Reset</a>
         </div>
       </form>
@@ -108,7 +108,7 @@
             <label class="form-check-label small text-secondary" for="confirmFilteredSend">Confirm send for filtered set (cap 200)</label>
           </div>
 
-          <button class="btn btn-sm btn-dark" type="submit" id="bulkApplyBtn" disabled>
+          <button class="btn btn-sm btn-ez" type="submit" id="bulkApplyBtn" disabled>
             <i class="bi bi-lightning-charge me-1"></i>Apply
           </button>
         </div>

@@ -13,7 +13,7 @@
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="{% url 'payables:bill_list' %}"><i class="bi bi-receipt me-1"></i>Bills</a>
     <a class="btn btn-outline-secondary" href="{% url 'payables:vendor_list' %}"><i class="bi bi-building me-1"></i>Vendors</a>
-    <a class="btn btn-primary" href="{% url 'payables:recurring_bill_plan_create' %}"><i class="bi bi-plus-lg me-1"></i>New plan</a>
+    <a class="btn btn-ez" href="{% url 'payables:recurring_bill_plan_create' %}"><i class="bi bi-plus-lg me-1"></i>New plan</a>
   </div>
 </div>
 
@@ -83,7 +83,7 @@
               {% else %}
                 {% include "includes/empty_state.html" with icon="bi-arrow-repeat" title="No recurring bill plans yet" subtitle="Create a plan to auto-generate vendor bills on a schedule." %}
                 <div class="text-center pb-4">
-                  <a class="btn btn-sm btn-primary" href="{% url 'payables:recurring_bill_plan_create' %}">
+                  <a class="btn btn-sm btn-ez" href="{% url 'payables:recurring_bill_plan_create' %}">
                     <i class="bi bi-plus-lg me-1"></i>Create your first plan
                   </a>
                 </div>

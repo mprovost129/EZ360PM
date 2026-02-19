@@ -23,7 +23,7 @@
       <a class="btn btn-outline-dark" href="{{ print_url }}" target="_blank" rel="noopener">
         <i class="bi bi-printer me-1"></i>Print
       </a>
-      <a class="btn btn-dark" href="{{ pdf_url }}">
+      <a class="btn btn-ez" href="{{ pdf_url }}">
         <i class="bi bi-filetype-pdf me-1"></i>PDF
       </a>
       <a class="btn btn-outline-secondary" href="{% url 'helpcenter:invoices_payments' %}">
@@ -345,7 +345,7 @@
                 <input type="text" name="memo" class="form-control" placeholder="e.g., Credit from overpayment">
               </div>
               <div class="col-12 col-md-2 d-grid">
-                <button class="btn btn-dark" type="submit">Apply</button>
+                <button class="btn btn-ez" type="submit">Apply</button>
               </div>
             </form>
           {% else %}

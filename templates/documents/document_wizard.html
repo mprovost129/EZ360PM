@@ -36,7 +36,7 @@
 
   <div class="d-flex gap-2 justify-content-end">
     <a class="btn btn-outline-secondary" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_list' %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_list' %}{% else %}{% url 'documents:proposal_list' %}{% endif %}">Cancel</a>
-    <button class="btn btn-dark" type="submit"><i class="bi bi-plus-lg me-1"></i>Create</button>
+    <button class="btn btn-ez" type="submit"><i class="bi bi-plus-lg me-1"></i>Create</button>
   </div>
 </form>
 {% endblock %}

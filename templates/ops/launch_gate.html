@@ -79,7 +79,7 @@
                     <button class="btn btn-sm btn-outline-dark" type="submit">Reopen</button>
                   {% else %}
                     <input type="hidden" name="action" value="complete">
-                    <button class="btn btn-sm btn-dark" type="submit">Mark complete</button>
+                    <button class="btn btn-sm btn-ez" type="submit">Mark complete</button>
                   {% endif %}
                 </form>
               </td>
@@ -91,7 +91,7 @@
                 <div class="small text-secondary mt-1">Seed the recommended defaults, then tailor the list in Django admin if needed.</div>
                 <form class="mt-3" method="post" action="{% url 'ops:launch_gate_seed' %}">
                   {% csrf_token %}
-                  <button class="btn btn-sm btn-dark" type="submit"><i class="bi bi-magic me-1"></i>Seed default checklist</button>
+                  <button class="btn btn-sm btn-ez" type="submit"><i class="bi bi-magic me-1"></i>Seed default checklist</button>
                 </form>
               </td>
             </tr>

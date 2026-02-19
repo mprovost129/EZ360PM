@@ -139,7 +139,7 @@
       <p class="text-secondary mb-3">
         Not connected yet. Connect your bank to import transactions and quickly create categorized expenses.
       </p>
-      <button class="btn btn-dark {% if not bank_enabled or not bank_configured %}disabled{% endif %}" type="button" id="plaid-connect-btn">
+      <button class="btn btn-ez {% if not bank_enabled or not bank_configured %}disabled{% endif %}" type="button" id="plaid-connect-btn">
         <i class="bi bi-link-45deg me-1"></i>Connect bank account
       </button>
       <div class="small text-secondary mt-2">
@@ -239,7 +239,7 @@
           <div class="small text-secondary">Process imported transactions and prevent duplicate expenses.</div>
         </div>
         <div class="d-flex gap-2">
-          <a class="btn btn-primary" href="{% url 'integrations:banking_review_queue' %}">
+          <a class="btn btn-ez" href="{% url 'integrations:banking_review_queue' %}">
             <i class="bi bi-inbox me-1"></i>Open review queue
           </a>
           <a class="btn btn-outline-secondary" href="{% url 'integrations:banking_reconcile' %}">

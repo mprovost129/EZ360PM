@@ -50,7 +50,7 @@
       <p class="text-secondary mb-3">
         Not connected yet. Connect Dropbox to enable future features like saving project files to Dropbox, syncing attachments, and sharing folders.
       </p>
-      <a class="btn btn-dark {% if not dropbox_configured %}disabled{% endif %}" href="{% url 'integrations:dropbox_connect' %}">
+      <a class="btn btn-ez {% if not dropbox_configured %}disabled{% endif %}" href="{% url 'integrations:dropbox_connect' %}">
         <i class="bi bi-box-arrow-in-right me-1"></i>Connect Dropbox
       </a>
     {% endif %}
@@ -76,7 +76,7 @@
           </div>
         </div>
         <div class="mt-3">
-          <button class="btn btn-dark" type="submit">
+          <button class="btn btn-ez" type="submit">
             <i class="bi bi-save me-1"></i>Save preferences
           </button>
         </div>

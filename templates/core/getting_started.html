@@ -25,7 +25,7 @@
               <div class="text-secondary small">We compute this from your live data—no manual checkboxes.</div>
             </div>
             {% if onboarding_progress and onboarding_progress.next %}
-              <a class="btn btn-sm btn-dark" href="{% url onboarding_progress.next.url_name %}">
+              <a class="btn btn-sm btn-ez" href="{% url onboarding_progress.next.url_name %}">
                 Next: {{ onboarding_progress.next.title }}
               </a>
             {% endif %}

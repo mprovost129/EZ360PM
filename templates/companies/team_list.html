@@ -25,7 +25,7 @@
         <i class="bi bi-gear me-1"></i>Company settings
       </a>
       {% if is_admin or is_owner %}
-        <a class="btn btn-primary" href="{% url 'companies:invite_create' %}">
+        <a class="btn btn-ez" href="{% url 'companies:invite_create' %}">
           <i class="bi bi-person-plus me-1"></i>Invite employee
         </a>
       {% endif %}

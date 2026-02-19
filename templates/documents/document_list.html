@@ -11,7 +11,7 @@
   </div>
 
   {% if is_manager %}
-    <a class="btn btn-dark" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_wizard' %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_wizard' %}{% else %}{% url 'documents:proposal_wizard' %}{% endif %}">
+    <a class="btn btn-ez" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_wizard' %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_wizard' %}{% else %}{% url 'documents:proposal_wizard' %}{% endif %}">
       <i class="bi bi-plus-lg me-1"></i>New {{ doc_label }}
     </a>
   {% endif %}
@@ -113,7 +113,7 @@
             <td colspan="6">
               {% include "includes/empty_state.html" with title="No documents yet" subtitle="Create your first document to start billing and tracking A/R." %}
               <div class="text-center pb-4">
-                <a class="btn btn-sm btn-dark" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_wizard' %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_wizard' %}{% else %}{% url 'documents:proposal_wizard' %}{% endif %}">
+                <a class="btn btn-sm btn-ez" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_wizard' %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_wizard' %}{% else %}{% url 'documents:proposal_wizard' %}{% endif %}">
                   <i class="bi bi-plus-lg me-1"></i>New {{ doc_label|lower }}
                 </a>
               </div>

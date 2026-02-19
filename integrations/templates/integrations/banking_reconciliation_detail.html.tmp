@@ -23,7 +23,7 @@
     {% if period.status != 'locked' %}
       <form method="post" action="{% url 'integrations:banking_reconciliation_lock' period.pk %}">
         {% csrf_token %}
-        <button class="btn btn-primary" type="submit" data-ez-confirm="Lock this reconciliation period? This saves a snapshot.">
+        <button class="btn btn-ez" type="submit" data-ez-confirm="Lock this reconciliation period? This saves a snapshot.">
           <i class="bi bi-lock me-1"></i>Lock
         </button>
       </form>

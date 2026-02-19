@@ -10,7 +10,7 @@
     <div class="ez-page-subtitle">Track work, assign staff, and manage billable time.</div>
   </div>
   {% if is_manager %}
-    <a class="btn btn-dark" href="{% url 'projects:project_create' %}"><i class="bi bi-plus-lg me-1"></i>New project</a>
+    <a class="btn btn-ez" href="{% url 'projects:project_create' %}"><i class="bi bi-plus-lg me-1"></i>New project</a>
   {% endif %}
 </div>
 
@@ -93,7 +93,7 @@
               {% include "includes/empty_state.html" with title="No projects yet" subtitle="Projects organize your work, time, and billing in one place." %}
               {% if can_manage %}
                 <div class="text-center pb-4">
-                  <a class="btn btn-sm btn-dark" href="{% url 'projects:project_create' %}">
+                  <a class="btn btn-sm btn-ez" href="{% url 'projects:project_create' %}">
                     <i class="bi bi-plus-lg me-1"></i>Create your first project
                   </a>
                 </div>
