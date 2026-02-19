@@ -171,11 +171,15 @@ def dropbox_disconnect(request: HttpRequest) -> HttpResponse:
 @tier_required(PlanCode.PROFESSIONAL)
 @require_min_role(EmployeeRole.ADMIN)
 def banking_settings(request: HttpRequest) -> HttpResponse:
-    """Bank feeds integration (scaffold).
+    """Bank feeds integration.
 
-    We surface configuration and the connection state now.
-    Actual transaction sync + mapping to Expenses is a later pack.
+    For now, this routes to a friendly "Plaid coming soon" landing page.
+    The underlying Plaid service code remains in place, but we avoid
+    surfacing partial/broken flows until we finalize Plaid onboarding.
     """
+
+    # Temporary product decision: show a stable landing page.
+    return render(request, "integrations/banking_coming_soon.html", {})
 
     company = get_active_company(request)
     if not company:

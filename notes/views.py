@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.db.models import Q
+from django.views.decorators.http import require_POST
 
 from companies.services import ensure_active_company_for_user, get_active_company
 from notes.forms import UserNoteForm
@@ -63,4 +64,22 @@ def note_create(request: HttpRequest) -> HttpResponse:
     nxt = (request.POST.get("next") or "").strip()
     if nxt:
         return redirect(nxt)
+    return redirect("notes:list")
+
+
+@login_required
+@require_POST
+def note_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    if not ensure_active_company_for_user(request):
+        return redirect("companies:switch")
+
+    company = get_active_company(request)
+    qs = UserNote.objects.filter(company=company, created_by=request.user)
+    obj = qs.filter(pk=pk).first()
+    if not obj:
+        messages.error(request, "Note not found.")
+        return redirect("notes:list")
+
+    obj.delete()
+    messages.success(request, "Note deleted.")
     return redirect("notes:list")

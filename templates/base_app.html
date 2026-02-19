@@ -35,6 +35,9 @@
           <div class="input-group">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
             <input class="form-control" name="q" value="{{ request.GET.q|default:'' }}" placeholder="Search clients, projects, documents…" aria-label="Search">
+            <button class="btn btn-outline-ez" type="submit" aria-label="Search">
+              <i class="bi bi-arrow-right"></i>
+            </button>
           </div>
         </form>
 
@@ -174,11 +177,11 @@
 
               function fmt(sec) {
                 sec = Math.max(0, sec|0);
-                const mins = Math.floor(sec / 60);
-                const hrs = Math.floor(mins / 60);
-                const remM = mins % 60;
-                if (hrs > 0) return `${hrs}h ${String(remM).padStart(2,'0')}m`;
-                return `${remM}m`;
+                const hrs = Math.floor(sec / 3600);
+                const mins = Math.floor((sec % 3600) / 60);
+                const remS = sec % 60;
+                if (hrs > 0) return `${hrs}:${String(mins).padStart(2,'0')}:${String(remS).padStart(2,'0')}`;
+                return `${mins}:${String(remS).padStart(2,'0')}`;
               }
 
               function tick() {
@@ -203,15 +206,28 @@
           <button class="btn btn-outline-secondary btn-sm" disabled title="Notifications (coming soon)">
             <i class="bi bi-bell"></i>
           </button>
+
+          <button id="themeToggleBtn" class="btn btn-outline-ez btn-sm" type="button" title="Light/Dark">
+            <i class="bi bi-moon-stars"></i>
+          </button>
+
           {% if request.user.is_staff %}
-          {% if qa_report_href %}
-          <a class="btn btn-outline-warning btn-sm" href="{{ qa_report_href }}" title="Report a QA issue">
-            <i class="bi bi-bug"></i>
-          </a>
-          {% endif %}
-          <a class="btn btn-outline-danger btn-sm" href="{% url 'core:support_mode_status' %}" title="Support Mode">
-            <i class="bi bi-shield-lock"></i>
-          </a>
+          <div class="dropdown">
+            <button class="btn btn-outline-danger btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Support & staff tools">
+              <i class="bi bi-shield-lock"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="{% url 'core:support_mode_status' %}"><i class="bi bi-headset me-2"></i>Support Mode</a></li>
+              {% if qa_report_href %}
+                <li><a class="dropdown-item" href="{{ qa_report_href }}"><i class="bi bi-bug me-2"></i>Report QA issue</a></li>
+              {% endif %}
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{% url 'ops:dashboard' %}"><i class="bi bi-shield-lock me-2"></i>Ops Console</a></li>
+              <li><a class="dropdown-item" href="{% url 'ops:launch_checks' %}"><i class="bi bi-clipboard-check me-2"></i>Launch Checks</a></li>
+              <li><a class="dropdown-item" href="{% url 'ops:email_test' %}"><i class="bi bi-envelope-at me-2"></i>Email Test</a></li>
+              <li><a class="dropdown-item" href="{% url 'ops:retention' %}"><i class="bi bi-trash3 me-2"></i>Retention</a></li>
+            </ul>
+          </div>
           {% endif %}
           <div class="dropdown">
             <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Help">
@@ -423,31 +439,7 @@
               <span class="nav-icon"><i class="bi bi-question-circle"></i></span>
               Help Center
             </a>
-          {% if user.is_staff %}
-<div class="mt-2 pt-2 border-top">
-  <div class="text-uppercase text-secondary small fw-semibold mb-1">Staff</div>
-  <a class="sidebar-link" href="{% url 'ops:dashboard' %}">
-    <span class="nav-icon"><i class="bi bi-shield-lock"></i></span>
-    Ops Console
-  </a>
-  <a class="sidebar-link" href="{% url 'ops:launch_checks' %}">
-    <span class="nav-icon"><i class="bi bi-clipboard-check"></i></span>
-    Launch Checks
-  </a>
-	  <a class="sidebar-link" href="{% url 'ops:email_test' %}">
-	    <span class="nav-icon"><i class="bi bi-envelope-at"></i></span>
-	    Email Test
-	  </a>
-  <a class="sidebar-link" href="{% url 'ops:retention' %}">
-    <span class="nav-icon"><i class="bi bi-trash3"></i></span>
-    Retention
-  </a>
-  <a class="sidebar-link" href="{% url 'core:support_mode_status' %}">
-    <span class="nav-icon"><i class="bi bi-headset"></i></span>
-    Support Mode
-  </a>
-</div>
-{% endif %}
+          {# Staff tools moved to the top navbar (Support dropdown) #}
 
 </nav>
 

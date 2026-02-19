@@ -155,8 +155,28 @@ def client_create(request: HttpRequest) -> HttpResponse:
             messages.success(request, "Client created.")
             return redirect("crm:client_list")
     else:
-        form = ClientForm()
-        formset = ClientPhoneFormSet()
+        # Optional prefill from query params (used by Notes -> Create client)
+        name = (request.GET.get("name") or "").strip()
+        email = (request.GET.get("email") or "").strip()
+        phone = (request.GET.get("phone") or "").strip()
+
+        initial = {}
+        if name:
+            parts = [p for p in name.split(" ") if p]
+            if len(parts) >= 2:
+                initial["first_name"] = parts[0]
+                initial["last_name"] = " ".join(parts[1:])
+            else:
+                # If it's a single token, prefer company name.
+                initial["company_name"] = name
+        if email:
+            initial["email"] = email
+
+        form = ClientForm(initial=initial)
+        formset_initial = []
+        if phone:
+            formset_initial.append({"number": phone, "type": "mobile"})
+        formset = ClientPhoneFormSet(initial=formset_initial)
 
     return render(
         request,

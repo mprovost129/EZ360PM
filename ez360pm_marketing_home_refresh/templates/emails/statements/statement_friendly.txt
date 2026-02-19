@@ -1,9 +1,0 @@
-Hi{% if client.first_name %} {{ client.first_name }}{% endif %},
-
-This is a friendly reminder that your current statement is available in EZ360PM.
-
-{% if statement_url %}View statement: {{ statement_url }}{% endif %}
-
-If you have any questions, reply to this email or contact {{ support_email }}.
-
-Sent by {{ company.name }} via {{ site_name }}.

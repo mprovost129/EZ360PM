@@ -111,7 +111,7 @@ INSTALLED_APPS = [
     "audit",
 
     # Presigned direct upload API (S3)
-    "storage",
+    "projects.storage",
     "accounting",
     "billing",
     "catalog",

@@ -3,13 +3,14 @@ from __future__ import annotations
 import datetime
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.db.models.functions import TruncMonth
 from django.http import HttpRequest, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
-from companies.services import ensure_active_company_for_user, get_active_company
+from companies.services import ensure_active_company_for_user, get_active_company, get_active_employee_profile
+from crm.models import Client
 from core.onboarding import build_onboarding_checklist, onboarding_progress
 from documents.models import Document, DocumentStatus, DocumentType
 from expenses.models import Expense, ExpenseStatus
@@ -52,14 +53,16 @@ def app_dashboard(request: HttpRequest):
     subscription = build_subscription_summary(company)
     plan_key = subscription.plan
 
-    active_employee = getattr(request, "active_employee", None)
-    employee_role = getattr(active_employee, "role", "staff")
+    # Some deployments don't attach request.active_employee via middleware; resolve it safely.
+    active_employee = getattr(request, "active_employee", None) or get_active_employee_profile(request)
+    employee_role = getattr(active_employee, "role", EmployeeRole.STAFF)
 
     # Display helpers
     user_display_name = (
         (getattr(user, "get_full_name", lambda: "")() or "").strip() or getattr(user, "username", "") or getattr(user, "email", "")
     )
-    user_role_label = str(employee_role).replace("_", " ").title() if employee_role else "Staff"
+    # employee_role is stored as a TextChoices value (e.g. "owner").
+    user_role_label = str(employee_role or EmployeeRole.STAFF).replace("_", " ").title()
 
     # ------------------------------------------------------------------
     # Dashboard period filter (Revenue/Expenses KPIs)
@@ -533,24 +536,19 @@ def global_search(request: HttpRequest):
     # Clients
     clients = _safe(
         lambda: list(
-            __import__("crm.models", fromlist=["Client"]).Client.objects.filter(company=company).filter(
-                # name/email/phone-ish fields
-                # (phone stored in related model; keep it simple for now)
-                # fall back to name/email
-                name__icontains=q
-            ).order_by("name")[:10]
+            Client.objects.filter(company=company, deleted_at__isnull=True)
+            .filter(
+                Q(company_name__icontains=q)
+                | Q(first_name__icontains=q)
+                | Q(last_name__icontains=q)
+                | Q(email__icontains=q)
+                | Q(phones__number__icontains=q)
+            )
+            .distinct()
+            .order_by("company_name", "last_name", "first_name")[:10]
         ),
         [],
     )
-    if not clients:
-        clients = _safe(
-            lambda: list(
-                __import__("crm.models", fromlist=["Client"]).Client.objects.filter(company=company).filter(
-                    email__icontains=q
-                ).order_by("name")[:10]
-            ),
-            [],
-        )
 
     # Projects
     projects = _safe(

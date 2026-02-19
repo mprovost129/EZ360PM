@@ -1,6 +1,8 @@
 .ez-paper-wrap {
   display: flex;
   justify-content: center;
+  /* Keep the sticky save/footer bar aligned with the paper width */
+  --ez-form-max-width: 920px;
 }
 
 /* "Paper" surface inside the app shell */

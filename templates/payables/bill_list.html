@@ -90,7 +90,22 @@
         {% empty %}
           <tr>
             <td colspan="8">
-              {% if q or (status|default:'') and status != 'all' or due_soon %}
+	              {# Django templates can be picky with complex boolean logic. Keep this explicit. #}
+	              {% if q %}
+	                {% include "includes/empty_state.html" with icon="bi-funnel" title="No bills match your filters" subtitle="Try adjusting your search, status, or due-soon filter." %}
+	                <div class="text-center pb-4">
+	                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'payables:bill_list' %}">
+	                    <i class="bi bi-arrow-counterclockwise me-1"></i>Reset filters
+	                  </a>
+	                </div>
+	              {% elif due_soon %}
+	                {% include "includes/empty_state.html" with icon="bi-funnel" title="No bills match your filters" subtitle="Try adjusting your search, status, or due-soon filter." %}
+	                <div class="text-center pb-4">
+	                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'payables:bill_list' %}">
+	                    <i class="bi bi-arrow-counterclockwise me-1"></i>Reset filters
+	                  </a>
+	                </div>
+	              {% elif status and status != 'all' %}
                 {% include "includes/empty_state.html" with icon="bi-funnel" title="No bills match your filters" subtitle="Try adjusting your search, status, or due-soon filter." %}
                 <div class="text-center pb-4">
                   <a class="btn btn-sm btn-outline-secondary" href="{% url 'payables:bill_list' %}">

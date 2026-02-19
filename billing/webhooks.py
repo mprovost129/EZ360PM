@@ -169,19 +169,63 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
 
         if company:
             if event_type in {"checkout.session.completed"}:
-                # subscription created/confirmed via checkout
-                plan = (metadata.get("plan") or "").strip() or None
-                interval = (metadata.get("interval") or "").strip() or None
-                stripe_customer_id = str(data_object.get("customer") or "")
-                stripe_subscription_id = str(data_object.get("subscription") or "")
-                sync_subscription_from_stripe(
-                    company=company,
-                    stripe_customer_id=stripe_customer_id,
-                    stripe_subscription_id=stripe_subscription_id,
-                    plan=plan,
-                    interval=interval,
-                    status="active",
-                )
+                # Either: invoice payment checkout OR subscription checkout.
+                invoice_id = (metadata.get("invoice_id") or "").strip()
+
+                if invoice_id:
+                    # Customer paid an invoice.
+                    try:
+                        from documents.models import Document, DocumentType, DocumentStatus
+                        from payments.models import Payment, PaymentStatus, PaymentMethod
+                        from payments.services import apply_payment_and_recalc
+
+                        inv = Document.objects.filter(id=invoice_id, company=company, doc_type=DocumentType.INVOICE).first()
+                        if inv and not inv.deleted_at:
+                            session_id = str(data_object.get("id") or "")
+                            payment_intent = str(data_object.get("payment_intent") or "")
+                            amount_total = int(data_object.get("amount_total") or 0)
+
+                            # Idempotency: do not create duplicate Payment rows for the same checkout session.
+                            existing = None
+                            if session_id:
+                                existing = Payment.objects.filter(company=company, stripe_checkout_session_id=session_id).first()
+
+                            if not existing:
+                                p = Payment.objects.create(
+                                    company=company,
+                                    client=inv.client,
+                                    invoice=inv,
+                                    payment_date=timezone.now().date(),
+                                    method=PaymentMethod.STRIPE,
+                                    amount_cents=amount_total,
+                                    status=PaymentStatus.SUCCEEDED,
+                                    stripe_checkout_session_id=session_id,
+                                    stripe_payment_intent_id=payment_intent,
+                                )
+                                apply_payment_and_recalc(p, actor=None)
+
+                            # Defensive status update (apply_payment_and_recalc should set correctly)
+                            if inv.status != DocumentStatus.PAID and int(inv.balance_due_cents or 0) <= 0:
+                                inv.status = DocumentStatus.PAID
+                                inv.save(update_fields=["status", "updated_at"])
+                    except Exception:
+                        # Keep webhook processing resilient; record failure via outer handler.
+                        raise
+
+                else:
+                    # subscription created/confirmed via checkout
+                    plan = (metadata.get("plan") or "").strip() or None
+                    interval = (metadata.get("interval") or "").strip() or None
+                    stripe_customer_id = str(data_object.get("customer") or "")
+                    stripe_subscription_id = str(data_object.get("subscription") or "")
+                    sync_subscription_from_stripe(
+                        company=company,
+                        stripe_customer_id=stripe_customer_id,
+                        stripe_subscription_id=stripe_subscription_id,
+                        plan=plan,
+                        interval=interval,
+                        status="active",
+                    )
 
             elif event_type in {"customer.subscription.created", "customer.subscription.updated"}:
                 stripe_customer_id = str(data_object.get("customer") or "")

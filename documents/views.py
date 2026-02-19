@@ -51,6 +51,106 @@ from .services_email import send_document_to_client_from_request
 from core.pagination import paginate
 
 
+# ------------------------------------------------------------------------------
+# Public invoice payment links (customer-facing)
+# ------------------------------------------------------------------------------
+
+
+def public_invoice_paid(request, token):
+    """Simple landing page after successful Stripe checkout."""
+    from .models import Document, DocumentType
+
+    inv = get_object_or_404(Document, public_token=token, doc_type=DocumentType.INVOICE, deleted_at__isnull=True)
+    return render(request, "documents/public_invoice_paid.html", {"invoice": inv})
+
+
+def public_invoice_canceled(request, token):
+    """Simple landing page after a canceled Stripe checkout."""
+    from .models import Document, DocumentType
+
+    inv = get_object_or_404(Document, public_token=token, doc_type=DocumentType.INVOICE, deleted_at__isnull=True)
+    return render(request, "documents/public_invoice_canceled.html", {"invoice": inv})
+
+
+def public_invoice_pay(request, token):
+    """Create (idempotently) a Stripe Checkout session for an invoice and redirect the customer."""
+    from django.conf import settings
+    from django.http import HttpResponse
+    from django.urls import reverse
+
+    import stripe
+
+    from .models import Document, DocumentType, DocumentStatus
+
+    inv = get_object_or_404(Document, public_token=token, doc_type=DocumentType.INVOICE, deleted_at__isnull=True)
+
+    # Only payable when sent/partially paid. Block drafts/void.
+    if inv.status in {DocumentStatus.DRAFT, DocumentStatus.VOID}:
+        return render(request, "documents/public_invoice_not_payable.html", {"invoice": inv, "reason": "not_payable"})
+
+    due_cents = int(inv.balance_due_cents or 0)
+    if due_cents <= 0 or inv.status == DocumentStatus.PAID:
+        return redirect("documents:public_invoice_paid", token=token)
+
+    if not getattr(settings, "STRIPE_SECRET_KEY", ""):
+        return HttpResponse("Stripe is not configured.", status=503)
+
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    currency = getattr(settings, "STRIPE_CURRENCY", "usd")
+    app_name = getattr(settings, "EZ360PM_APP_NAME", "EZ360PM")
+
+    # Prefer client email if available
+    customer_email = ""
+    try:
+        if inv.client and getattr(inv.client, "email", ""):
+            customer_email = (inv.client.email or "").strip()
+    except Exception:
+        customer_email = ""
+
+    success_url = request.build_absolute_uri(reverse("documents:public_invoice_paid", kwargs={"token": token}))
+    cancel_url = request.build_absolute_uri(reverse("documents:public_invoice_canceled", kwargs={"token": token}))
+
+    # Stripe idempotency key prevents accidental double-click creating multiple sessions.
+    idempotency_key = f"invoice:{inv.id}:due:{due_cents}"
+
+    session = stripe.checkout.Session.create(
+        mode="payment",
+        success_url=success_url,
+        cancel_url=cancel_url,
+        customer_email=customer_email or None,
+        line_items=[
+            {
+                "quantity": 1,
+                "price_data": {
+                    "currency": currency,
+                    "unit_amount": due_cents,
+                    "product_data": {
+                        "name": f"Invoice {inv.number or str(inv.id)[:8]}",
+                        "description": f"Payment for invoice {inv.number or ''} via {app_name}",
+                    },
+                },
+            }
+        ],
+        metadata={
+            "company_id": str(inv.company_id),
+            "invoice_id": str(inv.id),
+            "doc_type": "invoice",
+            "public_token": str(inv.public_token or ""),
+        },
+        payment_intent_data={
+            "metadata": {
+                "company_id": str(inv.company_id),
+                "invoice_id": str(inv.id),
+                "doc_type": "invoice",
+            }
+        },
+        idempotency_key=idempotency_key,
+    )
+
+    return redirect(session.url)
+
+
 def _doc_label(doc_type: str) -> str:
     return {
         DocumentType.INVOICE: "Invoice",
@@ -668,9 +768,11 @@ def document_pdf(request, doc_type: str, pk):
     safe_num = (doc.number or "draft").replace("/", "-")
     resp["Content-Disposition"] = f'attachment; filename="{doc_type}_{safe_num}.pdf"'
     return resp
+from companies.services import get_active_company, get_active_employee_profile
+
 def document_delete(request, doc_type: str, pk):
-    company = request.active_company
-    employee = request.active_employee
+    company = get_active_company(request)
+    employee = get_active_employee_profile(request)
     doc = get_object_or_404(Document, pk=pk, company=company, doc_type=doc_type, deleted_at__isnull=True)
 
     if request.method == "POST":

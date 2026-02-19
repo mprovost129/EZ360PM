@@ -49,7 +49,7 @@ urlpatterns = [
     path("api/v1/sync/", include("sync.urls")),
 
     # S3 direct upload presign endpoint
-    path("", include("storage.urls")),
+    path("", include("projects.storage.urls")),
 ]
 
 if settings.DEBUG:
