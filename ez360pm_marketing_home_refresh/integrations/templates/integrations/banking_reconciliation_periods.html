@@ -1,0 +1,102 @@
+{% extends "base_app.html" %}
+{% load money %}
+{% block title %}Reconciliation periods · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">Reconciliation periods</h1>
+    <div class="text-secondary small">Create a period, reconcile bank transactions to expenses, then lock it for audit clarity.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'integrations:banking_reconcile' %}"><i class="bi bi-graph-up me-1"></i>Summary</a>
+    <a class="btn btn-outline-secondary" href="{% url 'integrations:banking_settings' %}"><i class="bi bi-arrow-left me-1"></i>Bank settings</a>
+    <a class="btn btn-ez" href="{% url 'integrations:banking_reconciliation_new' %}"><i class="bi bi-plus-lg me-1"></i>New period</a>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end mb-3">
+      <div class="col-12 col-md-4">
+        <label class="form-label small text-secondary">Status</label>
+        <select name="status" class="form-select">
+          <option value="" {% if not status %}selected{% endif %}>All</option>
+          <option value="open" {% if status == 'open' %}selected{% endif %}>Open</option>
+          <option value="locked" {% if status == 'locked' %}selected{% endif %}>Locked</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-2 d-grid">
+        <button class="btn btn-outline-primary" type="submit"><i class="bi bi-funnel me-1"></i>Filter</button>
+      </div>
+    </form>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle ez-table">
+        <thead>
+          <tr>
+            <th>Period</th>
+            <th>Status</th>
+            <th class="text-end">Snapshot bank outflow</th>
+            <th class="text-end">Snapshot expenses</th>
+            <th class="text-end">Matched</th>
+            <th class="text-end">Unmatched bank</th>
+            <th class="text-end">Unmatched expenses</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in page_obj %}
+            <tr>
+              <td class="fw-semibold">
+                <a href="{% url 'integrations:banking_reconciliation_detail' p.pk %}">{{ p.start_date }} → {{ p.end_date }}</a>
+              </td>
+              <td>
+                {% if p.status == 'locked' %}
+                  <span class="badge bg-success">Locked</span>
+                {% else %}
+                  <span class="badge bg-secondary">Open</span>
+                {% endif %}
+              </td>
+              <td class="text-end">{{ p.snapshot_bank_outflow_cents|money_cents }}</td>
+              <td class="text-end">{{ p.snapshot_expense_total_cents|money_cents }}</td>
+              <td class="text-end">{{ p.snapshot_matched_count }}</td>
+              <td class="text-end">{{ p.snapshot_unmatched_bank_count }}</td>
+              <td class="text-end">{{ p.snapshot_unmatched_expense_count }}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'integrations:banking_reconciliation_detail' p.pk %}">Open</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="8" class="text-secondary small py-4">
+                No reconciliation periods yet. Create one to start reconciling.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+      <nav class="mt-3">
+        <ul class="pagination">
+          {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&status={{ status }}">Previous</a></li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">Previous</span></li>
+          {% endif %}
+
+          <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+
+          {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&status={{ status }}">Next</a></li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">Next</span></li>
+          {% endif %}
+        </ul>
+      </nav>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

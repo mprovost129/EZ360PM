@@ -1,0 +1,41 @@
+/* static/css/document_pdf.css
+   Customer-facing document styling for HTML print preview + WeasyPrint PDF.
+   Intentionally minimal and Bootstrap-compatible.
+*/
+
+@page {
+  size: Letter;
+  margin: 0.65in;
+}
+
+/* Screen container should look like a sheet on the app background */
+.ez-paper-wrap {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.ez-paper {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.06);
+  box-shadow: 0 .5rem 1rem rgba(0,0,0,.08);
+}
+
+.ez-paper-body {
+  padding: 1.0rem 1.0rem;
+}
+
+/* Ensure the “paper” prints cleanly (no shadow/border) */
+@media print {
+  body { background: #fff !important; }
+  .container { padding: 0 !important; margin: 0 !important; max-width: none !important; }
+  .ez-paper { border: none !important; box-shadow: none !important; }
+  .ez-paper-body { padding: 0 !important; }
+  .btn, .d-flex.gap-2, .alert { display: none !important; }
+  .table-responsive { overflow: visible !important; }
+}
+
+/* Text blocks */
+.ez-doc-block {
+  min-height: 24px;
+  white-space: normal;
+}

@@ -1,0 +1,73 @@
+{% load money %}
+
+{% if tier_flags.is_premium and is_manager and premium_insights %}
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="d-flex align-items-start justify-content-between gap-2">
+        <div>
+          <div class="fw-semibold">Premium insights</div>
+          <div class="text-secondary small">Trends, alerts, and integration status.</div>
+        </div>
+        <span class="badge text-bg-dark">Premium</span>
+      </div>
+
+      <div class="row g-3 mt-1">
+        <div class="col-12">
+          <div class="p-3 rounded border">
+            <div class="text-secondary small">Revenue trend</div>
+            <div class="d-flex align-items-baseline justify-content-between">
+              <div class="h4 mb-0">{{ kpi.revenue_net_cents|money }}</div>
+              <div class="text-secondary small">
+                vs last month: {% if premium_insights.rev_change_pct is not None %}{{ premium_insights.rev_change_pct }}%{% else %}—{% endif %}
+              </div>
+            </div>
+            <div class="text-secondary small">Last month: {{ premium_insights.rev_last_month_net_cents|money }}</div>
+          </div>
+        </div>
+
+        {% if tier_flags.is_professional %}
+          <div class="col-12">
+            <div class="p-3 rounded border">
+              <div class="text-secondary small">Expense trend</div>
+              <div class="d-flex align-items-baseline justify-content-between">
+                <div class="h4 mb-0">{{ kpi.expenses_cents|money }}</div>
+                <div class="text-secondary small">
+                  vs last month: {% if premium_insights.expenses_change_pct is not None %}{{ premium_insights.expenses_change_pct }}%{% else %}—{% endif %}
+                </div>
+              </div>
+              <div class="text-secondary small">Last month: {{ premium_insights.expenses_last_month_cents|money }}</div>
+            </div>
+          </div>
+        {% endif %}
+
+        <div class="col-12">
+          <div class="p-3 rounded border">
+            <div class="text-secondary small">Collections alert</div>
+            <div class="d-flex align-items-baseline justify-content-between">
+              <div class="h4 mb-0">{{ premium_insights.overdue_count }}</div>
+              <div class="text-secondary small">Overdue balance: {{ premium_insights.overdue_cents|money }}</div>
+            </div>
+            <div class="text-secondary small">Invoices past due with an outstanding balance.</div>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <div class="p-3 rounded border">
+            <div class="text-secondary small">Dropbox</div>
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="fw-semibold">
+                {% if premium_insights.dropbox_connected %}
+                  <i class="bi bi-check-circle-fill text-success me-1"></i>Connected
+                {% else %}
+                  <i class="bi bi-exclamation-circle-fill text-warning me-1"></i>Not connected
+                {% endif %}
+              </div>
+              <a class="btn btn-sm btn-outline-dark" href="{% url 'integrations:dropbox_settings' %}">Open</a>
+            </div>
+            <div class="text-secondary small">Manage your Dropbox integration settings.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}

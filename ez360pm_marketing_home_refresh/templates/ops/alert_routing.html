@@ -1,0 +1,103 @@
+{% extends "base_app.html" %}
+{% block title %}Ops alert routing · EZ360PM{% endblock %}
+{% block content %}
+<div class="container-fluid" style="max-width: 900px;">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">Alert routing</h1>
+      <div class="text-secondary small">Control where Ops Alerts are delivered (in addition to storing in the database).</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-dark" href="{% url 'ops:alerts' %}">View alerts</a>
+      <a class="btn btn-outline-dark" href="{% url 'ops:dashboard' %}">Back to Ops</a>
+    </div>
+  </div>
+
+  <form method="post" class="card shadow-sm">
+    {% csrf_token %}
+    <div class="card-body">
+      <h2 class="h6">Webhook routing</h2>
+      <div class="row g-2 align-items-end">
+        <div class="col-12">
+          <div class="form-check">
+            {{ form.ops_alert_webhook_enabled }}
+            <label class="form-check-label" for="{{ form.ops_alert_webhook_enabled.id_for_label }}">
+              Enable webhook delivery
+            </label>
+          </div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Webhook URL</label>
+          {{ form.ops_alert_webhook_url }}
+          {% if form.ops_alert_webhook_url.errors %}<div class="text-danger small">{{ form.ops_alert_webhook_url.errors|join:", " }}</div>{% endif %}
+          <div class="text-secondary small mt-1">POSTs JSON payloads for each alert to your endpoint.</div>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">Timeout (seconds)</label>
+          {{ form.ops_alert_webhook_timeout_seconds }}
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <h2 class="h6">Email routing</h2>
+      <div class="row g-2 align-items-end">
+        <div class="col-12">
+          <div class="form-check">
+            {{ form.ops_alert_email_enabled }}
+            <label class="form-check-label" for="{{ form.ops_alert_email_enabled.id_for_label }}">
+              Enable email delivery
+            </label>
+          </div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Recipients</label>
+          {{ form.ops_alert_email_recipients }}
+          <div class="text-secondary small mt-1">Comma-separated email addresses.</div>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">Minimum level</label>
+          {{ form.ops_alert_email_min_level }}
+        </div>
+      <hr class="my-4">
+
+      <h2 class="h6">Noise filters</h2>
+      <div class="text-secondary small mb-2">
+        These filters prevent creating alerts for known noisy probes (bots/scanners). Matching is best-effort and uses <code>details.path</code> and <code>details.user_agent</code> when provided.
+      </div>
+      <div class="row g-2">
+        <div class="col-12 col-md-6">
+          <label class="form-label">Ignore path prefixes</label>
+          {{ form.ops_alert_noise_path_prefixes }}
+          <div class="text-secondary small mt-1">One prefix per line. Example: <code>/wp-login.php</code></div>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label">Ignore user-agent tokens</label>
+          {{ form.ops_alert_noise_user_agents }}
+          <div class="text-secondary small mt-1">One token per line. Case-insensitive substring match.</div>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">Prune resolved alerts after (days)</label>
+          {{ form.ops_alert_prune_resolved_after_days }}
+          <div class="text-secondary small mt-1">Used by the prune command.</div>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">Deduplicate alerts (minutes)</label>
+          {{ form.ops_alert_dedup_minutes }}
+          <div class="text-secondary small mt-1">Coalesce identical open alerts within this window.</div>
+        </div>
+      </div>
+
+      </div>
+
+    </div>
+    <div class="card-footer bg-white d-flex justify-content-end">
+      <button class="btn btn-ez" type="submit">Save routing</button>
+    </div>
+  </form>
+
+  <div class="text-secondary small mt-3">
+    Note: Alerts are always stored in the Ops Alerts table. Routing controls additional delivery (webhook/email).
+  </div>
+</div>
+{% endblock %}

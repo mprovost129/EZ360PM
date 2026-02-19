@@ -1,0 +1,28 @@
+{% extends "helpcenter/_help_base.html" %}
+
+{% block help_h1 %}Client credits{% endblock %}
+
+{% block help_body %}
+<p>Client credits represent amounts the client has available to apply to future invoices (e.g., overpayments or adjustments).</p>
+
+<div class="fw-semibold mb-2">How credits work</div>
+<ul>
+  <li>Credits are stored as a <strong>ledger</strong> (adds and spends).</li>
+  <li>Applying a credit creates a <strong>credit application</strong> against a specific invoice.</li>
+  <li>A credit application reduces the invoice’s effective balance due.</li>
+</ul>
+
+<div class="fw-semibold mb-2">Common credit sources</div>
+<ul>
+  <li><strong>Overpayments</strong> on invoices (automatic credit creation).</li>
+  <li><strong>Manual credit</strong> entries (manager/admin workflows).</li>
+  <li><strong>Refund allocation</strong> (if your refund logic converts part of a prior payment into credit).</li>
+</ul>
+
+<div class="alert alert-warning mb-0">
+  <div class="fw-semibold">Auditability</div>
+  <div class="small">
+    Credits should never be edited “in place”. Use ledger entries so the audit log stays intact.
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% load formatting %}
+
+{% block title %}Invoice Reconciliation{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="max-width: 900px;">
+  <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">Invoice Reconciliation</h1>
+      <div class="text-secondary small">Invoice <strong>{{ invoice.number|default:invoice.id }}</strong> · Total <strong>${{ invoice.total_cents|cents_to_dollars }}</strong> · Stored Balance <strong>${{ invoice.balance_due_cents|cents_to_dollars }}</strong></div>
+    </div>
+    <form method="post" class="m-0">
+      {% csrf_token %}
+      <button class="btn btn-ez"><i class="bi bi-arrow-repeat me-1"></i>Recalculate</button>
+    </form>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="row g-2">
+        <div class="col-6">Payments net</div>
+        <div class="col-6 text-end">${{ payments_net|cents_to_dollars }}</div>
+        <div class="col-6">Credit notes applied</div>
+        <div class="col-6 text-end">-${{ credit_note_ar_applied|cents_to_dollars }}</div>
+        <div class="col-6">Client credit applied</div>
+        <div class="col-6 text-end">-${{ credit_apps_total|cents_to_dollars }}</div>
+        <hr class="my-2">
+        <div class="col-6"><strong>Computed balance due</strong></div>
+        <div class="col-6 text-end"><strong>${{ computed_balance|cents_to_dollars }}</strong></div>
+      </div>
+      {% if computed_balance != invoice.balance_due_cents %}
+        <div class="alert alert-warning mt-3 mb-0">Stored balance differs from computed balance. Click <strong>Recalculate</strong> to sync.</div>
+      {% else %}
+        <div class="alert alert-success mt-3 mb-0">Stored balance matches computed balance.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="mt-3 text-secondary small">
+    Records: {{ payments|length }} payments · {{ refunds|length }} refunds · {{ credit_notes|length }} credit notes · {{ credit_apps|length }} credit applications
+  </div>
+</div>
+{% endblock %}

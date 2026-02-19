@@ -1,0 +1,48 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% block title %}PII Export · Ops · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 980px;">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">PII Export</h1>
+      <div class="text-secondary small">Export company records as CSV (ZIP). Staff-only. Use for portability / DSAR requests.</div>
+    </div>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'ops:dashboard' %}">Back to Ops</a>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <form method="post" class="row g-3">
+        {% csrf_token %}
+        <div class="col-12 col-md-6">
+          <label class="form-label">Company</label>
+          <select class="form-select" name="company_id">
+            {% for c in companies %}
+              <option value="{{ c.id }}" {% if company and c.id == company.id %}selected{% endif %}>{{ c.name }} (id={{ c.id }})</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Export is scoped to the selected company.</div>
+        </div>
+
+        <div class="col-12">
+          <div class="alert alert-warning mb-0">
+            <div class="fw-semibold">Heads up</div>
+            <div class="small">
+              This export includes business records as CSV (clients, projects, documents, payments, expenses, time entries).
+              It does not include private file blobs (S3 objects). Use the backup system for full backups.
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <button class="btn btn-ez">
+            <i class="bi bi-download me-1"></i>Download ZIP export
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "helpcenter/_help_base.html" %}
+{% load static helpcenter_tags %}
+
+{% block help_h1 %}Statements{% endblock %}
+
+{% block help_body %}
+<p class="text-secondary">Statements summarize what a client owes across multiple invoices. They are most useful when a client has multiple open items or pays on a schedule.</p>
+
+<h2 class="h6 mt-3">When to use statements</h2>
+<ul>
+  <li>Monthly billing cycles (send at the start/end of month).</li>
+  <li>Clients who pay by check/ACH and prefer a single “what’s due” summary.</li>
+  <li>High-volume service work where individual invoices may be missed.</li>
+</ul>
+
+<h2 class="h6 mt-3">Operational checklist</h2>
+<ul>
+  <li>Confirm invoices are <strong>Sent</strong> (not Draft).</li>
+  <li>Confirm any <strong>credits</strong> have been applied correctly.</li>
+  <li>Confirm payment links / instructions match your business process.</li>
+</ul>
+
+<div class="alert alert-light border mt-3 mb-0">
+  <div class="small text-secondary">See also:</div>
+  <div class="d-flex flex-wrap gap-2 mt-1">
+    <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:collections' %}">Collections</a>
+    <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:ar_aging' %}">A/R Aging</a>
+    <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:report_interpretation' %}">Report interpretation</a>
+  </div>
+</div>
+
+<hr class="my-4">
+<h2 class="h6">Screenshots</h2>
+<div class="row g-3">
+  <div class="col-lg-12">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Client statement table</div>
+        <img class="img-fluid border rounded" src="{% hc_screenshot 'statements_table' 'images/helpcenter/statements_table.png' %}" alt="Statement table">
+        <div class="text-secondary small mt-2">Placeholder image — replace with a real screenshot in a launch polishing pass.</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Export actions (CSV/PDF)</div>
+        <img class="img-fluid border rounded" src="{% hc_screenshot 'statements_actions' 'images/helpcenter/statements_actions.png' %}" alt="Statement exports">
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Email statement</div>
+        <img class="img-fluid border rounded" src="{% hc_screenshot 'statements_email' 'images/helpcenter/statements_email.png' %}" alt="Statement email">
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
