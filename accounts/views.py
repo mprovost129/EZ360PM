@@ -177,7 +177,24 @@ def register_view(request):
     if request.user.is_authenticated:
         return redirect("core:app_dashboard")
 
+    # Optional: public pricing page can preselect a plan/interval and we carry it
+    # through registration -> company onboarding -> billing.
+    selected_plan = str(request.GET.get("plan") or "").strip().lower()
+    selected_interval = str(request.GET.get("interval") or "").strip().lower()
+    if selected_plan in {"starter", "professional", "premium"}:
+        request.session["preselected_plan"] = selected_plan
+    if selected_interval in {"month", "year"}:
+        request.session["preselected_interval"] = selected_interval
+
     if request.method == "POST":
+        # Preserve any plan selection posted from the registration form.
+        post_plan = str(request.POST.get("plan") or "").strip().lower()
+        post_interval = str(request.POST.get("interval") or "").strip().lower()
+        if post_plan in {"starter", "professional", "premium"}:
+            request.session["preselected_plan"] = post_plan
+        if post_interval in {"month", "year"}:
+            request.session["preselected_interval"] = post_interval
+
         # Throttle + reCAPTCHA (Pack Q)
         if not _throttle_or_block(request, prefix="register", limit=10, window_seconds=60 * 10):
             messages.error(request, "Too many sign-up attempts. Please wait a few minutes and try again.")
@@ -213,7 +230,19 @@ def register_view(request):
     else:
         form = RegisterForm()
 
-    return render(request, "accounts/register.html", {"form": form})
+    # Pull from session so deep links still show the selection.
+    selected_plan = str(request.session.get("preselected_plan") or "").strip().lower()
+    selected_interval = str(request.session.get("preselected_interval") or "").strip().lower()
+    if selected_plan not in {"starter", "professional", "premium"}:
+        selected_plan = ""
+    if selected_interval not in {"month", "year"}:
+        selected_interval = ""
+
+    return render(
+        request,
+        "accounts/register.html",
+        {"form": form, "selected_plan": selected_plan, "selected_interval": selected_interval},
+    )
 
 
 def logout_view(request):

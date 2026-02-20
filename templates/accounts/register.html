@@ -12,9 +12,19 @@
           <h1 class="h4 mb-3">Create your account</h1>
           <p class="text-secondary small mb-4">Start your free trial. You can add your company next.</p>
 
+          {% if selected_plan %}
+            <div class="alert alert-light border small">
+              <div class="fw-semibold">Plan selected: {{ selected_plan|capfirst }}{% if selected_interval %} ({% if selected_interval == 'year' %}Annual{% else %}Monthly{% endif %}){% endif %}</div>
+              <div class="text-secondary">After you create your company, we’ll bring you to Billing to confirm checkout.</div>
+            </div>
+          {% endif %}
+
           <form method="post" novalidate data-recaptcha-action="register">
             {% csrf_token %}
             <input type="hidden" name="recaptcha_token" value="">
+
+            {% if selected_plan %}<input type="hidden" name="plan" value="{{ selected_plan }}">{% endif %}
+            {% if selected_interval %}<input type="hidden" name="interval" value="{{ selected_interval }}">{% endif %}
 
             {% if form.non_field_errors %}
               <div class="alert alert-danger">{{ form.non_field_errors }}</div>

@@ -549,7 +549,7 @@ class SiteConfig(models.Model):
         default=True,
         help_text="If enabled, staff users may continue to use the app during maintenance.",
     )
-    
+
     # ------------------------------------------------------------------
     # Billing & onboarding controls (platform-wide)
     # ------------------------------------------------------------------
@@ -557,7 +557,7 @@ class SiteConfig(models.Model):
         default=14,
         help_text="Number of free-trial days for new subscriptions created via Stripe Checkout.",
     )
-    
+
     # ------------------------------------------------------------------
     # Ops notification emails (high-signal events, not alerts)
     # ------------------------------------------------------------------
@@ -598,9 +598,8 @@ class SiteConfig(models.Model):
         parts = [p.strip() for p in raw.split(",")]
         return [p for p in parts if p]
 
-
-def notify_recipients_list(self) -> list[str]:
-    raw = self.ops_notify_email_recipients or ""
-    parts = [p.strip() for p in raw.split(",")]
-    return [p for p in parts if p]
+    def notify_recipients_list(self) -> list[str]:
+        raw = self.ops_notify_email_recipients or ""
+        parts = [p.strip() for p in raw.split(",")]
+        return [p for p in parts if p]
 

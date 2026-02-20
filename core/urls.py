@@ -9,6 +9,7 @@ app_name = "core"
 
 urlpatterns = [
     path("", views.home, name="home"),
+    path("pricing/", views.pricing, name="pricing"),
     path("app/", views.app_dashboard, name="app_dashboard"),
     path("app/dashboard/customize/", views.dashboard_customize, name="dashboard_customize"),
     path("app/dashboard/api/revenue-trend/", views.dashboard_revenue_trend_api, name="dashboard_revenue_trend_api"),

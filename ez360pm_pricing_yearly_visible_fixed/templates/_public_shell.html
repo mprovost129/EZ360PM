@@ -1,0 +1,20 @@
+{% extends "base_public.html" %}
+{% load static %}
+
+{# This template is a compatibility shim for legacy templates that expect a "public_content" block. #}
+
+{% block title %}EZ360PM{% endblock %}
+
+{#
+  Compatibility shim.
+
+  Some legacy/error templates extend "_public_shell.html" and expect a block
+  named "public_content". Our canonical public layout is "base_public.html"
+  with a "content" block.
+
+  This template bridges the two so production never 500s due to missing shell.
+#}
+
+{% block content %}
+  {% block public_content %}{% endblock %}
+{% endblock %}

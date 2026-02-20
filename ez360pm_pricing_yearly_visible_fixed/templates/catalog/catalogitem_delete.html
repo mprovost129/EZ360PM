@@ -1,0 +1,21 @@
+{% extends "base_app.html" %}
+
+{% block title %}Delete catalog item · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">Delete catalog item</h1>
+  <a class="btn btn-outline-secondary" href="{% url 'catalog:item_list' %}">Back</a>
+</div>
+
+<div class="card shadow-sm" style="max-width: 720px;">
+  <div class="card-body">
+    <p class="mb-3">Are you sure you want to remove <strong>{{ object.name }}</strong>?</p>
+    <form method="post">
+      {% csrf_token %}
+      <button class="btn btn-danger" type="submit">Yes, delete</button>
+      <a class="btn btn-outline-secondary" href="{% url 'catalog:item_list' %}">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

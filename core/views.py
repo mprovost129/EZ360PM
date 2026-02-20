@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from django.db.models import Sum, Q
 from django.db.models.functions import TruncMonth
 from django.http import HttpRequest, JsonResponse
@@ -37,6 +38,80 @@ def home(request: HttpRequest):
     if request.user.is_authenticated:
         return redirect("core:app_dashboard")
     return render(request, "core/home.html")
+
+
+def pricing(request: HttpRequest):
+    """Public pricing + feature matrix page."""
+    if request.user.is_authenticated:
+        # Authenticated users manage billing inside the app.
+        return redirect("billing:overview")
+
+    # Feature matrix is based on actual tier gating used in code.
+    # Keep labels user-facing and stable; gating rules live in billing decorators/services.
+    feature_rows = [
+        {"label": "Multi-company + team roles (Owner/Admin/Manager/Staff)", "min_plan": PlanCode.STARTER},
+        {"label": "Clients (CRM) — list/search + CSV import/export", "min_plan": PlanCode.STARTER},
+        {"label": "Projects — staff scoping, services, project files", "min_plan": PlanCode.STARTER},
+        {"label": "Time tracking — timer + manual entries + unbilled totals", "min_plan": PlanCode.STARTER},
+        {"label": "Time approvals (manager workflow)", "min_plan": PlanCode.PROFESSIONAL},
+        {"label": "Documents — Estimates, Proposals, Invoices + professional PDFs", "min_plan": PlanCode.STARTER},
+        {"label": "Online invoice payments via Stripe Checkout", "min_plan": PlanCode.STARTER},
+        {"label": "Payments — partial payments + credit ledger", "min_plan": PlanCode.STARTER},
+        {"label": "Payables — vendors, bills, recurring bills + attachments", "min_plan": PlanCode.STARTER},
+        {"label": "Expenses — merchants, receipts, posting", "min_plan": PlanCode.PROFESSIONAL},
+        # Plaid: implemented as a stable "coming soon" landing page (Pro+) while onboarding is finalized.
+        {"label": "Bank feeds (Plaid) — connect, sync, review queue, rules", "min_plan": PlanCode.PROFESSIONAL, "coming_soon": True},
+        {"label": "Accounting engine — chart of accounts + journal invariants", "min_plan": PlanCode.PROFESSIONAL},
+        {"label": "Financial reports — P&L, Balance Sheet, Trial Balance, GL", "min_plan": PlanCode.PROFESSIONAL},
+        {"label": "Advanced reporting enhancements", "min_plan": PlanCode.PREMIUM},
+        {"label": "Custom dashboards", "min_plan": PlanCode.PREMIUM},
+        {"label": "Dropbox integration", "min_plan": PlanCode.PREMIUM},
+        # Desktop sync: planned post‑launch.
+        {"label": "Desktop app sync (offline mode)", "min_plan": PlanCode.PROFESSIONAL, "coming_soon": True},
+        {"label": "Help Center + in-app guidance", "min_plan": PlanCode.STARTER},
+    ]
+
+    tiers = [
+        {
+            "code": PlanCode.STARTER,
+            "name": "Starter",
+            "price_m": "19.99",
+            "price_y": "199.99",
+            "included_seats": 1,
+        },
+        {
+            "code": PlanCode.PROFESSIONAL,
+            "name": "Professional",
+            "price_m": "49.99",
+            "price_y": "499.99",
+            "included_seats": 5,
+        },
+        {
+            "code": PlanCode.PREMIUM,
+            "name": "Premium",
+            "price_m": "99.99",
+            "price_y": "999.99",
+            "included_seats": 10,
+        },
+    ]
+
+    seat_addon = {"price_m": "9.99", "price_y": "99.99"}
+
+    def _has(plan: str, min_plan: str) -> bool:
+        return plan_meets(plan, min_plan=min_plan)
+
+    return render(
+        request,
+        "core/pricing.html",
+        {
+            "feature_rows": feature_rows,
+            "tiers": tiers,
+            "seat_addon": seat_addon,
+            "trial_days": int(getattr(settings, "EZ360PM_TRIAL_DAYS", 14) or 14),
+            "has_feature": _has,
+            "PlanCode": PlanCode,
+        },
+    )
 
 
 

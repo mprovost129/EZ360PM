@@ -83,6 +83,38 @@ def onboarding(request: HttpRequest) -> HttpResponse:
                     pass
 
             messages.success(request, "Company created. Welcome to EZ360PM.")
+
+            # If the user selected a plan from the public pricing page, preselect it
+            # and send them straight to Billing to confirm Stripe checkout.
+            pre_plan = str(request.session.pop("preselected_plan", "") or "").strip().lower()
+            pre_interval = str(request.session.pop("preselected_interval", "") or "").strip().lower()
+            plan_map = {"starter": "starter", "professional": "professional", "premium": "premium"}
+            interval_map = {"month": "month", "year": "year"}
+            if pre_plan in plan_map or pre_interval in interval_map:
+                try:
+                    from billing.services import ensure_company_subscription
+                    from billing.models import PlanCode, BillingInterval
+
+                    sub = ensure_company_subscription(company)
+                    changed: list[str] = []
+                    if pre_plan in plan_map:
+                        desired_plan = plan_map[pre_plan]
+                        if desired_plan in {PlanCode.STARTER, PlanCode.PROFESSIONAL, PlanCode.PREMIUM} and desired_plan != sub.plan:
+                            sub.plan = desired_plan
+                            changed.append("plan")
+                    if pre_interval in interval_map:
+                        desired_interval = interval_map[pre_interval]
+                        if desired_interval in {BillingInterval.MONTH, BillingInterval.YEAR} and desired_interval != sub.billing_interval:
+                            sub.billing_interval = desired_interval
+                            changed.append("billing_interval")
+                    if changed:
+                        sub.save(update_fields=changed + ["updated_at"])
+                except Exception:
+                    pass
+
+                messages.info(request, "Plan selected — confirm your subscription in Billing to start your trial.")
+                return redirect("billing:overview")
+
             return redirect("core:app_dashboard")
     else:
         form = CompanyCreateForm()

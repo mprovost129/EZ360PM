@@ -1,5 +1,13 @@
 ## 2026-02-19 — Stripe trial days + ops signup/conversion notifications (DONE)
 
+## 2026-02-20 — Pricing page feature matrix (checks + coming soon badges)
+
+- Updated the public pricing matrix to reflect **real tier gating**.
+- Added explicit **Coming soon** status to pricing rows that are implemented as landing pages / planned post‑launch:
+  - **Plaid bank feeds** (Professional+): shown as *Coming soon*.
+  - **Desktop app sync (offline mode)** (Professional+): shown as *Coming soon*.
+- Kept **Dropbox integration** as **Premium** (live gating).
+
 - Moved **trial length** to DB-backed Ops SiteConfig: `billing_trial_days` (default 14) used by Stripe Checkout subscription creation.
 - Added **ops notification emails** (separate from alerts) in Ops SiteConfig:
   - `ops_notify_email_enabled`, `ops_notify_email_recipients`
@@ -1748,3 +1756,12 @@ Next:
   - `/notes/` page to create/search/view notes
   - Sidebar “Notes” nav item
 - Removed dashboard “Active company / Role / Subscription” widgets from the default layout (active company is shown under the company dropdown in the sidebar; subscription lives under Billing).
+
+## 2026-02-19 — Phase 9 (P9-PRICING-PAGE)
+
+- Added a dedicated public **Pricing** page at `/pricing/` with a 4-column feature matrix (Features / Starter / Professional / Premium).
+- Pricing includes monthly/annual toggle and clearly lists **extra seat** pricing.
+- Pricing page “Select” buttons deep-link into registration with a plan + interval preselection; onboarding routes users to Billing to confirm checkout.
+- Fixed pricing page feature matrix checkmarks/Xs by correcting the `has_feature` template filter to use real plan tier ranking (`billing.services.plan_meets`) instead of lexicographic string comparison.
+
+- Pricing page: show **both** monthly + annual prices for Starter/Professional/Premium (annual shows "2 months free") and provide separate Select buttons for Monthly vs Annual.
