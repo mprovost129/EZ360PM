@@ -210,6 +210,26 @@
         </button>
 
         <!-- User dropdown -->
+
+        {% if request.user.is_staff %}
+                  <div class="dropdown">
+                    <button class="btn btn-outline-danger btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Support & staff tools">
+                      <i class="bi bi-shield-lock"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li><a class="dropdown-item" href="{% url 'core:support_mode_status' %}"><i class="bi bi-headset me-2"></i>Support Mode</a></li>
+                      {% if qa_report_href %}
+                        <li><a class="dropdown-item" href="{{ qa_report_href }}"><i class="bi bi-bug me-2"></i>Report QA issue</a></li>
+                      {% endif %}
+                      <li><hr class="dropdown-divider"></li>
+                      <li><a class="dropdown-item" href="{% url 'ops:dashboard' %}"><i class="bi bi-shield-lock me-2"></i>Ops Console</a></li>
+                      <li><a class="dropdown-item" href="{% url 'ops:launch_checks' %}"><i class="bi bi-clipboard-check me-2"></i>Launch Checks</a></li>
+                      <li><a class="dropdown-item" href="{% url 'ops:email_test' %}"><i class="bi bi-envelope-at me-2"></i>Email Test</a></li>
+                      <li><a class="dropdown-item" href="{% url 'ops:retention' %}"><i class="bi bi-trash3 me-2"></i>Retention</a></li>
+                    </ul>
+                  </div>
+                  {% endif %}
+
         <div class="dropdown">
           <button class="btn btn-outline-dark btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Account">
             <i class="bi bi-person-circle me-1"></i>{{ request.user.username|default:request.user.email }}

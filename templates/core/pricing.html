@@ -82,8 +82,8 @@
             {% for t in tiers %}
               <td class="border text-center">
                 <div class="d-grid gap-2">
-                  <a class="btn btn-ez w-100" href="{% url 'accounts:register' %}?plan={{ t.code }}&interval=month">Select {{ t.name }} (Monthly)</a>
-                  <a class="btn btn-outline-ez w-100" href="{% url 'accounts:register' %}?plan={{ t.code }}&interval=year">Select {{ t.name }} (Annual)</a>
+                  <a class="btn btn-ez w-100" href="{% url 'accounts:register' %}?plan={{ t.code }}&interval=month">Select {{ t.name }} (mo)</a>
+                  <a class="btn btn-outline-ez w-100" href="{% url 'accounts:register' %}?plan={{ t.code }}&interval=year">Select {{ t.name }} (yr)</a>
                 </div>
                 <div class="text-secondary small mt-2">{{ trial_days }}‑day free trial included</div>
               </td>
