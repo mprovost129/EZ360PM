@@ -1,0 +1,311 @@
+{% extends "base_app.html" %}
+{% load formatting file_extras %}
+{% block title %}Bill · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h4 mb-1">Bill</h1>
+    <div class="text-secondary small">{{ bill.vendor.name }}{% if bill.bill_number %} · #{{ bill.bill_number }}{% endif %}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'payables:bill_list' %}"><i class="bi bi-arrow-left me-1"></i>Back</a>
+    <a class="btn btn-outline-secondary" href="{% url 'helpcenter:accounting' %}"><i class="bi bi-question-circle me-1"></i>Help</a>
+    {% if not bill.is_posted %}
+      <a class="btn btn-outline-secondary" href="{% url 'payables:bill_edit' bill.id %}">Edit</a>
+      <form method="post" action="{% url 'payables:bill_post' bill.id %}" class="d-inline">
+        {% csrf_token %}
+        <button class="btn btn-ez" type="submit"><i class="bi bi-check2-circle me-1"></i>Post bill</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div class="text-secondary small">Status</div>
+          <div>
+            {% if bill.status == 'draft' %}<span class="badge text-bg-secondary">Draft</span>{% endif %}
+            {% if bill.status == 'posted' %}<span class="badge text-bg-primary">Posted</span>{% endif %}
+            {% if bill.status == 'partially_paid' %}<span class="badge text-bg-warning">Partially paid</span>{% endif %}
+            {% if bill.status == 'paid' %}<span class="badge text-bg-success">Paid</span>{% endif %}
+          </div>
+        </div>
+        <hr>
+        <div class="d-flex justify-content-between"><div class="text-secondary">Issue date</div><div>{{ bill.issue_date }}</div></div>
+        <div class="d-flex justify-content-between"><div class="text-secondary">Due date</div><div>{{ bill.due_date|default:"—" }}</div></div>
+        <hr>
+        <div class="d-flex justify-content-between"><div class="text-secondary">Subtotal</div><div>{{ bill.subtotal_cents|cents_to_dollars }}</div></div>
+        <div class="d-flex justify-content-between"><div class="text-secondary">Tax</div><div>{{ bill.tax_cents|cents_to_dollars }}</div></div>
+        <div class="d-flex justify-content-between fw-semibold"><div>Total</div><div>{{ bill.total_cents|cents_to_dollars }}</div></div>
+        <hr>
+        <div class="d-flex justify-content-between"><div class="text-secondary">Paid</div><div>{{ bill.amount_paid_cents|cents_to_dollars }}</div></div>
+        <div class="d-flex justify-content-between fw-semibold"><div>Balance</div><div>{{ bill.balance_cents|cents_to_dollars }}</div></div>
+      </div>
+    </div>
+
+    {% if bill.is_posted and bill.balance_cents > 0 %}
+      <div class="card shadow-sm mt-3">
+        <div class="card-body">
+          <h2 class="h6 mb-3">Record payment</h2>
+          <form method="post" action="{% url 'payables:bill_add_payment' bill.id %}" novalidate>
+            {% csrf_token %}
+            <div class="mb-2">
+              <label class="form-label">Date</label>
+              {{ payment_form.payment_date }}
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Amount</label>
+              <div class="input-group"><span class="input-group-text">$</span>{{ payment_form.amount_cents }}</div>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Account</label>
+              {{ payment_form.payment_account }}
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Reference</label>
+              {{ payment_form.reference }}
+            </div>
+            <button class="btn btn-ez" type="submit"><i class="bi bi-credit-card me-1"></i>Add payment</button>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between">
+          <h2 class="h6 mb-0">Line items</h2>
+          {% if bill.is_posted %}
+            <span class="text-secondary small">Posted bills are locked.</span>
+          {% endif %}
+        </div>
+
+        <div class="table-responsive mt-3">
+          <table class="table align-middle">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th class="text-end">Qty</th>
+                <th class="text-end">Unit</th>
+                <th class="text-end">Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for li in bill.lines.all %}
+                <tr>
+                  <td>
+                    <div class="fw-semibold">{{ li.description }}</div>
+                    <div class="text-secondary small">{{ li.expense_account.code }} · {{ li.expense_account.name }}</div>
+                  </td>
+                  <td class="text-end">{{ li.quantity }}</td>
+                  <td class="text-end">{{ li.unit_price_cents|cents_to_dollars }}</td>
+                  <td class="text-end">{{ li.line_total_cents|cents_to_dollars }}</td>
+                  <td class="text-end">
+                    {% if not bill.is_posted %}
+                      <form method="post" action="{% url 'payables:bill_delete_line' bill.id li.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                      </form>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="text-center text-secondary py-4">No line items yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {% if not bill.is_posted %}
+          <hr>
+          <h3 class="h6 mb-3">Add line item</h3>
+          <form method="post" action="{% url 'payables:bill_add_line' bill.id %}" class="row g-2" novalidate>
+            {% csrf_token %}
+            <div class="col-md-6">
+              <label class="form-label">Description</label>
+              {{ line_form.description }}
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Qty</label>
+              {{ line_form.quantity }}
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Unit price</label>
+              <div class="input-group"><span class="input-group-text">$</span>{{ line_form.unit_price_cents }}</div>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Expense account</label>
+              {{ line_form.expense_account }}
+            </div>
+            <div class="col-12">
+              <button class="btn btn-outline-primary" type="submit"><i class="bi bi-plus-lg me-1"></i>Add line</button>
+            </div>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if bill.payments.exists %}
+      <div class="card shadow-sm mt-3">
+        <div class="card-body">
+          <h2 class="h6">Payments</h2>
+          <div class="table-responsive">
+            <table class="table mb-0">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Account</th>
+                  <th>Reference</th>
+                  <th class="text-end">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in bill.payments.all %}
+                  <tr>
+                    <td>{{ p.payment_date }}</td>
+                    <td>{{ p.payment_account.code }} · {{ p.payment_account.name }}</td>
+                    <td>{{ p.reference|default:"—" }}</td>
+                    <td class="text-end">{{ p.amount_cents|cents_to_dollars }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="card shadow-sm mt-3">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between">
+          <h2 class="h6 mb-0">Attachments</h2>
+          {% if s3_direct_uploads %}
+            <span class="text-secondary small">Private S3</span>
+          {% endif %}
+        </div>
+
+        {% if attachments %}
+          <div class="table-responsive mt-3">
+            <table class="table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>File</th>
+                  <th class="text-end">Key</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for a in attachments %}
+                  <tr>
+                    <td class="fw-semibold">{{ a.original_filename|default:"Attachment" }}</td>
+                    <td class="text-end"><code class="small">{{ a.file_s3_key }}</code></td>
+                    <td class="text-end">
+                      {% if a.original_filename|previewable %}
+                      <a class="btn btn-sm btn-outline-secondary me-2" href="{% url 'payables:bill_attachment_download' bill.id a.id %}?preview=1"><i class="bi bi-eye me-1"></i>Preview</a>
+                      {% endif %}
+                      <a class="btn btn-sm btn-outline-secondary me-2" href="{% url 'payables:bill_attachment_download' bill.id a.id %}"><i class="bi bi-download me-1"></i>Download</a>
+d me-1"></i>Download</a>
+                      <form method="post" action="{% url \'payables:bill_delete_attachment\' bill.id a.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <button class="btn btn-sm btn-outline-danger" type="submit">Remove</button>
+                      </form>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-secondary small mt-2">No attachments yet.</div>
+        {% endif %}
+
+        {% if s3_direct_uploads %}
+          <hr>
+          <form id="billAttachForm" method="post" action="{% url 'payables:bill_add_attachment' bill.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="file_s3_key" id="billAttachKey">
+            <input type="hidden" name="original_filename" id="billAttachName">
+            <input type="hidden" name="content_type" id="billAttachType">
+
+            <div class="row g-2 align-items-end">
+              <div class="col-md-8">
+                <label class="form-label">Add attachment</label>
+                <input class="form-control" type="file" id="billAttachFile">
+                <div class="form-text">Uploads directly to S3, then registers it to this bill.</div>
+              </div>
+              <div class="col-md-4">
+                <button class="btn btn-outline-primary w-100" type="button" id="billAttachUploadBtn"><i class="bi bi-upload me-1"></i>Upload</button>
+              </div>
+            </div>
+          </form>
+
+          <script>
+            (function(){
+              const fileEl = document.getElementById('billAttachFile');
+              const btn = document.getElementById('billAttachUploadBtn');
+              const form = document.getElementById('billAttachForm');
+              const keyEl = document.getElementById('billAttachKey');
+              const nameEl = document.getElementById('billAttachName');
+              const typeEl = document.getElementById('billAttachType');
+
+              async function presign(file){
+                const resp = await fetch("{% url 'storage:presign_upload' %}", {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': (document.querySelector('input[name=csrfmiddlewaretoken]')||{}).value || ''
+                  },
+                  body: JSON.stringify({
+                    kind: 'bill_attachment',
+                    filename: file.name,
+                    content_type: file.type || 'application/octet-stream',
+                    bill_id: '{{ bill.id }}'
+                  })
+                });
+                return await resp.json();
+              }
+
+              async function uploadToS3(file, presigned){
+                const fd = new FormData();
+                Object.entries(presigned.fields).forEach(([k,v])=>fd.append(k,v));
+                fd.append('file', file);
+                const up = await fetch(presigned.url, { method: 'POST', body: fd });
+                if (!up.ok) throw new Error('upload_failed');
+              }
+
+              btn && btn.addEventListener('click', async function(){
+                const f = (fileEl && fileEl.files && fileEl.files[0]) ? fileEl.files[0] : null;
+                if (!f) return;
+                btn.disabled = true;
+                try {
+                  const ps = await presign(f);
+                  if (ps.error) throw new Error(ps.detail || ps.error);
+                  await uploadToS3(f, ps);
+                  keyEl.value = ps.key;
+                  nameEl.value = f.name;
+                  typeEl.value = f.type || '';
+                  form.submit();
+                } catch (e) {
+                  alert('Could not upload attachment: ' + e);
+                } finally {
+                  btn.disabled = false;
+                }
+              });
+            })();
+          </script>
+        {% else %}
+          <div class="alert alert-info mt-3 mb-0">Direct uploads are disabled. Enable USE_S3=1 and S3_DIRECT_UPLOADS=1 to attach files.</div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

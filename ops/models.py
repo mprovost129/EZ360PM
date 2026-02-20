@@ -549,6 +549,36 @@ class SiteConfig(models.Model):
         default=True,
         help_text="If enabled, staff users may continue to use the app during maintenance.",
     )
+    
+    # ------------------------------------------------------------------
+    # Billing & onboarding controls (platform-wide)
+    # ------------------------------------------------------------------
+    billing_trial_days = models.PositiveSmallIntegerField(
+        default=14,
+        help_text="Number of free-trial days for new subscriptions created via Stripe Checkout.",
+    )
+    
+    # ------------------------------------------------------------------
+    # Ops notification emails (high-signal events, not alerts)
+    # ------------------------------------------------------------------
+    ops_notify_email_enabled = models.BooleanField(
+        default=False,
+        help_text="When enabled, EZ360PM sends owner notifications for key lifecycle events (signups, conversions).",
+    )
+    ops_notify_email_recipients = models.TextField(
+        blank=True,
+        default="",
+        help_text="Comma-separated list of recipient email addresses for ops notifications (separate from alerts).",
+    )
+    ops_notify_on_company_signup = models.BooleanField(
+        default=True,
+        help_text="Notify when a new company is created (trial started).",
+    )
+    ops_notify_on_subscription_active = models.BooleanField(
+        default=True,
+        help_text="Notify when a subscription becomes active (first successful renewal/payment).",
+    )
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -567,4 +597,10 @@ class SiteConfig(models.Model):
         raw = self.ops_alert_email_recipients or ""
         parts = [p.strip() for p in raw.split(",")]
         return [p for p in parts if p]
+
+
+def notify_recipients_list(self) -> list[str]:
+    raw = self.ops_notify_email_recipients or ""
+    parts = [p.strip() for p in raw.split(",")]
+    return [p for p in parts if p]
 

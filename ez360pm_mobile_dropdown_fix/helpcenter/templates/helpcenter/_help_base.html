@@ -1,0 +1,104 @@
+{% extends shell %}
+
+{% block title %}{% block help_title %}Help · EZ360PM{% endblock %}{% endblock %}
+
+{% block help_content %}
+<div class="container-fluid" style="max-width: 1100px;">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 mb-3">
+    <div>
+      <h1 class="h4 mb-1">{% block help_h1 %}Help Center{% endblock %}</h1>
+      <div class="text-secondary small">Guides, permissions, workflows, and launch operations.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-dark btn-sm" href="{% url 'helpcenter:home' %}"><i class="bi bi-house me-1"></i>Help home</a>
+      <a class="btn btn-outline-dark btn-sm" href="{% url 'helpcenter:terms' %}">Terms</a>
+      <a class="btn btn-outline-dark btn-sm" href="{% url 'helpcenter:privacy' %}">Privacy</a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2">Browse</div>
+          <div class="mb-2">
+            <input id="helpFilterInput" type="search" class="form-control form-control-sm" placeholder="Search help…" aria-label="Search help">
+          </div>
+          <div class="list-group list-group-flush">
+            <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:getting_started' %}">Getting started</a>
+            <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:roles_permissions' %}">Roles & permissions</a>
+            <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:time_tracking' %}">Time tracking</a>
+            <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:invoices_payments' %}">Invoices & payments</a>
+            <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:accounting' %}">Accounting engine</a>
+            <a class="list-group-item list-group-item-action ps-4" href="{% url 'helpcenter:accounts_receivable' %}">Accounts receivable</a>
+            <a class="list-group-item list-group-item-action ps-4" href="{% url 'helpcenter:client_credits' %}">Client credits</a>
+            <a class="list-group-item list-group-item-action ps-4" href="{% url 'helpcenter:ar_aging' %}">A/R aging</a>
+            <a class="list-group-item list-group-item-action ps-4" href="{% url 'helpcenter:collections' %}">Collections</a>
+            <a class="list-group-item list-group-item-action ps-4" href="{% url 'helpcenter:statements' %}">Statements</a>
+            <a class="list-group-item list-group-item-action ps-4" href="{% url 'helpcenter:report_interpretation' %}">Report interpretation</a>
+            <a class="list-group-item list-group-item-action ps-4" href="{% url 'helpcenter:profit_loss' %}">Profit &amp; Loss</a>
+            <a class="list-group-item list-group-item-action ps-4" href="{% url 'helpcenter:balance_sheet' %}">Balance Sheet</a>
+            <a class="list-group-item list-group-item-action ps-4" href="{% url 'helpcenter:trial_balance' %}">Trial Balance</a>
+            <a class="list-group-item list-group-item-action ps-4" href="{% url 'helpcenter:ap_aging' %}">A/P aging</a>
+            <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:storage_files' %}">Storage & files</a>
+            <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:billing' %}">Billing & subscriptions</a>
+            <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:ops' %}">Ops console</a>
+            <a class="list-group-item list-group-item-action ps-4" href="{% url 'helpcenter:production_runbook' %}">Production runbook</a>
+            <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:faq' %}">FAQ</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mt-3">
+        <div class="card-body">
+          <div class="fw-semibold mb-2">Legal</div>
+          <div class="list-group list-group-flush">
+            <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:terms' %}">Terms of Service</a>
+            <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:privacy' %}">Privacy Policy</a>
+            <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:cookies' %}">Cookie Policy</a>
+            <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:acceptable_use' %}">Acceptable Use</a>
+            <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:security' %}">Security</a>
+            <a class="list-group-item list-group-item-action" href="{% url 'helpcenter:refund_policy' %}">Refund Policy</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-9">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          {% block help_body %}{% endblock %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const input = document.getElementById('helpFilterInput');
+    if (!input) return;
+    const items = Array.from(document.querySelectorAll('.list-group a.list-group-item'));
+
+    function norm(s) {
+      return (s || '').toString().trim().toLowerCase();
+    }
+
+    function apply() {
+      const q = norm(input.value);
+      if (!q) {
+        items.forEach(a => a.classList.remove('d-none'));
+        return;
+      }
+      items.forEach(a => {
+        const text = norm(a.textContent);
+        const href = norm(a.getAttribute('href'));
+        const match = text.includes(q) || href.includes(q);
+        a.classList.toggle('d-none', !match);
+      });
+    }
+
+    input.addEventListener('input', apply);
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base_app.html" %}
+{% block title %}Snooze · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="max-width: 900px;">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">Snooze</h1>
+      <div class="text-secondary small">ID {{ snooze.id }}</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-dark" href="{% url 'ops:alert_snoozes' %}">Back to snoozes</a>
+      <a class="btn btn-outline-dark" href="{% url 'ops:alerts' %}">Alerts</a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="text-secondary small">Status</div>
+          {% if is_active %}
+            <div class="fw-semibold"><span class="badge text-bg-warning">Active</span></div>
+          {% else %}
+            <div class="fw-semibold"><span class="badge text-bg-secondary">Expired</span></div>
+          {% endif %}
+        </div>
+        <div class="col-md-4">
+          <div class="text-secondary small">Source</div>
+          <div class="fw-semibold text-monospace">{{ snooze.source }}</div>
+        </div>
+        <div class="col-md-4">
+          <div class="text-secondary small">Company</div>
+          <div class="fw-semibold">
+            {% if snooze.company %}{{ snooze.company.name }}{% else %}Platform{% endif %}
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="text-secondary small">Snoozed until</div>
+          <div class="fw-semibold">{{ snooze.snoozed_until|date:"Y-m-d H:i" }}</div>
+        </div>
+        <div class="col-md-4">
+          <div class="text-secondary small">Created at</div>
+          <div class="fw-semibold">{{ snooze.created_at|date:"Y-m-d H:i" }}</div>
+        </div>
+        <div class="col-md-4">
+          <div class="text-secondary small">Created by</div>
+          <div class="fw-semibold">{{ snooze.created_by_email|default:"—" }}</div>
+        </div>
+
+        <div class="col-12">
+          <div class="text-secondary small">Reason</div>
+          <div class="fw-semibold">{{ snooze.reason|default:"—" }}</div>
+        </div>
+      </div>
+
+      <hr class="my-4" />
+
+      <div class="d-flex gap-2">
+        {% if is_active %}
+          <form method="post" action="{% url 'ops:alert_snooze_clear' %}">
+            {% csrf_token %}
+            <input type="hidden" name="source" value="{{ snooze.source }}">
+            {% if snooze.company %}<input type="hidden" name="company_id" value="{{ snooze.company.id }}">{% endif %}
+            <button class="btn btn-outline-dark" type="submit">Clear active snooze</button>
+          </form>
+        {% endif %}
+
+        <form method="post" action="{% url 'ops:alert_snooze_delete' snooze.id %}" onsubmit="return confirm('Delete this snooze record?');">
+          {% csrf_token %}
+          <button class="btn btn-danger" type="submit">Delete record</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="text-secondary small">
+    Note: clearing stops suppression immediately; deleting removes the audit record.
+  </div>
+</div>
+{% endblock %}

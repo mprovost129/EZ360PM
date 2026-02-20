@@ -1,0 +1,38 @@
+{% extends "helpcenter/_help_base.html" %}
+{% load static helpcenter_tags %}
+
+{% block help_h1 %}Profit &amp; Loss (P&amp;L){% endblock %}
+
+{% block help_body %}
+<p>The Profit &amp; Loss report summarizes revenue and expenses over a date range.</p>
+
+<h2 class="h6 mt-3">What it answers</h2>
+<ul>
+  <li>Are we profitable this month/quarter/year?</li>
+  <li>What are the largest expense categories?</li>
+  <li>Which income accounts drive revenue?</li>
+</ul>
+
+<h2 class="h6 mt-3">How it’s calculated (high level)</h2>
+<ul>
+  <li>Revenue comes from posted income entries (e.g., invoices).</li>
+  <li>Expenses come from posted expense entries (e.g., expenses, bills if configured to post).</li>
+  <li>Totals roll up by the Chart of Accounts.</li>
+</ul>
+
+<div class="alert alert-info">
+  <div class="fw-semibold">Tip</div>
+  <div class="small">Use this alongside Aging reports to separate “book revenue” from “cash collected”.</div>
+</div>
+
+<h2 class="h6 mt-3">Screenshots</h2>
+
+<div class="card shadow-sm mt-2">
+  <div class="card-body">
+    <div class="fw-semibold mb-2">Screenshot</div>
+    <img class="img-fluid border rounded" src="{% hc_screenshot 'profit_loss' 'images/helpcenter/profit_loss.png' %}" alt="Help screenshot">
+    <div class="text-secondary small mt-2">Placeholder image — replace with a real screenshot in a launch polishing pass.</div>
+  </div>
+</div>
+
+{% endblock %}
