@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EZ360PM Mockup — Time Tracking</title>
+
+  <link rel="icon" href="../static/images/favicon.ico">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../static/css/ez360pm.css">
+
+  <style>
+    body{ background: var(--ez-muted-bg); }
+    .mock-wrap{ max-width: 1200px; }
+    .mock-card{ border: 1px solid var(--ez-card-border); background: var(--ez-card-bg); box-shadow: var(--ez-card-shadow); border-radius: 1rem; }
+    .table thead th{ color: var(--ez-text-muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; }
+    .timer-face{
+      width: 220px;
+      height: 220px;
+      border-radius: 999px;
+      border: 10px solid rgba(31,95,191,.18);
+      background: rgba(31,95,191,.04);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      flex-direction:column;
+    }
+    html[data-theme="dark"] .timer-face{
+      border-color: rgba(127,179,255,.22);
+      background: rgba(127,179,255,.06);
+    }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom ez-topbar">
+    <div class="container-fluid mock-wrap">
+      <a class="navbar-brand fw-semibold d-flex align-items-center gap-2" href="./index.html">
+        <img class="ez-brand-logo" src="../static/images/ez360pm_logo.svg" alt="EZ360PM">
+        <span class="d-none d-md-inline">Time Tracking</span>
+      </a>
+      <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-dark" href="./index.html"><i class="bi bi-grid me-1"></i>All mockups</a>
+        <button id="themeToggleBtn" class="btn btn-outline-ez" type="button" title="Light/Dark"><i class="bi bi-moon-stars"></i></button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container-fluid mock-wrap py-4">
+    <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+      <div>
+        <h1 class="h3 mb-1 fw-bold">Time</h1>
+        <div class="text-muted">Track billable work, convert to invoices, and eliminate missed hours.</div>
+      </div>
+      <div class="d-flex gap-2">
+        <select class="form-select" style="width: 190px;">
+          <option selected>This week</option>
+          <option>Last 7 days</option>
+          <option>This month</option>
+        </select>
+        <button class="btn btn-ez"><i class="bi bi-file-earmark-plus me-1"></i>Convert to invoice</button>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-lg-5">
+        <div class="mock-card p-3 mb-3">
+          <div class="d-flex align-items-start justify-content-between">
+            <div>
+              <div class="fw-semibold">Active Timer</div>
+              <div class="text-muted small">Project + task + billable toggle</div>
+            </div>
+            <span class="badge text-bg-success">Running</span>
+          </div>
+
+          <div class="d-flex justify-content-center my-3">
+            <div class="timer-face">
+              <div class="text-muted small">Elapsed</div>
+              <div class="mono fw-bold" style="font-size: 2.25rem;">01:12:34</div>
+              <div class="text-muted small">Billable</div>
+            </div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-12">
+              <label class="form-label text-muted small mb-1">Project</label>
+              <select class="form-select">
+                <option selected>2602 — Oak Ridge Builders (Addition)</option>
+                <option>2601 — Coastal Renovations (Kitchen)</option>
+                <option>2602 — Maple Street LLC (Permit set)</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label text-muted small mb-1">Description</label>
+              <input class="form-control" value="Framing coordination + RFI responses">
+            </div>
+            <div class="col-6">
+              <label class="form-label text-muted small mb-1">Rate</label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input class="form-control" value="125.00">
+                <span class="input-group-text">/hr</span>
+              </div>
+            </div>
+            <div class="col-6">
+              <label class="form-label text-muted small mb-1">Billable</label>
+              <select class="form-select">
+                <option selected>Yes</option>
+                <option>No</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="d-grid gap-2 mt-3">
+            <button class="btn btn-ez btn-lg"><i class="bi bi-stop-circle me-1"></i>Stop timer</button>
+            <button class="btn btn-outline-dark"><i class="bi bi-pencil-square me-1"></i>Edit details</button>
+          </div>
+        </div>
+
+        <div class="mock-card p-3">
+          <div class="fw-semibold">This period</div>
+          <div class="row g-2 mt-1">
+            <div class="col-6">
+              <div class="border rounded-3 p-2" style="border-color: var(--ez-border);">
+                <div class="text-muted small">Billable hours</div>
+                <div class="fw-bold fs-5">18.75</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="border rounded-3 p-2" style="border-color: var(--ez-border);">
+                <div class="text-muted small">Unbilled value</div>
+                <div class="fw-bold fs-5">$2,343.75</div>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="border rounded-3 p-2" style="border-color: var(--ez-border);">
+                <div class="text-muted small">Top project</div>
+                <div class="fw-semibold">Oak Ridge Builders — 9.25 hrs</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-7">
+        <div class="mock-card p-3">
+          <div class="d-flex align-items-start justify-content-between">
+            <div>
+              <div class="fw-semibold">Time Entries</div>
+              <div class="text-muted small">Recent activity • grouped by day</div>
+            </div>
+            <div class="d-flex gap-2">
+              <div class="input-group" style="width: 280px;">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input class="form-control" placeholder="Search entries…" value="rfi">
+              </div>
+              <button class="btn btn-outline-dark"><i class="bi bi-plus-lg me-1"></i>Manual entry</button>
+            </div>
+          </div>
+
+          <div class="table-responsive mt-3">
+            <table class="table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th style="width: 120px;">Date</th>
+                  <th>Project</th>
+                  <th>Description</th>
+                  <th class="text-center" style="width: 90px;">Billable</th>
+                  <th class="text-end" style="width: 90px;">Hours</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><div class="fw-semibold">Feb 20</div><div class="text-muted small">Today</div></td>
+                  <td><div class="fw-semibold">Oak Ridge Builders</div><div class="text-muted small">Addition</div></td>
+                  <td>Framing coordination + RFI responses</td>
+                  <td class="text-center"><span class="badge text-bg-success">Yes</span></td>
+                  <td class="text-end fw-semibold">1.25</td>
+                </tr>
+                <tr>
+                  <td><div class="fw-semibold">Feb 19</div><div class="text-muted small">Yesterday</div></td>
+                  <td><div class="fw-semibold">Maple Street LLC</div><div class="text-muted small">Permit set</div></td>
+                  <td>Structural notes cleanup</td>
+                  <td class="text-center"><span class="badge text-bg-success">Yes</span></td>
+                  <td class="text-end fw-semibold">2.50</td>
+                </tr>
+                <tr>
+                  <td><div class="fw-semibold">Feb 18</div></td>
+                  <td><div class="fw-semibold">Coastal Renovations</div><div class="text-muted small">Kitchen</div></td>
+                  <td>As-built field measure</td>
+                  <td class="text-center"><span class="badge text-bg-secondary">No</span></td>
+                  <td class="text-end fw-semibold">1.00</td>
+                </tr>
+                <tr>
+                  <td><div class="fw-semibold">Feb 18</div></td>
+                  <td><div class="fw-semibold">Oak Ridge Builders</div><div class="text-muted small">Addition</div></td>
+                  <td>Client call + scope confirmation</td>
+                  <td class="text-center"><span class="badge text-bg-success">Yes</span></td>
+                  <td class="text-end fw-semibold">0.75</td>
+                </tr>
+                <tr>
+                  <td><div class="fw-semibold">Feb 17</div></td>
+                  <td><div class="fw-semibold">Stonebridge Custom Homes</div><div class="text-muted small">Concept</div></td>
+                  <td>Early massing options</td>
+                  <td class="text-center"><span class="badge text-bg-success">Yes</span></td>
+                  <td class="text-end fw-semibold">3.25</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="d-flex align-items-center justify-content-between mt-3">
+            <div class="text-muted small">Showing 5 of 128 entries</div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-dark btn-sm">Prev</button>
+              <button class="btn btn-outline-dark btn-sm">Next</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../static/js/ez360pm.js"></script>
+</body>
+</html>
