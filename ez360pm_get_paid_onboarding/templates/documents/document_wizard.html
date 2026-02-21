@@ -1,0 +1,42 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% block title %}New {{ doc_label }} · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">Create {{ doc_label }}</h1>
+    <div class="text-secondary small">Start from a template, or copy a recent {{ doc_label|lower }}.</div>
+  </div>
+</div>
+
+<form method="post" class="card card-body">
+  {% csrf_token %}
+  <div class="row g-3">
+    <div class="col-md-4">
+      <label class="form-label">Mode</label>
+      {{ form.mode }}
+      <div class="form-text">Choose whether to create a new document or copy an existing one.</div>
+    </div>
+
+    <div class="col-md-4">
+      <label class="form-label">Template (optional)</label>
+      {{ form.template }}
+      <div class="form-text">Templates are per-company and per-document type.</div>
+    </div>
+
+    <div class="col-md-4">
+      <label class="form-label">Copy from (optional)</label>
+      {{ form.copy_from }}
+      <div class="form-text">Copies line items but clears client/number/notes.</div>
+    </div>
+  </div>
+
+  <hr class="my-4">
+
+  <div class="d-flex gap-2 justify-content-end">
+    <a class="btn btn-outline-secondary" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_list' %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_list' %}{% else %}{% url 'documents:proposal_list' %}{% endif %}">Cancel</a>
+    <button class="btn btn-ez" type="submit"><i class="bi bi-plus-lg me-1"></i>Create</button>
+  </div>
+</form>
+{% endblock %}

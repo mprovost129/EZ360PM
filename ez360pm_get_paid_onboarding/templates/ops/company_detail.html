@@ -1,0 +1,144 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% block title %}{{ company.name }} · Ops · EZ360PM{% endblock %}
+{% block content %}
+<div class="container-fluid" style="max-width: 1100px;">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <div class="text-secondary small">Company</div>
+      <h1 class="h4 mb-1">{{ company.name }}</h1>
+      <div class="text-secondary small">Owner: {{ company.owner.email }}</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-dark" href="{% url 'ops:dashboard' %}">
+        <i class="bi bi-arrow-left me-1"></i>Back
+      </a>
+      <form method="post">
+        {% csrf_token %}
+        <button class="btn btn-ez" type="submit">
+          <i class="bi bi-headset me-1"></i>Enter support mode for this company
+        </button>
+      </form>
+      <a class="btn btn-outline-primary" href="{% url 'ops:company_timeline' company.id %}">
+        <i class="bi bi-clock-history me-1"></i>Timeline
+      </a>
+      <form method="post" action="{% url 'ops:resync_subscription' company.id %}">
+        {% csrf_token %}
+        <button class="btn btn-outline-danger" type="submit">
+          <i class="bi bi-arrow-repeat me-1"></i>Resync from Stripe
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="text-secondary small">Subscription</div>
+          {% if subscription %}
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <span class="badge text-bg-dark text-uppercase">{{ subscription.plan }}</span>
+              <span class="badge text-bg-secondary text-uppercase">{{ subscription.status }}</span>
+              <span class="text-secondary small">{{ subscription.billing_interval }}</span>
+            </div>
+            <div class="mt-2 text-secondary small">
+              Seats limit: <strong>{{ seats_limit }}</strong>
+              · Extra seats: <strong>{{ subscription.extra_seats }}</strong>
+            </div>
+          {% else %}
+            <div class="text-secondary">No subscription row found.</div>
+          {% endif %}
+        </div>
+      
+        </div>
+      </div>
+
+      <div class="card shadow-sm mt-3">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="text-secondary small">Recent Stripe webhooks</div>
+              <div class="small text-secondary">Best-effort match by Stripe customer/subscription IDs.</div>
+            </div>
+            <a class="btn btn-sm btn-outline-dark" href="{% url 'billing:webhook_history' %}">All webhooks</a>
+          </div>
+
+          {% if recent_webhooks %}
+            <div class="table-responsive mt-2">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for e in recent_webhooks %}
+                    <tr>
+                      <td class="text-secondary small">{{ e.received_at|date:"Y-m-d H:i" }}</td>
+                      <td class="small">{{ e.event_type }}</td>
+                      <td>
+                        {% if e.ok %}
+                          <span class="badge text-bg-success">OK</span>
+                        {% else %}
+                          <span class="badge text-bg-danger">ERR</span>
+                        {% endif %}
+                      </td>
+                      <td class="text-end">
+                        <a class="btn btn-sm btn-outline-dark" href="{% url 'billing:webhook_event_detail' e.pk %}">View</a>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="text-secondary small mt-2">No recent events found for this company yet.</div>
+          {% endif %}
+        </div>
+      </div>
+</div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="text-secondary small">Employees</div>
+          <div class="mt-1">Active employees: <strong>{{ employees|length }}</strong></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>User</th>
+              <th>Role</th>
+              <th>Display</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in employees %}
+              <tr>
+                <td class="fw-semibold">{{ e.user.email }}</td>
+                <td><span class="badge text-bg-light text-uppercase">{{ e.role }}</span></td>
+                <td class="text-secondary small">{{ e.display_name }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="3" class="p-3 text-secondary">No employees.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

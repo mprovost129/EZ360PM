@@ -1,0 +1,40 @@
+<div class="card ez-card">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div>
+        <div class="fw-semibold">Recent open projects</div>
+        <div class="text-muted small">Active work in progress (completed projects are excluded).</div>
+      </div>
+      <a class="btn btn-sm btn-outline-dark" href="{% url 'projects:project_list' %}">All projects</a>
+    </div>
+
+    {% if recent_open_projects %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr class="text-muted small">
+              <th>Project</th>
+              <th>Client</th>
+              <th class="text-end" style="width: 20%">Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in recent_open_projects %}
+              <tr>
+                <td>
+                  <a href="{% url 'projects:project_detail' p.id %}">
+                    {{ p.project_number }} · {{ p.name }}
+                  </a>
+                </td>
+                <td class="text-muted small">{{ p.client.name|default:"—" }}</td>
+                <td class="text-end text-muted small">{{ p.updated_at|date:"M j" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-muted small">No open projects yet.</div>
+    {% endif %}
+  </div>
+</div>

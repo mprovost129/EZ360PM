@@ -1,0 +1,28 @@
+{% extends "base_public.html" %}
+{% load static %}
+{% block title %}2FA Verification · EZ360PM{% endblock %}
+{% block content %}
+<div class="container" style="max-width: 520px;">
+  <h1 class="h4 mb-2">Enter your verification code</h1>
+  <div class="text-secondary small mb-3">We sent you here because 2FA is enabled for <strong>{{ email }}</strong>.</div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="mb-3">
+          {{ form.code.label_tag }}
+          {{ form.code }}
+          {% if form.code.errors %}
+            <div class="text-danger small mt-1">{{ form.code.errors|join:", " }}</div>
+          {% endif %}
+        </div>
+        <button class="btn btn-ez w-100" type="submit">Verify</button>
+      </form>
+      <div class="text-center mt-3">
+        <a class="small" href="{% url 'accounts:login' %}">Back to login</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

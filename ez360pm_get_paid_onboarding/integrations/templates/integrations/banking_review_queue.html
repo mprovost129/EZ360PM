@@ -1,0 +1,167 @@
+{% extends "base_app.html" %}
+{% load formatting %}
+{% block title %}Bank review queue · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">Bank review queue</h1>
+    <div class="text-secondary small">Process imported transactions: ignore noise, mark transfers, and create draft expenses.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'integrations:banking_settings' %}"><i class="bi bi-arrow-left me-1"></i>Bank settings</a>
+    <a class="btn btn-outline-secondary" href="{% url 'integrations:banking_reconcile' %}"><i class="bi bi-clipboard-check me-1"></i>Reconcile</a>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-4">
+        <label class="form-label small text-secondary">Status</label>
+        <select class="form-select" name="status">
+          {% for key,label in status_choices %}
+            <option value="{{ key }}" {% if key == status %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label small text-secondary">Account</label>
+        <select class="form-select" name="account">
+          <option value="">All accounts</option>
+          {% for a in accounts %}
+            <option value="{{ a.account_id }}" {% if a.account_id == account_filter %}selected{% endif %}>{{ a.name|default:"Account" }}{% if a.mask %} ••{{ a.mask }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-2 d-grid">
+        <button class="btn btn-outline-primary" type="submit"><i class="bi bi-funnel me-1"></i>Filter</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<form method="post" action="{% url 'integrations:banking_review_bulk_action' %}">
+  {% csrf_token %}
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="small text-secondary">
+          Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} transactions
+        </div>
+
+        <div class="d-flex gap-2 align-items-center">
+          <select class="form-select form-select-sm" name="action" style="max-width: 240px;">
+            <option value="ignore">Ignore selected</option>
+            <option value="transfer">Mark transfer</option>
+            <option value="create_expense">Create draft expense</option>
+            <option value="link_existing">Link to suggested existing expense</option>
+          </select>
+          <button class="btn btn-sm btn-ez" type="submit"><i class="bi bi-check2-square me-1"></i>Apply</button>
+        </div>
+      </div>
+
+      <div class="table-responsive mt-3">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th style="width: 38px;"><input class="form-check-input" type="checkbox" id="check-all"></th>
+              <th>Date</th>
+              <th>Merchant</th>
+              <th class="text-muted">Suggested</th>
+              <th>Status</th>
+              <th class="text-end">Amount</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for tx in page_obj.object_list %}
+              <tr>
+                <td>
+                  <input class="form-check-input tx-check" type="checkbox" name="tx_ids" value="{{ tx.id }}">
+                </td>
+                <td class="text-muted small">{{ tx.posted_date|default:"" }}</td>
+                <td>
+                  <div class="fw-semibold">{{ tx.name }}</div>
+                  <div class="text-muted small">{{ tx.account.name|default:"Account" }}{% if tx.account.mask %} ••{{ tx.account.mask }}{% endif %}</div>
+                </td>
+                <td class="small">
+                  {% if tx.suggested_existing_expense_id %}
+                    <div class="fw-semibold">Possible duplicate</div>
+                    <div class="text-muted">Expense #{{ tx.suggested_existing_expense_id }} ({{ tx.suggested_existing_expense_score }}%)</div>
+                  {% elif tx.suggested_category or tx.suggested_merchant_name %}
+                    <div class="text-muted">{{ tx.suggested_merchant_name|default:"" }}{% if tx.suggested_category %} · {{ tx.suggested_category }}{% endif %}</div>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if tx.status == 'ignored' %}
+                    <span class="badge text-bg-secondary">Ignored</span>
+                  {% elif tx.status == 'transfer' %}
+                    <span class="badge text-bg-warning">Transfer</span>
+                  {% elif tx.status == 'expense_created' %}
+                    <span class="badge text-bg-success">Expense</span>
+                  {% else %}
+                    <span class="badge text-bg-primary">New</span>
+                  {% endif %}
+                </td>
+                <td class="text-end fw-semibold">{{ tx.amount_cents|cents_to_dollars }}</td>
+                <td class="text-end">
+                  {% if tx.linked_expense_id %}
+                    <a class="btn btn-sm btn-outline-secondary" href="{% url 'expenses:expense_edit' pk=tx.linked_expense_id %}">View expense</a>
+                  {% else %}
+                    <div class="d-flex gap-1 justify-content-end">
+                      <button class="btn btn-sm btn-outline-secondary" type="submit" formmethod="post" formaction="{% url 'integrations:banking_tx_mark' tx_id=tx.id status='ignored' %}">Ignore</button>
+                      <button class="btn btn-sm btn-outline-warning" type="submit" formmethod="post" formaction="{% url 'integrations:banking_tx_mark' tx_id=tx.id status='transfer' %}">Transfer</button>
+                      {% if tx.suggested_existing_expense_id and not tx.linked_expense_id %}
+                        <button class="btn btn-sm btn-outline-secondary" type="submit" formmethod="post" formaction="{% url 'integrations:banking_tx_link_existing' tx_id=tx.id %}">
+                          Link suggested
+                        </button>
+                      {% endif %}
+                      <button class="btn btn-sm btn-outline-primary" type="submit" formmethod="post" formaction="{% url 'integrations:banking_tx_create_expense' tx_id=tx.id %}">Create expense</button>
+                    </div>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="7" class="text-secondary small py-4">No transactions found for this filter.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if page_obj.paginator.num_pages > 1 %}
+        <nav aria-label="Bank review pagination" class="mt-2">
+          <ul class="pagination pagination-sm mb-0">
+            {% if page_obj.has_previous %}
+              <li class="page-item"><a class="page-link" href="?status={{ status }}&account={{ account_filter }}&page={{ page_obj.previous_page_number }}">Prev</a></li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">Prev</span></li>
+            {% endif %}
+            <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+            {% if page_obj.has_next %}
+              <li class="page-item"><a class="page-link" href="?status={{ status }}&account={{ account_filter }}&page={{ page_obj.next_page_number }}">Next</a></li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">Next</span></li>
+            {% endif %}
+          </ul>
+        </nav>
+      {% endif %}
+    </div>
+  </div>
+</form>
+
+<script>
+(function(){
+  const all = document.getElementById('check-all');
+  if(!all) return;
+  all.addEventListener('change', function(){
+    document.querySelectorAll('.tx-check').forEach(cb => cb.checked = all.checked);
+  });
+})();
+</script>
+{% endblock %}

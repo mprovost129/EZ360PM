@@ -1,0 +1,27 @@
+<div class="card">
+  <div class="card-body">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+      <div>
+        <div class="fw-semibold">A/R aging</div>
+        <div class="text-secondary small">Open invoice balances grouped by age.</div>
+      </div>
+      <a class="btn btn-sm btn-outline-ez" href="{% url 'documents:invoice_list' %}">
+        <i class="bi bi-receipt-cutoff me-1"></i>Invoices
+      </a>
+    </div>
+
+    <div class="ez-chart-wrap">
+      <canvas
+        id="ezArAgingChart"
+        class="ez-chart"
+        data-url="{% url 'core:dashboard_ar_aging_api' %}"
+        aria-label="Accounts receivable aging chart"
+        role="img"
+      ></canvas>
+    </div>
+
+    <noscript>
+      <div class="text-secondary small">Enable JavaScript to view the chart.</div>
+    </noscript>
+  </div>
+</div>

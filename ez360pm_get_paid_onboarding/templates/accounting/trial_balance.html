@@ -1,0 +1,62 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% load formatting %}
+{% block title %}Trial Balance · EZ360PM{% endblock %}
+
+{% block app_content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">Trial Balance</h1>
+    <div class="text-secondary small">Debits and credits by account.</div>
+  </div>
+  <a class="btn btn-outline-dark" href="{% url 'accounting:home' %}">Accounting</a>
+    <a class="btn btn-outline-dark" href="{% url 'helpcenter:trial_balance' %}"><i class="bi bi-question-circle me-1"></i>Help</a>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    {% include "accounting/partials_date_range.html" %}
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Account</th>
+            <th class="text-end">Debits</th>
+            <th class="text-end">Credits</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td class="text-secondary small">{{ r.account__type }}</td>
+            <td>{{ r.account__code }} {{ r.account__name }}</td>
+            <td class="text-end">{{ r.debits|cents_to_dollars }}</td>
+            <td class="text-end">{{ r.credits|cents_to_dollars }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-secondary">No journal activity.</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <th colspan="2">Totals</th>
+            <th class="text-end">{{ total_debits|cents_to_dollars }}</th>
+            <th class="text-end">{{ total_credits|cents_to_dollars }}</th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    {% if total_debits != total_credits %}
+      <div class="alert alert-warning mb-0">
+        Trial balance is not balanced. Check source documents for rounding or incomplete journal posting.
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
