@@ -1782,16 +1782,6 @@ Next:
   - Manage maintenance mode, billing trial fallback, owner notifications, and ops alert routing.
 - Ops dashboard toolbar now links to **Settings**.
 
-## 2026-02-20 — S3 ACL Hardening + Onboarding Recovery
-
-- Confirmed media storage is compatible with **S3 buckets with ACLs disabled** (Object Ownership: Bucket owner enforced):
-  - `AWS_DEFAULT_ACL=None`
-  - storage backends use `default_acl=None` (no `x-amz-acl` header)
-- Hardened company onboarding and company settings so a logo upload failure can **never** strand a user:
-  - Onboarding proceeds without the logo if S3 rejects the upload (recoverable), and shows a warning.
-  - Company Settings saves non-file fields even if logo upload fails.
-  - Company switch page auto-selects the only company (no limbo) and redirects appropriately.
-
 ## Pack: Home Marketing Alternating Features
 
 - Home public marketing page: replaced feature cards with alternating left/right feature sections with illustrative images (documents, time, reports, integrations) and kept pricing teaser.

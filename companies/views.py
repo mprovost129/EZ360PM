@@ -36,24 +36,6 @@ from .services import (
 )
 
 
-def _is_s3_acl_disabled_error(exc: Exception) -> bool:
-    """Return True if the exception is the S3 'bucket does not allow ACLs' error.
-
-    We treat this as a *recoverable* upload problem during onboarding/settings.
-    The platform can proceed without the logo and allow the user to retry later.
-    """
-    try:
-        # botocore ClientError shape: exc.response['Error']['Code']
-        resp = getattr(exc, "response", None)
-        if isinstance(resp, dict):
-            code = (resp.get("Error") or {}).get("Code")
-            if code == "AccessControlListNotSupported":
-                return True
-    except Exception:
-        pass
-    return "AccessControlListNotSupported" in str(exc)
-
-
 def _user_display_name(user) -> str:
     parts = [getattr(user, "first_name", "").strip(), getattr(user, "last_name", "").strip()]
     name = " ".join([p for p in parts if p]).strip()
@@ -69,68 +51,36 @@ def onboarding(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = CompanyCreateForm(request.POST, request.FILES)
         if form.is_valid():
-            # Onboarding must never strand a user in "company limbo".
-            #
-            # In production, media buckets are often configured with ACLs disabled
-            # (Object Ownership: Bucket owner enforced). Any ACL attempt raises
-            # AccessControlListNotSupported. Company creation should still succeed
-            # even if the logo upload fails.
-            logo_failed = False
-            try:
-                with transaction.atomic():
-                    try:
-                        company = form.save()
-                    except Exception as e:
-                        if request.FILES and "logo" in request.FILES and _is_s3_acl_disabled_error(e):
-                            company = form.save(commit=False)
-                            company.logo = None
-                            company.save()
-                            logo_failed = True
-                        else:
-                            raise
+            with transaction.atomic():
+                company = form.save()
 
-                    # Phase 5B: provision sensible defaults (numbering, templates, chart of accounts)
-                    provision_company_defaults(company)
+                # Phase 5B: provision sensible defaults (numbering, templates, chart of accounts)
+                provision_company_defaults(company)
 
-                    # Security hardening default: require 2FA for managers/admins/owners in production.
-                    if getattr(settings, "COMPANY_DEFAULT_REQUIRE_2FA_ADMINS_MANAGERS", False):
-                        if not getattr(company, "require_2fa_for_admins_managers", False):
-                            company.require_2fa_for_admins_managers = True
-                            company.save(update_fields=["require_2fa_for_admins_managers", "updated_at", "revision"])
-
-                    EmployeeProfile.objects.create(
-                        company=company,
-                        user=request.user,
-                        display_name=_user_display_name(request.user),
-                        username_public=request.user.username,
-                        role=EmployeeRole.OWNER,
-                        can_view_company_financials=True,
-                        can_approve_time=True,
-                    )
-                    set_active_company_id(request, str(company.id))
-
-                    # Ops notification (platform owner): new company signup
-                    try:
-                        from django.db import transaction as _tx
-                        from ops.services_notifications import notify_new_company_signup
-
-                        _tx.on_commit(lambda: notify_new_company_signup(company=company))
-                    except Exception:
-                        pass
-
-            except Exception as e:
-                # Never throw a raw 500 for onboarding. Keep user on the form.
-                form.add_error(None, "We couldn't create your company. Please try again.")
-                # If we have no company yet, we cannot write a per-company audit event.
-                # The underlying exception will still appear in server logs / Sentry.
-                return render(request, "companies/onboarding.html", {"form": form})
-
-            if logo_failed:
-                messages.warning(
-                    request,
-                    "Company created, but your logo upload could not be saved. "
-                    "You can upload it later from Company Settings.",
+                # Security hardening default: require 2FA for managers/admins/owners in production.
+                if getattr(settings, "COMPANY_DEFAULT_REQUIRE_2FA_ADMINS_MANAGERS", False):
+                    if not getattr(company, "require_2fa_for_admins_managers", False):
+                        company.require_2fa_for_admins_managers = True
+                        company.save(update_fields=["require_2fa_for_admins_managers", "updated_at", "revision"])
+                EmployeeProfile.objects.create(
+                    company=company,
+                    user=request.user,
+                    display_name=_user_display_name(request.user),
+                    username_public=request.user.username,
+                    role=EmployeeRole.OWNER,
+                    can_view_company_financials=True,
+                    can_approve_time=True,
                 )
+                set_active_company_id(request, str(company.id))
+
+                # Ops notification (platform owner): new company signup
+                try:
+                    from django.db import transaction as _tx
+                    from ops.services_notifications import notify_new_company_signup
+
+                    _tx.on_commit(lambda: notify_new_company_signup(company=company))
+                except Exception:
+                    pass
 
             messages.success(request, "Company created. Welcome to EZ360PM.")
 
@@ -177,17 +127,6 @@ def switch_company(request: HttpRequest) -> HttpResponse:
     """Company picker page used whenever active company is missing/invalid."""
     companies = list(user_companies_qs(request.user).order_by("name", "created_at"))
     active_id = get_active_company_id(request)
-
-    # Never strand users here if there is exactly one company.
-    if companies and len(companies) == 1:
-        only = companies[0]
-        if not active_id or str(active_id) != str(only.id):
-            set_active_company_id(request, str(only.id))
-            return redirect("core:app_dashboard")
-
-    if not companies:
-        clear_active_company_id(request)
-        return redirect("companies:onboarding")
 
     if request.method == "POST":
         cid = request.POST.get("company_id", "")
@@ -240,31 +179,7 @@ def company_settings(request: HttpRequest) -> HttpResponse:
             if form.is_valid():
                 updated = form.save(commit=False)
                 updated.updated_by_user = request.user
-
-                try:
-                    updated.save()
-                except Exception as e:
-                    # Best-effort logo upload: never brick settings save.
-                    if request.FILES and "logo" in request.FILES and _is_s3_acl_disabled_error(e):
-                        # Keep existing logo; save other fields.
-                        updated.logo = company.logo
-                        changed = [f for f in getattr(form, "changed_data", []) if f != "logo"]
-                        # Always persist updated_by_user
-                        if "updated_by_user" not in changed:
-                            changed.append("updated_by_user")
-                        try:
-                            updated.save(update_fields=changed + ["updated_at", "revision"])
-                        except Exception:
-                            # If even the non-file save fails, surface the original error.
-                            raise
-
-                        messages.warning(
-                            request,
-                            "Settings saved, but the logo upload could not be stored. "
-                            "Please try again later.",
-                        )
-                    else:
-                        raise
+                updated.save()
 
                 try:
                     log_event(

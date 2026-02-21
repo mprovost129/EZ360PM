@@ -1,10 +1,3 @@
-## 2026-02-20 — Decision: S3 buckets run with ACLs disabled
-
-- Production media buckets use **Object Ownership: Bucket owner enforced** (ACLs disabled).
-- EZ360PM must **never** set object ACLs via headers (`x-amz-acl`).
-- "Public" access (logos) is achieved via **bucket policy** and/or **CloudFront**, not ACLs.
-- Private media is accessed via **presigned URLs** (short-lived) and/or app-gated download routes.
-
 ## 2026-02-18 — Decision: Server is the source of truth for composer tax
 
 - The paper-style composer computes tax in-browser for instant feedback, but the server must recompute and persist tax totals on save.

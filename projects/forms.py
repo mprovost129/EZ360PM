@@ -10,6 +10,8 @@ from core.forms.money import MoneyCentsField
 
 from .models import Project, ProjectService, ProjectBillingType, ProjectFile
 from catalog.models import CatalogItem, CatalogItemType
+from crm.models import Client
+from companies.models import EmployeeProfile
 
 _DUR_RE = re.compile(r"^\s*(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?\s*$", re.I)
 
@@ -49,6 +51,7 @@ class ProjectForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        self.company = kwargs.pop("company", None)
         super().__init__(*args, **kwargs)
         for name, field in self.fields.items():
             css = 'form-control'
@@ -57,6 +60,27 @@ class ProjectForm(forms.ModelForm):
             existing = field.widget.attrs.get('class', '')
             field.widget.attrs['class'] = (existing + ' ' + css).strip()
         self.fields['billing_type'].widget = forms.Select(choices=ProjectBillingType.choices)
+
+        # Company-scoped dropdowns
+        if self.company is not None:
+            # Client dropdown should only show clients for the active company.
+            self.fields["client"].queryset = (
+                Client.objects.filter(company=self.company, deleted_at__isnull=True)
+                .order_by("company_name", "last_name", "first_name")
+            )
+
+            # Assigned-to dropdown should only show employees for the active company.
+            self.fields["assigned_to"].queryset = (
+                EmployeeProfile.objects.filter(company=self.company, deleted_at__isnull=True)
+                .select_related("user")
+                .order_by("user__last_name", "user__first_name", "user__email")
+            )
+
+        # In UI dropdowns we want the client label only (not "(Company)")
+        # because the list is already company-scoped.
+        if "client" in self.fields:
+            self.fields["client"].label_from_instance = lambda obj: obj.display_label()
+
         if self.instance and getattr(self.instance, 'estimated_minutes', 0):
             mins = int(self.instance.estimated_minutes or 0)
             self.fields['estimated_hours'].initial = f"{mins//60}h {mins%60:02d}m"

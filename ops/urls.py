@@ -1,7 +1,6 @@
 from django.urls import path
 
 from . import views
-from .security_views import ops_security
 
 app_name = "ops"
 
@@ -30,7 +29,7 @@ urlpatterns = [
     path("alerts/<int:alert_id>/details.json", views.ops_alert_details_json, name="alert_details_json"),
     path("alert-routing/", views.ops_alert_routing, name="alert_routing"),
     path("alerts/<int:alert_id>/resolve/", views.ops_alert_resolve, name="alert_resolve"),
-    path("security/", ops_security, name="security"),
+    path("security/", views.ops_security, name="security"),
     path("launch-checks/", views.ops_launch_checks, name="launch_checks"),
     path("email-test/", views.ops_email_test, name="email_test"),
     path("checks/", views.ops_checks, name="checks"),

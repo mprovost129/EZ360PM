@@ -28,17 +28,6 @@ Notes:
 - Static files are still served via `collectstatic` (filesystem) by default.
 - Media URLs will use `AWS_S3_CUSTOM_DOMAIN` when provided.
 
-### Important: ACLs disabled (recommended)
-
-EZ360PM assumes modern S3 posture where **ACLs are disabled** (S3 Object Ownership: *Bucket owner enforced*).
-
-Implications:
-- Do **not** configure `public-read` ACLs.
-- `AWS_DEFAULT_ACL` must be `None`.
-- Storage backends must not send any `x-amz-acl` header (EZ360PM sets `default_acl=None`).
-
-"Public" media (e.g., company logos) should be made accessible via **bucket policy** and/or **CloudFront**, not ACLs.
-
 
 
 ## Multiple buckets (recommended)

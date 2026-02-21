@@ -97,7 +97,7 @@ def project_create(request):
     employee = request.active_employee
 
     if request.method == 'POST':
-        form = ProjectForm(request.POST)
+        form = ProjectForm(request.POST, company=company)
         formset = ProjectServiceFormSet(request.POST, form_kwargs={"company": company})
         if form.is_valid() and formset.is_valid():
             obj = form.save(commit=False)
@@ -112,7 +112,7 @@ def project_create(request):
             messages.success(request, 'Project created.')
             return redirect('projects:project_detail', pk=obj.id)
     else:
-        form = ProjectForm()
+        form = ProjectForm(company=company)
         formset = ProjectServiceFormSet(form_kwargs={"company": company})
 
     return render(request, 'projects/project_form.html', {'form': form, 'formset': formset, 'mode': 'create'})
@@ -162,7 +162,7 @@ def project_edit(request, pk):
     before_assignee_id = obj.assigned_to_id
 
     if request.method == 'POST':
-        form = ProjectForm(request.POST, instance=obj)
+        form = ProjectForm(request.POST, instance=obj, company=company)
         formset = ProjectServiceFormSet(request.POST, instance=obj, form_kwargs={"company": company})
         if form.is_valid() and formset.is_valid():
             obj = form.save(commit=False)
@@ -180,7 +180,7 @@ def project_edit(request, pk):
             messages.success(request, 'Project updated.')
             return redirect('projects:project_detail', pk=obj.id)
     else:
-        form = ProjectForm(instance=obj)
+        form = ProjectForm(instance=obj, company=company)
         formset = ProjectServiceFormSet(instance=obj, form_kwargs={"company": company})
 
     return render(request, 'projects/project_form.html', {'form': form, 'formset': formset, 'mode': 'edit', 'project': obj})

@@ -2796,3 +2796,49 @@ def ops_qa_issue_close(request: HttpRequest, pk: int) -> HttpResponse:
     issue.save(update_fields=["status", "resolved_at", "resolution_notes", "updated_at"])
     messages.success(request, "QA issue closed.")
     return redirect("ops:qa_issue_detail", pk=issue.pk)
+
+
+# --------------------------------------------------------------------------------------
+# Ops: Security dashboard (lockouts + auth/throttle alerts)
+# --------------------------------------------------------------------------------------
+
+@user_passes_test(_is_staff)
+def ops_security(request):
+    """Security ops view.
+
+    Never blocks ops navigation. Shows recent account lockouts and open auth/throttle alerts.
+    """
+    from accounts.models import AccountLockout
+    from .models import OpsAlertEvent, OpsAlertSource
+
+    lockouts = (
+        AccountLockout.objects.order_by("-updated_at")[:50]
+    )
+
+    auth_alerts = (
+        OpsAlertEvent.objects.filter(source=OpsAlertSource.AUTH, is_resolved=False)
+        .select_related("company")
+        .order_by("-created_at")[:50]
+    )
+    throttle_alerts = (
+        OpsAlertEvent.objects.filter(source=OpsAlertSource.THROTTLE, is_resolved=False)
+        .select_related("company")
+        .order_by("-created_at")[:50]
+    )
+
+    counts = {
+        "open_auth": OpsAlertEvent.objects.filter(source=OpsAlertSource.AUTH, is_resolved=False).count(),
+        "open_throttle": OpsAlertEvent.objects.filter(source=OpsAlertSource.THROTTLE, is_resolved=False).count(),
+    }
+
+    return render(
+        request,
+        "ops/security.html",
+        {
+            "lockouts": lockouts,
+            "auth_alerts": auth_alerts,
+            "throttle_alerts": throttle_alerts,
+            "counts": counts,
+        },
+    )
+
