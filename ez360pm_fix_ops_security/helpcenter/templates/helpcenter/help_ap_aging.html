@@ -1,0 +1,30 @@
+{% extends "helpcenter/_help_base.html" %}
+
+{% block help_h1 %}A/P Aging{% endblock %}
+
+{% block help_body %}
+<p class="text-secondary">A/P Aging shows what you owe to vendors, bucketed by days past due. It is the primary “don’t miss bills” report.</p>
+
+<h2 class="h6 mt-3">How it’s calculated</h2>
+<ul>
+  <li>Only <strong>open</strong> bills are included.</li>
+  <li>The report buckets based on <strong>due date</strong> relative to the report date.</li>
+  <li>Balances reflect payments applied and vendor credits (if applied).</li>
+</ul>
+
+<h2 class="h6 mt-3">Operational workflow</h2>
+<ol>
+  <li>Run A/P aging weekly.</li>
+  <li>Pay highest-risk vendors first (utilities, critical suppliers).</li>
+  <li>Use Recurring Bills for predictable expenses to prevent misses.</li>
+</ol>
+
+<div class="alert alert-light border mt-3 mb-0">
+  <div class="small text-secondary">See also:</div>
+  <div class="d-flex flex-wrap gap-2 mt-1">
+    <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:bills' %}">Bills (A/P)</a>
+    <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:recurring_bills' %}">Recurring bills</a>
+    <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:ap_reconciliation' %}">A/P reconciliation</a>
+  </div>
+</div>
+{% endblock %}

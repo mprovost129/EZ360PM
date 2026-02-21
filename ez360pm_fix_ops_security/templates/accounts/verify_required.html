@@ -1,0 +1,30 @@
+{% extends "base_public.html" %}
+{% load static %}
+{% block title %}Verify Email · EZ360PM{% endblock %}
+{% block content %}
+<div class="container py-5" style="max-width: 640px;">
+  <h1 class="h4 mb-3">Verify your email</h1>
+  <p class="text-secondary">
+    Email verification is required before accessing company data.
+  </p>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="mb-3">
+        <div class="small text-secondary">Signed in as</div>
+        <div class="fw-semibold">{{ request.user.email }}</div>
+      </div>
+
+      <p class="mb-3">
+        Check your inbox for the verification link. If you don’t see it, check spam/junk.
+      </p>
+
+      <form method="post" action="{% url 'accounts:verify_email_resend' %}">
+        {% csrf_token %}
+        <button class="btn btn-ez">Resend verification email</button>
+        <a class="btn btn-link" href="{% url 'accounts:logout' %}">Sign out</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

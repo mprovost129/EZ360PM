@@ -1,0 +1,52 @@
+{% load money %}
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+      <div>
+        <div class="fw-semibold">Recent invoices</div>
+        <div class="text-secondary small">Latest activity across your company.</div>
+      </div>
+      <a class="btn btn-sm btn-outline-dark" href="{% url 'documents:invoice_list' %}"><i class="bi bi-arrow-right me-1"></i>All invoices</a>
+    </div>
+
+    {% if recent_invoices %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr class="text-secondary small">
+              <th scope="col">Invoice</th>
+              <th scope="col">Client</th>
+              <th scope="col" class="text-end">Total</th>
+              <th scope="col" class="text-end">Balance</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inv in recent_invoices %}
+              <tr>
+                <td>
+                  <a class="text-decoration-none" href="{% url 'documents:invoice_edit' inv.id %}">
+                    {{ inv.number|default:"(unassigned)" }}
+                  </a>
+                </td>
+                <td class="text-secondary">{% if inv.client %}{{ inv.client.name }}{% else %}-{% endif %}</td>
+                <td class="text-end">{{ inv.total_cents|money }}</td>
+                <td class="text-end">{{ inv.balance_due_cents|money }}</td>
+                <td>
+                  <span class="badge text-bg-light">{{ inv.get_status_display }}</span>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      {% include "includes/empty_state.html" with icon="bi-receipt" title="No invoices yet" subtitle="Create your first invoice to start billing and collecting payments." %}
+      <div class="text-center pb-2">
+        <a class="btn btn-sm btn-ez" href="{% url 'documents:invoice_wizard' %}"><i class="bi bi-plus-lg me-1"></i>Create invoice</a>
+        <a class="btn btn-sm btn-outline-secondary ms-1" href="{% url 'documents:invoice_list' %}"><i class="bi bi-list-ul me-1"></i>Open invoices list</a>
+      </div>
+    {% endif %}
+  </div>
+</div>

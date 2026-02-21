@@ -1,0 +1,24 @@
+{% extends "helpcenter/_help_base.html" %}
+
+{% block help_h1 %}Storage & files{% endblock %}
+
+{% block help_body %}
+<p>EZ360PM supports an S3-first posture (recommended for production):</p>
+
+<div class="fw-semibold mb-2">Direct uploads (presigned POST)</div>
+<ul>
+  <li>Expense receipts upload <strong>directly to S3</strong> to avoid large uploads through the web dyno.</li>
+  <li>Project files upload <strong>directly to S3</strong> with tenant/permission checks performed before issuing presign policy.</li>
+</ul>
+
+<div class="fw-semibold mb-2">Private downloads</div>
+<ul>
+  <li>Receipts and project files are private by default.</li>
+  <li>Downloads use short-lived signed URLs (querystring auth).</li>
+</ul>
+
+<div class="alert alert-info mb-0">
+  <div class="fw-semibold">Ops verification</div>
+  <div class="small">Use Ops → Storage to run smoke tests and complete the Production Readiness checklist before going live.</div>
+</div>
+{% endblock %}

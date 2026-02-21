@@ -1,0 +1,160 @@
+{% extends "base_app.html" %}
+{% load static %} file_extras
+{% block title %}Files · {{ project.name }} · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Project files</h1>
+    <div class="text-secondary small">
+      <a href="{% url 'projects:project_detail' project.id %}" class="text-decoration-none">{{ project.name }}</a>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    {% if dropbox_enabled and dropbox_connected and active_employee and active_employee.role in "owner admin" %}
+      <form method="post" action="{% url 'projects:project_files_sync_dropbox' project.id %}">
+        {% csrf_token %}
+          {{ form.file_s3_key }}
+        <button class="btn btn-outline-primary" type="submit" onclick="return confirm('Sync all project files to Dropbox now?')">
+          <i class="bi bi-cloud-arrow-up me-1"></i>Sync to Dropbox
+        </button>
+      </form>
+    {% endif %}
+    <a class="btn btn-outline-secondary" href="{% url 'projects:project_detail' project.id %}">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h6 mb-3">Upload a file</h2>
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="mb-2">
+            <label class="form-label small">Title (optional)</label>
+            {{ form.title }}
+            {% if form.title.errors %}<div class="text-danger small">{{ form.title.errors }}</div>{% endif %}
+          </div>
+          <div class="mb-2">
+            <label class="form-label small">File</label>
+            {{ form.file }}
+            {% if form.file.errors %}<div class="text-danger small">{{ form.file.errors }}</div>{% endif %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label small">Notes (optional)</label>
+            {{ form.notes }}
+            {% if form.notes.errors %}<div class="text-danger small">{{ form.notes.errors }}</div>{% endif %}
+          </div>
+          <button class="btn btn-ez" type="submit"><i class="bi bi-upload me-1"></i>Upload</button>
+        </form>
+        <div class="text-secondary small mt-3">
+          Tip: If Dropbox is connected, you can enable auto-upload in Integrations → Dropbox.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h6 mb-3">Files</h2>
+
+        {% if files %}
+          <div class="list-group">
+            {% for f in files %}
+              <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start gap-3">
+                  <div class="min-w-0">
+                    <div class="fw-semibold">
+                      {% if f.title %}{{ f.title }}{% else %}{{ f.file.name|default:"(file)" }}{% endif %}
+                      {% if f.dropbox_shared_url %}
+                        <span class="badge text-bg-primary ms-2"><i class="bi bi-cloud-check me-1"></i>Dropbox</span>
+                      {% endif %}
+                    </div>
+                    <div class="text-secondary small">
+                      Uploaded {{ f.created_at|date:"M j, Y g:i A" }}
+                      {% if f.uploaded_by %} · by {{ f.uploaded_by.username_public }}{% endif %}
+                    </div>
+                    {% if f.notes %}
+                      <div class="small mt-2">{{ f.notes|linebreaksbr }}</div>
+                    {% endif %}
+                  </div>
+                  <div class="d-flex gap-2">
+                    {% if f.storage_backend != 'dropbox' and f.file.name|previewable %}
+                    <a class="btn btn-sm btn-outline-secondary" href="{% url 'projects:project_file_open' project.id f.id %}?preview=1" target="_blank" rel="noopener">
+                      <i class="bi bi-eye me-1"></i>Preview
+                    </a>
+                    {% endif %}
+                    <a class="btn btn-sm btn-outline-dark" href="{% url 'projects:project_file_open' project.id f.id %}" target="_blank" rel="noopener">
+                      <i class="bi bi-box-arrow-up-right me-1"></i>Open
+                    </a>
+                    {% if is_manager %}
+                      <a class="btn btn-sm btn-outline-danger" href="{% url 'projects:project_file_delete' project.id f.id %}">
+                        <i class="bi bi-trash me-1"></i>Remove
+                      </a>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-secondary">No files uploaded yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function() {
+  var enabled = {{ s3_direct_uploads|yesno:"true,false" }};
+  if (!enabled) return;
+
+  var form = document.querySelector("form[enctype='multipart/form-data']");
+  if (!form) return;
+
+  var fileInput = form.querySelector('input[type="file"][name="file"]');
+  var keyInput = form.querySelector('input[name="file_s3_key"]');
+  if (!fileInput || !keyInput) return;
+
+  form.addEventListener("submit", async function(ev) {
+    if (!fileInput.files || fileInput.files.length === 0) return;
+    ev.preventDefault();
+
+    try {
+      var f = fileInput.files[0];
+      var csrf = form.querySelector('input[name="csrfmiddlewaretoken"]')?.value || "";
+      var resp = await fetch("{% url 'storage:presign_upload' %}", {
+        method: "POST",
+        headers: {"Content-Type":"application/json","X-CSRFToken": csrf},
+        body: JSON.stringify({
+          kind: "project_file",
+          project_id: "{{ project.id }}",
+          filename: f.name,
+          content_type: f.type || ""
+        })
+      });
+      var data = await resp.json();
+      if (!resp.ok) throw new Error(data.detail || data.error || "presign_failed");
+
+      var fd = new FormData();
+      Object.keys(data.fields).forEach(function(k){ fd.append(k, data.fields[k]); });
+      fd.append("file", f);
+
+      var up = await fetch(data.url, { method: "POST", body: fd });
+      if (!up.ok) throw new Error("upload_failed");
+
+      keyInput.value = data.key;
+      fileInput.value = "";
+      form.submit();
+    } catch (e) {
+      alert("Upload failed: " + (e && e.message ? e.message : e));
+    }
+  });
+})();
+</script>
+
+{% endblock %}

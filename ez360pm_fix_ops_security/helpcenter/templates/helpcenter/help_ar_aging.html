@@ -1,0 +1,24 @@
+{% extends "helpcenter/_help_base.html" %}
+
+{% block help_h1 %}A/R aging report{% endblock %}
+
+{% block help_body %}
+<p>The A/R aging report groups unpaid invoice balances by how long they have been outstanding (e.g., 0–30, 31–60, 61–90, 90+ days).</p>
+
+<div class="fw-semibold mb-2">What’s included</div>
+<ul>
+  <li>Invoices with an outstanding <strong>effective</strong> balance due.</li>
+  <li>Payments and applied credits are reflected in the balance.</li>
+</ul>
+
+<div class="fw-semibold mb-2">Common workflows</div>
+<ul>
+  <li>Use aging to prioritize collections and follow-ups.</li>
+  <li>Export or filter by client to focus outreach.</li>
+</ul>
+
+<div class="alert alert-info mb-0">
+  <div class="fw-semibold">Tip</div>
+  <div class="small">If the aging balances look wrong, run <code>python manage.py ez360_invariants_check</code> and review the Ops evidence.</div>
+</div>
+{% endblock %}

@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Statement</title>
+    <style>
+      @page {
+        size: Letter;
+        margin: 0.7in;
+        @bottom-center { content: "Page " counter(page) " of " counter(pages); color: #666; font-size: 10px; }
+      }
+
+      body { font-family: Arial, sans-serif; font-size: 12px; color: #111; }
+      .muted { color: #666; }
+      h1 { font-size: 20px; margin: 0; letter-spacing: 0.2px; }
+      .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+      .company { font-weight: 700; font-size: 12px; }
+      .meta { text-align: right; }
+      .meta div { margin-bottom: 2px; }
+
+      .rule { height: 1px; background: #e5e5e5; margin: 10px 0 12px; }
+
+      .box { border: 1px solid #e5e5e5; border-radius: 6px; padding: 10px; }
+      .box .label { font-size: 11px; color: #666; margin-bottom: 2px; }
+      .box .value { font-weight: 600; }
+
+      table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+      th, td { border-bottom: 1px solid #e5e5e5; padding: 7px 6px; text-align: left; }
+      th { background: #f7f7f7; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+      tbody tr:nth-child(even) td { background: #fcfcfc; }
+      .right { text-align: right; }
+      .total-row td { font-weight: bold; border-top: 2px solid #333; background: #fff; }
+      .nowrap { white-space: nowrap; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div>
+        <h1>Statement</h1>
+        <div class="muted" style="margin-top: 3px;">Open invoices summary</div>
+      </div>
+      <div class="meta">
+        <div class="company">{{ company.name }}</div>
+        <div class="muted">Generated {{ generated_at|date:"Y-m-d H:i" }}</div>
+        {% if date_from or date_to %}<div class="muted">Period: {{ date_from|date:"Y-m-d"|default:"" }}{% if date_from and date_to %} → {% endif %}{{ date_to|date:"Y-m-d"|default:"" }}</div>{% endif %}
+        {% if site_base_url %}<div class="muted">View online: {{ site_base_url }}{{ statement_path }}</div>{% endif %}
+      </div>
+    </div>
+
+    <div class="rule"></div>
+
+    <div class="box">
+      <div class="label">Client</div>
+      <div class="value">{{ client.display_label }}</div>
+      {% if client.email %}<div class="muted" style="margin-top: 2px;">{{ client.email }}</div>{% endif %}
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Invoice</th>
+          <th>Issue</th>
+          <th>Due</th>
+          <th>Status</th>
+          <th class="right">Total</th>
+          <th class="right">Paid</th>
+          <th class="right">Credits</th>
+          <th class="right">Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td class="nowrap">{{ r.invoice.number|default:"(no #)" }}</td>
+            <td class="nowrap">{{ r.invoice.issue_date|date:"Y-m-d" }}</td>
+            <td class="nowrap">{{ r.invoice.due_date|date:"Y-m-d" }}</td>
+            <td>{{ r.invoice.status }}</td>
+            <td class="right">${{ r.total_display }}</td>
+            <td class="right">${{ r.paid_display }}</td>
+            <td class="right">${{ r.credits_display }}</td>
+            <td class="right">${{ r.balance_display }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="8" class="muted">No open invoices.</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if rows %}
+        <tfoot>
+          <tr class="total-row">
+            <td colspan="7" class="right">Total due</td>
+            <td class="right">${{ total_due }}</td>
+          </tr>
+        </tfoot>
+      {% endif %}
+    </table>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+{% extends "helpcenter/_help_base.html" %}
+
+{% block help_h1 %}FAQ{% endblock %}
+
+{% block help_body %}
+<div class="fw-semibold">Why can’t I see a project?</div>
+<p class="mb-3">If you are Staff and project visibility is restricted, you must be assigned to the project.</p>
+
+<div class="fw-semibold">Why can’t I upload a receipt or project file?</div>
+<p class="mb-3">Uploads are restricted to Manager+ by default (and Staff only for assigned project files). Also confirm S3 env vars are configured in production.</p>
+
+<div class="fw-semibold">Where do I verify S3 is working?</div>
+<p class="mb-3">Ops → Storage. Run smoke tests and mark production readiness items complete.</p>
+
+<div class="fw-semibold">Where are legal policies?</div>
+<p class="mb-0">See the Legal section in the left sidebar on this page (Terms, Privacy, Cookies, Acceptable Use).</p>
+{% endblock %}
