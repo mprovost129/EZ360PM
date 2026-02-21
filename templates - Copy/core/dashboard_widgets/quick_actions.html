@@ -1,0 +1,72 @@
+{# Quick actions #}
+<div class="card shadow-sm mb-3">
+  <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+    <div>
+      <div class="fw-semibold">Quick actions</div>
+      <div class="text-secondary small">Jump into the most common workflows.</div>
+    </div>
+
+    <div class="dropdown">
+      <button
+        class="btn btn-ez dropdown-toggle"
+        type="button"
+        id="quickActionsDropdown"
+        data-bs-toggle="dropdown"
+        aria-expanded="false"
+      >
+        <i class="bi bi-plus-lg me-1"></i>New
+      </button>
+
+      <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="quickActionsDropdown">
+        <li>
+          <a class="dropdown-item" href="{% url 'timetracking:timer_panel' %}">
+            <i class="bi bi-stopwatch me-2"></i>Track time
+          </a>
+        </li>
+
+        {% if is_manager %}
+          <li><hr class="dropdown-divider"></li>
+          <li>
+            <a class="dropdown-item" href="{% url 'documents:invoice_wizard' %}">
+              <i class="bi bi-receipt me-2"></i>New invoice
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item" href="{% url 'documents:estimate_wizard' %}">
+              <i class="bi bi-file-earmark-spreadsheet me-2"></i>New estimate
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item" href="{% url 'documents:proposal_wizard' %}">
+              <i class="bi bi-file-earmark-richtext me-2"></i>New proposal
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item" href="{% url 'payments:payment_create' %}">
+              <i class="bi bi-credit-card me-2"></i>Record payment
+            </a>
+          </li>
+
+          {% if tier_flags.is_professional %}
+            <li>
+              <a class="dropdown-item" href="{% url 'expenses:expense_create' %}">
+                <i class="bi bi-cash-coin me-2"></i>Add expense
+              </a>
+            </li>
+          {% endif %}
+
+          <li>
+            <a class="dropdown-item" href="{% url 'crm:client_create' %}">
+              <i class="bi bi-person-plus me-2"></i>New client
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item" href="{% url 'projects:project_create' %}">
+              <i class="bi bi-kanban me-2"></i>New project
+            </a>
+          </li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</div>

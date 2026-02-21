@@ -1649,51 +1649,6 @@ def ops_alert_routing(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @user_passes_test(_is_staff)
-@login_required
-@user_passes_test(_is_staff)
-def ops_security(request: HttpRequest) -> HttpResponse:
-    """Security-focused ops view: lockouts + auth/throttle alerts."""
-    lockouts = AccountLockout.objects.all().order_by("-updated_at")[:200]
-    auth_alerts = OpsAlertEvent.objects.filter(source=OpsAlertSource.AUTH).order_by("-created_at")[:100]
-    throttle_alerts = OpsAlertEvent.objects.filter(source=OpsAlertSource.THROTTLE).order_by("-created_at")[:100]
-
-    counts = {
-        "open_auth": OpsAlertEvent.objects.filter(source=OpsAlertSource.AUTH, is_resolved=False).count(),
-        "open_throttle": OpsAlertEvent.objects.filter(source=OpsAlertSource.THROTTLE, is_resolved=False).count(),
-    }
-
-    return render(
-        request,
-        "ops/security.html",
-        {
-            "lockouts": lockouts,
-            "auth_alerts": auth_alerts,
-            "throttle_alerts": throttle_alerts,
-            "counts": counts,
-            "support_mode": get_support_mode(request),
-        },
-    )
-
-
-@login_required
-@user_passes_test(_is_staff)
-def ops_alert_routing(request: HttpRequest) -> HttpResponse:
-    """Configure where Ops alerts route (email/webhook)."""
-    config = SiteConfig.get_solo()
-
-    if request.method == "POST":
-        form = OpsAlertRoutingForm(request.POST, instance=config)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Alert routing updated.")
-            return redirect("ops:alert_routing")
-    else:
-        form = OpsAlertRoutingForm(instance=config)
-
-    return render(request, "ops/alert_routing.html", {"form": form, "config": config})
-
-@login_required
-@user_passes_test(_is_staff)
 def ops_launch_gate(request: HttpRequest) -> HttpResponse:
     items = LaunchGateItem.objects.all()
     total = items.count()

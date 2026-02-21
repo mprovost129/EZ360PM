@@ -1,0 +1,168 @@
+{% load billing_tags %}
+
+{# Logged-in app sidebar. #}
+
+<div id="sidebarOverlay"></div>
+
+<aside class="app-sidebar">
+  <div class="p-3">
+    <!-- Company dropdown -->
+    <div class="dropdown mb-3">
+      <button id="companyDropdownToggle" class="btn btn-outline-ez w-100 text-start d-flex justify-content-between align-items-center" type="button" aria-expanded="false" aria-controls="companyDropdownMenu" data-ez-dropdown="1">
+        <span class="text-truncate">
+          {% if active_company %}
+            <strong>{{ active_company.name }}</strong>
+          {% else %}
+            <strong>Select company</strong>
+          {% endif %}
+        </span>
+        <i class="bi bi-chevron-down"></i>
+      </button>
+      <ul id="companyDropdownMenu" class="dropdown-menu w-100">
+        {% for c in user_companies %}
+          <li>
+            <form method="post" action="{% url 'companies:set_active' %}" class="px-2 py-1">
+              {% csrf_token %}
+              <input type="hidden" name="company_id" value="{{ c.id }}">
+              <button class="btn btn-sm w-100 text-start {% if active_company and c.id == active_company.id %}btn-ez{% else %}btn-outline-ez{% endif %}" type="submit">
+                {{ c.name }}
+              </button>
+            </form>
+          </li>
+        {% endfor %}
+        <li><hr class="dropdown-divider"></li>
+        <li>
+          <a class="dropdown-item" href="{% url 'companies:switch' %}">
+            <i class="bi bi-arrow-repeat me-1"></i>Switch company
+          </a>
+        </li>
+        <li><a class="dropdown-item" href="{% url 'companies:settings' %}">Company settings</a></li>
+        <li><a class="dropdown-item" href="{% url 'companies:team_list' %}">Team</a></li>
+      </ul>
+    </div>
+
+    <nav class="d-flex flex-column gap-1">
+      <a class="sidebar-link" href="{% url 'core:app_dashboard' %}">
+        <span class="nav-icon"><i class="bi bi-speedometer2"></i></span>
+        Dashboard
+      </a>
+      <a class="sidebar-link" href="{% url 'core:getting_started' %}">
+        <span class="nav-icon"><i class="bi bi-check2-square"></i></span>
+        Getting started
+        {% if onboarding_progress_nav and onboarding_progress_nav.pct < 100 %}
+          <span class="ms-auto badge text-bg-warning">{{ onboarding_progress_nav.done }}/{{ onboarding_progress_nav.total }}</span>
+        {% endif %}
+      </a>
+      <a class="sidebar-link" href="{% url 'crm:client_list' %}">
+        <span class="nav-icon"><i class="bi bi-people"></i></span>
+        Clients
+      </a>
+
+      <a class="sidebar-link" href="{% url 'notes:list' %}">
+        <span class="nav-icon"><i class="bi bi-journal-text"></i></span>
+        Notes
+      </a>
+      <a class="sidebar-link" data-bs-toggle="collapse" href="#docsCollapse" role="button" aria-expanded="false" aria-controls="docsCollapse">
+        <span class="nav-icon"><i class="bi bi-file-earmark-text"></i></span>
+        Documents
+        <span class="ms-auto text-secondary"><i class="bi bi-chevron-down"></i></span>
+      </a>
+      <div class="collapse ms-4" id="docsCollapse">
+        <div class="d-flex flex-column gap-1 py-1">
+          <a class="sidebar-link" href="{% url 'documents:proposal_list' %}">
+            <span class="nav-icon"><i class="bi bi-file-text"></i></span>
+            Proposals
+          </a>
+          <a class="sidebar-link" href="{% url 'documents:estimate_list' %}">
+            <span class="nav-icon"><i class="bi bi-calculator"></i></span>
+            Estimates
+          </a>
+          <a class="sidebar-link" href="{% url 'documents:invoice_list' %}">
+            <span class="nav-icon"><i class="bi bi-receipt"></i></span>
+            Invoices
+          </a>
+          <a class="sidebar-link" href="{% url 'documents:recurring_plan_list' %}">
+            <span class="nav-icon"><i class="bi bi-arrow-repeat"></i></span>
+            Recurring
+          </a>
+        </div>
+      </div>
+
+      <a class="sidebar-link" href="{% url 'payments:payment_list' %}">
+        <span class="nav-icon"><i class="bi bi-credit-card"></i></span>
+        Payments
+      </a>
+      {% if subscription_summary and subscription_summary.plan|is_professional_or_higher %}
+        <a class="sidebar-link" href="{% url 'expenses:expense_list' %}">
+          <span class="nav-icon"><i class="bi bi-cash-coin"></i></span>
+          Expenses
+        </a>
+      {% endif %}
+
+      <a class="sidebar-link" href="{% if is_manager %}{% url 'payables:bill_list' %}{% else %}#{% endif %}" {% if not is_manager %}title="Manager access required"{% endif %}>
+        <span class="nav-icon"><i class="bi bi-receipt"></i></span>
+        Bills (A/P)
+      </a>
+      <a class="sidebar-link" href="{% if is_manager %}{% url 'payables:vendor_list' %}{% else %}#{% endif %}" {% if not is_manager %}title="Manager access required"{% endif %}>
+        <span class="nav-icon"><i class="bi bi-building"></i></span>
+        Vendors
+      </a>
+      <a class="sidebar-link" href="{% if is_manager %}{% url 'payables:recurring_bill_plan_list' %}{% else %}#{% endif %}" {% if not is_manager %}title="Manager access required"{% endif %}>
+        <span class="nav-icon"><i class="bi bi-arrow-repeat"></i></span>
+        Recurring bills
+      </a>
+      <a class="sidebar-link" href="{% url 'projects:project_list' %}">
+        <span class="nav-icon"><i class="bi bi-kanban"></i></span>
+        Projects
+      </a>
+      <a class="sidebar-link" href="{% if is_manager %}{% url 'catalog:item_list' %}{% else %}#{% endif %}" {% if not is_manager %}title="Manager access required"{% endif %}>
+        <span class="nav-icon"><i class="bi bi-box-seam"></i></span>
+        Catalog
+      </a>
+      <a class="sidebar-link" href="{% url 'timetracking:entry_list' %}">
+        <span class="nav-icon"><i class="bi bi-stopwatch"></i></span>
+        Time tracking
+      </a>
+      {% if subscription_summary and subscription_summary.plan|is_professional_or_higher %}
+        <a class="sidebar-link" href="{% if is_manager %}{% url 'accounting:home' %}{% else %}#{% endif %}" {% if not is_manager %}title="Manager access required"{% endif %}>
+          <span class="nav-icon"><i class="bi bi-journal-text"></i></span>
+          Accounting
+        </a>
+      {% endif %}
+      <a class="sidebar-link" href="{% if is_manager %}{% url 'accounting:reports_home' %}{% else %}#{% endif %}" {% if not is_manager %}title="Manager access required"{% endif %}>
+        <span class="nav-icon"><i class="bi bi-graph-up"></i></span>
+        Reports
+      </a>
+      <a class="sidebar-link" href="{% if is_manager %}{% url 'audit:event_list' %}{% else %}#{% endif %}" {% if not is_manager %}title="Manager access required"{% endif %}>
+        <span class="nav-icon"><i class="bi bi-shield-check"></i></span>
+        Audit log
+      </a>
+
+      <hr class="my-2">
+
+      {% if subscription_summary and subscription_summary.plan|is_professional_or_higher %}
+        <div class="text-uppercase text-secondary small fw-semibold mt-2 mb-1">Integrations</div>
+        <a class="sidebar-link" href="{% if is_admin %}{% url 'integrations:banking_settings' %}{% else %}#{% endif %}" {% if not is_admin %}title="Admin access required"{% endif %}>
+          <span class="nav-icon"><i class="bi bi-bank"></i></span>
+          Bank feeds
+        </a>
+        {% if subscription_summary.plan|is_premium %}
+          <a class="sidebar-link" href="{% if is_admin %}{% url 'integrations:dropbox_settings' %}{% else %}#{% endif %}" {% if not is_admin %}title="Admin access required"{% endif %}>
+            <span class="nav-icon"><i class="bi bi-cloud-arrow-up"></i></span>
+            Dropbox
+          </a>
+        {% endif %}
+      {% endif %}
+
+      <a class="sidebar-link" href="{% url 'billing:overview' %}">
+        <span class="nav-icon"><i class="bi bi-credit-card-2-front"></i></span>
+        Billing
+      </a>
+      <a class="sidebar-link" href="{% url 'helpcenter:home' %}">
+        <span class="nav-icon"><i class="bi bi-question-circle"></i></span>
+        Help Center
+      </a>
+      {# Staff tools are in the top navbar (Support dropdown). #}
+    </nav>
+  </div>
+</aside>

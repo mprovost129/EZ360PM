@@ -15,18 +15,20 @@ _BaseStorage = _S3Boto3Storage or FileSystemStorage
 
 @deconstructible
 class PublicMediaStorage(_BaseStorage):
-    """Public-ish media storage.
-
-    - If USE_S3=1 and django-storages is installed: uses S3_PUBLIC_MEDIA_BUCKET (or AWS_STORAGE_BUCKET_NAME)
-      with S3_PUBLIC_MEDIA_LOCATION.
-    - Else: falls back to local FileSystemStorage (MEDIA_ROOT).
-    """
-
     def __init__(self, *args, **kwargs):
         if getattr(settings, "USE_S3", False) and _S3Boto3Storage is not None:
-            kwargs.setdefault("bucket_name", getattr(settings, "S3_PUBLIC_MEDIA_BUCKET", "") or getattr(settings, "AWS_STORAGE_BUCKET_NAME", ""))
+            kwargs.setdefault(
+                "bucket_name",
+                getattr(settings, "S3_PUBLIC_MEDIA_BUCKET", "") or getattr(settings, "AWS_STORAGE_BUCKET_NAME", ""),
+            )
             kwargs.setdefault("location", getattr(settings, "S3_PUBLIC_MEDIA_LOCATION", "public-media"))
-            kwargs.setdefault("default_acl", "public-read")
+
+            # Bucket has ACLs disabled -> do not send ACL headers
+            kwargs.setdefault("default_acl", None)
+
+            # If you truly want "public-ish", that must be done via bucket policy / CloudFront,
+            # not ACLs.
+            kwargs.setdefault("querystring_auth", False)
         super().__init__(*args, **kwargs)
 
 
@@ -41,11 +43,17 @@ class PrivateMediaStorage(_BaseStorage):
 
     def __init__(self, *args, **kwargs):
         if getattr(settings, "USE_S3", False) and _S3Boto3Storage is not None:
-            kwargs.setdefault("bucket_name", getattr(settings, "S3_PRIVATE_MEDIA_BUCKET", "") or getattr(settings, "AWS_STORAGE_BUCKET_NAME", ""))
+            kwargs.setdefault(
+                "bucket_name",
+                getattr(settings, "S3_PRIVATE_MEDIA_BUCKET", "") or getattr(settings, "AWS_STORAGE_BUCKET_NAME", ""),
+            )
             kwargs.setdefault("location", getattr(settings, "S3_PRIVATE_MEDIA_LOCATION", "private-media"))
-            kwargs.setdefault("default_acl", "private")
-            # IMPORTANT: private objects must be served via signed URLs.
-            # django-storages generates presigned URLs when querystring_auth=True.
+        
+            # IMPORTANT: Bucket has ACLs disabled (Object Ownership: Bucket owner enforced).
+            # Do not set any ACL headers.
+            kwargs.setdefault("default_acl", None)
+        
+            # Private objects served via signed URLs.
             kwargs.setdefault("querystring_auth", True)
             kwargs.setdefault("querystring_expire", int(getattr(settings, "S3_PRIVATE_MEDIA_EXPIRE_SECONDS", 600)))
         super().__init__(*args, **kwargs)

@@ -1,0 +1,8 @@
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="fw-semibold">Your role</div>
+    <div class="text-secondary small mt-1">
+      {% if active_employee %}{{ active_employee.get_role_display }}{% else %}(unknown){% endif %}
+    </div>
+  </div>
+</div>

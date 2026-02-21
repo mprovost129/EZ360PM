@@ -1,0 +1,142 @@
+{% extends "base_app.html" %}
+{% load money %}
+
+{% block title %}Search · EZ360PM{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <div class="text-secondary small mb-1">Search results</div>
+      <h1 class="ez-page-title mb-0">“{{ q }}”</h1>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-ez" href="{% url 'core:app_dashboard' %}">
+        <i class="bi bi-speedometer2 me-1"></i>Dashboard
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2"><i class="bi bi-people me-2"></i>Clients</div>
+          {% if clients %}
+            <ul class="list-unstyled mb-0">
+              {% for c in clients %}
+                <li class="mb-1">
+                  <a href="{% url 'crm:client_edit' c.id %}">{{ c.name }}</a>
+                  {% if c.email %}<span class="text-secondary small"> · {{ c.email }}</span>{% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+            <div class="mt-2">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'crm:client_list' %}?q={{ q|urlencode }}">View all client matches</a>
+            </div>
+          {% else %}
+            <div class="text-secondary">No client matches.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2"><i class="bi bi-kanban me-2"></i>Projects</div>
+          {% if projects %}
+            <ul class="list-unstyled mb-0">
+              {% for p in projects %}
+                <li class="mb-1">
+                  <a href="{% url 'projects:project_edit' p.id %}">{{ p }}</a>
+                </li>
+              {% endfor %}
+            </ul>
+            <div class="mt-2">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'projects:project_list' %}?q={{ q|urlencode }}">View all project matches</a>
+            </div>
+          {% else %}
+            <div class="text-secondary">No project matches.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2"><i class="bi bi-file-earmark-text me-2"></i>Documents</div>
+          {% if documents %}
+            <ul class="list-unstyled mb-0">
+              {% for d in documents %}
+                <li class="mb-1">
+                  {% if d.doc_type == 'invoice' %}
+                    <a href="{% url 'documents:invoice_edit' d.id %}">{{ d.number|default:'(unassigned)' }}</a>
+                  {% elif d.doc_type == 'estimate' %}
+                    <a href="{% url 'documents:estimate_edit' d.id %}">{{ d.number|default:'(unassigned)' }}</a>
+                  {% else %}
+                    <a href="{% url 'documents:proposal_edit' d.id %}">{{ d.number|default:'(unassigned)' }}</a>
+                  {% endif %}
+                  <span class="text-secondary small"> · {{ d.get_doc_type_display }}{% if d.client %} · {{ d.client.name }}{% endif %}</span>
+                </li>
+              {% endfor %}
+            </ul>
+            <div class="mt-2">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'documents:invoice_list' %}?q={{ q|urlencode }}">Search invoices</a>
+              <a class="btn btn-sm btn-outline-secondary ms-1" href="{% url 'documents:estimate_list' %}?q={{ q|urlencode }}">Search estimates</a>
+              <a class="btn btn-sm btn-outline-secondary ms-1" href="{% url 'documents:proposal_list' %}?q={{ q|urlencode }}">Search proposals</a>
+            </div>
+          {% else %}
+            <div class="text-secondary">No document matches.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2"><i class="bi bi-cash-coin me-2"></i>Expenses</div>
+          {% if expenses %}
+            <ul class="list-unstyled mb-0">
+              {% for e in expenses %}
+                <li class="mb-1">
+                  <a href="{% url 'expenses:expense_edit' e.id %}">{{ e.description|default:'Expense' }}</a>
+                  <span class="text-secondary small"> · {{ e.date }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+            <div class="mt-2">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'expenses:expense_list' %}?q={{ q|urlencode }}">View all expense matches</a>
+            </div>
+          {% else %}
+            <div class="text-secondary">No expense matches.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="fw-semibold mb-2"><i class="bi bi-credit-card me-2"></i>Payments</div>
+          {% if payments %}
+            <ul class="list-unstyled mb-0">
+              {% for p in payments %}
+                <li class="mb-1">
+                  <a href="{% url 'payments:payment_edit' p.id %}">{{ p.amount_cents|money_cents }}</a>
+                  <span class="text-secondary small"> · {{ p.status }}{% if p.client %} · {{ p.client.name }}{% endif %}</span>
+                </li>
+              {% endfor %}
+            </ul>
+            <div class="mt-2">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'payments:payment_list' %}?q={{ q|urlencode }}">View all payment matches</a>
+            </div>
+          {% else %}
+            <div class="text-secondary">No payment matches.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

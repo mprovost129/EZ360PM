@@ -335,9 +335,15 @@ AWS_SECRET_ACCESS_KEY = _getenv("AWS_SECRET_ACCESS_KEY", "")
 AWS_STORAGE_BUCKET_NAME = _getenv("AWS_STORAGE_BUCKET_NAME", "")
 AWS_S3_REGION_NAME = _getenv("AWS_S3_REGION_NAME", "")
 _raw_aws_s3_endpoint_url = _getenv("AWS_S3_ENDPOINT_URL", "")
-AWS_S3_ENDPOINT_URL = _raw_aws_s3_endpoint_url if _raw_aws_s3_endpoint_url else None
+AWS_S3_ENDPOINT_URL = _raw_aws_s3_endpoint_url or None
 AWS_S3_CUSTOM_DOMAIN = _getenv("AWS_S3_CUSTOM_DOMAIN", "")
-AWS_DEFAULT_ACL = _getenv("AWS_DEFAULT_ACL", "")
+AWS_DEFAULT_ACL = None
+AWS_S3_OBJECT_PARAMETERS = {
+    # Do NOT include "ACL" here
+    "CacheControl": "max-age=86400",
+}
+AWS_QUERYSTRING_AUTH = True
+AWS_S3_SIGNATURE_VERSION = "s3v4"
 
 S3_PUBLIC_MEDIA_BUCKET = _getenv("S3_PUBLIC_MEDIA_BUCKET", "")
 S3_PRIVATE_MEDIA_BUCKET = _getenv("S3_PRIVATE_MEDIA_BUCKET", "")
@@ -379,7 +385,8 @@ if USE_S3:
         "OPTIONS": {
             "bucket_name": public_bucket,
             "location": S3_PUBLIC_MEDIA_LOCATION,
-            "default_acl": "public-read",
+            "default_acl": None,  # critical
+            "object_parameters": AWS_S3_OBJECT_PARAMETERS,
         },
     }
 

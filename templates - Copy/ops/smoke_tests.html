@@ -1,0 +1,93 @@
+{% extends "base_app.html" %}
+{% block title %}Smoke tests · Ops · EZ360PM{% endblock %}
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+      <div class="ez-page-title">Smoke tests</div>
+      <div class="ez-page-subtitle">Quick sanity checks after a deploy or database reset.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-dark" href="{% url 'ops:dashboard' %}">Back to Ops</a>
+      <a class="btn btn-outline-dark" href="{% url 'ops:system_status' %}">System status</a>
+      <a class="btn btn-outline-dark" href="{% url 'ops:healthz' %}" target="_blank" rel="noopener">healthz</a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-8">
+      <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body">
+          <div class="h6 text-muted text-uppercase mb-3">Checks</div>
+          <div class="list-group list-group-flush">
+            {% for c in checks %}
+              <div class="list-group-item px-0">
+                <div class="d-flex align-items-start justify-content-between gap-3">
+                  <div>
+                    <div class="fw-semibold">{{ c.name }}</div>
+                    {% if c.details %}<div class="small text-secondary">{{ c.details }}</div>{% endif %}
+                    {% if c.data and c.data|length %}
+                      <div class="small mt-2">
+                        <div class="text-secondary mb-1">Details</div>
+                        <div class="table-responsive">
+                          <table class="table table-sm table-hover align-middle mb-0">
+                            <thead>
+                              <tr>
+                                <th>App</th>
+                                <th>Migration</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {% for a, m in c.data %}
+                                <tr>
+                                  <td><code>{{ a }}</code></td>
+                                  <td><code>{{ m }}</code></td>
+                                </tr>
+                              {% endfor %}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    {% endif %}
+                  </div>
+                  <div>
+                    <span class="badge text-bg-{% if c.ok %}success{% else %}danger{% endif %}">
+                      {% if c.ok %}OK{% else %}Needs attention{% endif %}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-4">
+      <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body">
+          <div class="h6 text-muted text-uppercase mb-3">Suggested post-reset steps</div>
+          <ol class="mb-0 small">
+            <li>Run <code>python manage.py migrate</code></li>
+            <li>Create a superuser (<code>createsuperuser</code>)</li>
+            <li>Log in and create your first Company</li>
+            <li>Visit <code>/ops/system/</code> and confirm 0 pending migrations</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="card shadow-sm border-0 rounded-3 mt-3">
+        <div class="card-body">
+          <div class="h6 text-muted text-uppercase mb-2">Active company</div>
+          {% if active_company %}
+            <div class="fw-semibold">{{ active_company.name }}</div>
+            <div class="small text-secondary">Company context resolved.</div>
+          {% else %}
+            <div class="small text-secondary">No active company selected yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
