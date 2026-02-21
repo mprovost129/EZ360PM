@@ -1,0 +1,30 @@
+{% extends "helpcenter/_help_base.html" %}
+
+{% block help_h1 %}A/P Payments & Reconciliation{% endblock %}
+
+{% block help_body %}
+<p class="mb-3">This section explains how to record vendor payments, apply credits, and reconcile what you owe against what you've paid.</p>
+
+<h2 class="h6 mt-4">Record a vendor payment</h2>
+<ol class="mb-3">
+  <li>Open a bill and click <strong>Record payment</strong>.</li>
+  <li>Select the payment date and amount.</li>
+  <li>Save. The bill balance updates and the payment appears in A/P reporting.</li>
+</ol>
+
+<h2 class="h6 mt-4">Apply vendor credits</h2>
+<ul class="mb-3">
+  <li>Apply credits before recording the final payment so your payment amount reflects the net owed.</li>
+  <li>Credits should be tied to the vendor and only applied to that vendor’s bills.</li>
+</ul>
+
+<h2 class="h6 mt-4">Reconciliation checklist</h2>
+<ul class="mb-3">
+  <li>Open bills list matches what vendors say is outstanding.</li>
+  <li>Total A/P balance equals the sum of open bill balances (minus credits applied).</li>
+  <li>Payments recorded align with bank/credit card transactions.</li>
+  <li>Voids are reviewed and documented.</li>
+</ul>
+
+<p class="text-muted small mb-0">For recurring invoices, see <a href="{% url 'helpcenter:recurring_bills' %}">Recurring Bills</a>.</p>
+{% endblock %}

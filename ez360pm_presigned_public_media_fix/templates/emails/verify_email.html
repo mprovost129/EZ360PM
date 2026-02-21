@@ -1,0 +1,23 @@
+{% extends "emails/base.html" %}
+{% load static %}
+
+{% block content %}
+  <h1 style="margin:0 0 10px 0;font-size:18px;">Verify your email</h1>
+  <p style="margin:0 0 14px 0;color:#374151;line-height:1.5;">
+    Hi {{ user.first_name|default:user.email }},
+  </p>
+  <p style="margin:0 0 14px 0;color:#374151;line-height:1.5;">
+    Please confirm this email address for your EZ360PM account:
+    <strong>{{ user.email }}</strong>
+  </p>
+
+  <div style="margin:18px 0 18px 0;">
+    <a href="{{ verify_url }}" style="display:inline-block;background:#111827;color:#ffffff;text-decoration:none;padding:10px 14px;border-radius:10px;font-weight:700;">
+      Verify email
+    </a>
+  </div>
+
+  <p style="margin:0;color:#6b7280;font-size:13px;line-height:1.5;">
+    This link expires in a few days. If you didn’t create an account, you can ignore this email.
+  </p>
+{% endblock %}

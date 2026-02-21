@@ -1,0 +1,35 @@
+
+{% extends "base_app.html" %}
+{% load static %}
+
+{% block title %}New Merchant · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a class="btn btn-outline-dark btn-sm" href="{% url 'expenses:merchant_list' %}">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h1 class="h5">New merchant</h1>
+    <p class="text-secondary">Add a merchant so it can be selected on expenses.</p>
+
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div class="mb-3">
+        <label class="form-label">Name</label>
+        {{ form.name }}
+        <div class="text-danger small">{{ form.name.errors }}</div>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2">
+        <a class="btn btn-outline-secondary" href="{% url 'expenses:merchant_list' %}">Cancel</a>
+        <button class="btn btn-ez" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
