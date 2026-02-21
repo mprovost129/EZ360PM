@@ -1,0 +1,74 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% block title %}{{ company.name }} · Timeline · Ops · EZ360PM{% endblock %}
+{% block content %}
+<div class="container-fluid" style="max-width: 1100px;">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <div class="text-secondary small">Company timeline</div>
+      <h1 class="h4 mb-1">{{ company.name }}</h1>
+      <div class="text-secondary small">Merged view of audit events and Stripe webhook processing.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-dark" href="{% url 'ops:company_detail' company.id %}">
+        <i class="bi bi-arrow-left me-1"></i>Back
+      </a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      {% if items %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width: 170px;">When</th>
+                <th style="width: 120px;">Source</th>
+                <th>Event</th>
+                <th style="width: 120px;" class="text-end"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+                <tr>
+                  <td class="text-secondary small">
+                    {{ item.ts|date:"Y-m-d H:i" }}
+                  </td>
+                  <td>
+                    {% if item.kind == "audit" %}
+                      <span class="badge text-bg-dark">AUDIT</span>
+                    {% else %}
+                      <span class="badge text-bg-primary">STRIPE</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if item.kind == "audit" %}
+                      <div class="small fw-semibold">{{ item.event.event_type }}</div>
+                      <div class="text-secondary small">{{ item.event.summary }}</div>
+                    {% else %}
+                      <div class="small fw-semibold">{{ item.event.event_type }}</div>
+                      <div class="text-secondary small">
+                        {% if item.event.ok %}Processed OK{% else %}Error{% endif %}
+                      </div>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    {% if item.kind == "audit" %}
+                      <a class="btn btn-sm btn-outline-dark" href="{% url 'audit:event_detail' item.event.pk %}">View</a>
+                    {% else %}
+                      <a class="btn btn-sm btn-outline-dark" href="{% url 'billing:webhook_event_detail' item.event.pk %}">View</a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-secondary">No timeline events yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

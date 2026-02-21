@@ -1,0 +1,123 @@
+{% extends "base_app.html" %}
+{% load static %}
+{% load formatting %}
+{% block title %}Accounts Aging · EZ360PM{% endblock %}
+
+{% block app_content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">Accounts Aging</h1>
+    <div class="text-secondary small">Open invoice balances bucketed by due date.</div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-dark" href="{% url 'accounting:reports_home' %}">Reports</a>
+    <a class="btn btn-outline-dark" href="{% url 'helpcenter:ar_aging' %}"><i class="bi bi-question-circle me-1"></i>Help</a>
+    <a class="btn btn-outline-dark" href="?{% if request.GET.start %}start={{ request.GET.start }}&{% endif %}{% if request.GET.end %}end={{ request.GET.end }}&{% endif %}format=csv"><i class="bi bi-download me-1"></i>Export CSV</a>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    {% include "accounting/partials_date_range.html" %}
+    <div class="small text-secondary mt-2">Filters apply to invoice issue date.</div>
+  </div>
+</div>
+
+{% comment %}Manual cards to keep template simple{% endcomment %}
+<div class="row g-3">
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Current</div>
+        <div class="text-secondary small mb-2">Not past due</div>
+        <div class="fw-semibold mb-3">{{ total_current|cents_to_dollars }}</div>
+        <ul class="list-unstyled mb-0">
+          {% for inv in bucket_current %}
+            <li class="small mb-1">
+              <span class="text-secondary">{{ inv.client }}</span> · {{ inv.number }} · {{ inv.balance_due_cents|cents_to_dollars }}
+            </li>
+          {% empty %}
+            <li class="small text-secondary">No open invoices.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">1–30</div>
+        <div class="text-secondary small mb-2">Days past due</div>
+        <div class="fw-semibold mb-3">{{ total_1_30|cents_to_dollars }}</div>
+        <ul class="list-unstyled mb-0">
+          {% for inv in bucket_1_30 %}
+            <li class="small mb-1">
+              <span class="text-secondary">{{ inv.client }}</span> · {{ inv.number }} · {{ inv.balance_due_cents|cents_to_dollars }}
+            </li>
+          {% empty %}
+            <li class="small text-secondary">No open invoices.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">31–60</div>
+        <div class="text-secondary small mb-2">Days past due</div>
+        <div class="fw-semibold mb-3">{{ total_31_60|cents_to_dollars }}</div>
+        <ul class="list-unstyled mb-0">
+          {% for inv in bucket_31_60 %}
+            <li class="small mb-1">
+              <span class="text-secondary">{{ inv.client }}</span> · {{ inv.number }} · {{ inv.balance_due_cents|cents_to_dollars }}
+            </li>
+          {% empty %}
+            <li class="small text-secondary">No open invoices.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">61–90</div>
+        <div class="text-secondary small mb-2">Days past due</div>
+        <div class="fw-semibold mb-3">{{ total_61_90|cents_to_dollars }}</div>
+        <ul class="list-unstyled mb-0">
+          {% for inv in bucket_61_90 %}
+            <li class="small mb-1">
+              <span class="text-secondary">{{ inv.client }}</span> · {{ inv.number }} · {{ inv.balance_due_cents|cents_to_dollars }}
+            </li>
+          {% empty %}
+            <li class="small text-secondary">No open invoices.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">90+</div>
+        <div class="text-secondary small mb-2">Days past due</div>
+        <div class="fw-semibold mb-3">{{ total_90_plus|cents_to_dollars }}</div>
+        <ul class="list-unstyled mb-0">
+          {% for inv in bucket_90_plus %}
+            <li class="small mb-1">
+              <span class="text-secondary">{{ inv.client }}</span> · {{ inv.number }} · {{ inv.balance_due_cents|cents_to_dollars }}
+            </li>
+          {% empty %}
+            <li class="small text-secondary">No open invoices.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

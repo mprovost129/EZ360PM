@@ -1,0 +1,31 @@
+{% extends "helpcenter/_help_base.html" %}
+
+{% block help_h1 %}Collections{% endblock %}
+
+{% block help_body %}
+<p class="text-secondary">Collections in EZ360PM are the workflows you use to reduce outstanding receivables: consistent invoicing, follow-ups, statements, and credit hygiene.</p>
+
+<h2 class="h6 mt-3">Recommended workflow</h2>
+<ol>
+  <li><strong>Keep invoice status accurate</strong>: Draft → Sent → Paid (or Partially paid). Avoid leaving invoices in Draft after sending externally.</li>
+  <li><strong>Use A/R Aging weekly</strong>: prioritize the oldest balances and high-dollar accounts.</li>
+  <li><strong>Send statements</strong>: summarize open invoices for a client and confirm payment method / timing.</li>
+  <li><strong>Apply credits</strong>: if a client has credit, apply it before chasing payment for a balance that can be reduced internally.</li>
+</ol>
+
+<h2 class="h6 mt-3">Practical tips</h2>
+<ul>
+  <li><strong>Keep contact info complete</strong> (billing email/phone) on the Client record.</li>
+  <li><strong>Standardize invoice numbers</strong> so clients can reference them easily.</li>
+  <li><strong>Avoid "surprise" invoices</strong>: invoice at consistent intervals (weekly/biweekly/monthly) for service work.</li>
+</ul>
+
+<div class="alert alert-light border mt-3 mb-0">
+  <div class="small text-secondary">See also:</div>
+  <div class="d-flex flex-wrap gap-2 mt-1">
+    <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:ar_aging' %}">A/R Aging</a>
+    <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:statements' %}">Statements</a>
+    <a class="btn btn-sm btn-outline-dark" href="{% url 'helpcenter:client_credits' %}">Client credits</a>
+  </div>
+</div>
+{% endblock %}

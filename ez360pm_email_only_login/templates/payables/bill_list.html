@@ -1,0 +1,135 @@
+{% extends "base_app.html" %}
+{% load formatting %}
+{% block title %}Bills · EZ360PM{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="ez-page-title">Bills</h1>
+    <div class="ez-page-subtitle">Track vendor bills and payments (Accounts Payable).</div>
+  </div>
+  <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{% url 'helpcenter:accounting' %}">
+        <i class="bi bi-question-circle me-1"></i>Help
+      </a>
+    <a class="btn btn-outline-secondary" href="{% url 'payables:vendor_list' %}"><i class="bi bi-building me-1"></i>Vendors</a>
+    <a class="btn btn-outline-secondary" href="{% url 'payables:ap_aging_report' %}"><i class="bi bi-bar-chart-line me-1"></i>A/P Aging</a>
+    <a class="btn btn-ez" href="{% url 'payables:bill_create' %}"><i class="bi bi-plus-lg me-1"></i>New bill</a>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form class="row g-2 align-items-end" method="get">
+      <div class="col-12 col-md-5">
+        <label class="form-label">Search</label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input class="form-control" name="q" value="{{ q }}" placeholder="Vendor or bill #">
+        </div>
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label">Status</label>
+        <select class="form-select" name="status">
+          {% for val,label in statuses %}
+            <option value="{{ val }}" {% if val == status %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-2">
+        <label class="form-label">Due</label>
+        <div class="form-check mt-1">
+          <input class="form-check-input" type="checkbox" value="1" id="dueSoon" name="due_soon" {% if due_soon %}checked{% endif %}>
+          <label class="form-check-label" for="dueSoon">Due soon</label>
+        </div>
+      </div>
+      <div class="col-12 col-md-2 d-flex gap-2">
+        <button class="btn btn-outline-dark w-100" type="submit"><i class="bi bi-funnel me-1"></i>Apply</button>
+        <a class="btn btn-outline-secondary w-100" href="{% url 'payables:bill_list' %}">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle ez-table">
+      <thead class="table-light">
+        <tr>
+          <th>Vendor</th>
+          <th>Bill #</th>
+          <th>Issue</th>
+          <th>Due</th>
+          <th>Status</th>
+          <th class="text-end">Total</th>
+          <th class="text-end">Balance</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in bills %}
+          <tr>
+            <td class="fw-semibold">{{ b.vendor.name }}</td>
+            <td>{{ b.bill_number|default:"—" }}</td>
+            <td>{{ b.issue_date }}</td>
+            <td>{{ b.due_date|default:"—" }}</td>
+            <td>
+              {% if b.status == 'draft' %}<span class="badge text-bg-secondary">Draft</span>{% endif %}
+              {% if b.status == 'posted' %}<span class="badge text-bg-primary">Posted</span>{% endif %}
+              {% if b.status == 'partially_paid' %}<span class="badge text-bg-warning">Partially paid</span>{% endif %}
+              {% if b.status == 'paid' %}<span class="badge text-bg-success">Paid</span>{% endif %}
+            </td>
+            <td class="text-end">{{ b.total_cents|cents_to_dollars }}</td>
+            <td class="text-end">{{ b.balance_cents|cents_to_dollars }}</td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-dark btn-icon" title="Open" href="{% url 'payables:bill_detail' b.id %}">
+                <i class="bi bi-box-arrow-up-right"></i>
+              </a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="8">
+	              {# Django templates can be picky with complex boolean logic. Keep this explicit. #}
+	              {% if q %}
+	                {% include "includes/empty_state.html" with icon="bi-funnel" title="No bills match your filters" subtitle="Try adjusting your search, status, or due-soon filter." %}
+	                <div class="text-center pb-4">
+	                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'payables:bill_list' %}">
+	                    <i class="bi bi-arrow-counterclockwise me-1"></i>Reset filters
+	                  </a>
+	                </div>
+	              {% elif due_soon %}
+	                {% include "includes/empty_state.html" with icon="bi-funnel" title="No bills match your filters" subtitle="Try adjusting your search, status, or due-soon filter." %}
+	                <div class="text-center pb-4">
+	                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'payables:bill_list' %}">
+	                    <i class="bi bi-arrow-counterclockwise me-1"></i>Reset filters
+	                  </a>
+	                </div>
+	              {% elif status and status != 'all' %}
+                {% include "includes/empty_state.html" with icon="bi-funnel" title="No bills match your filters" subtitle="Try adjusting your search, status, or due-soon filter." %}
+                <div class="text-center pb-4">
+                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'payables:bill_list' %}">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Reset filters
+                  </a>
+                </div>
+              {% else %}
+                {% include "includes/empty_state.html" with icon="bi-receipt" title="No bills yet" subtitle="Add vendor bills to track what you owe and keep payables current." %}
+                <div class="text-center pb-4">
+                  <a class="btn btn-sm btn-ez" href="{% url 'payables:bill_create' %}">
+                    <i class="bi bi-plus-lg me-1"></i>Create your first bill
+                  </a>
+                  <a class="btn btn-sm btn-outline-secondary ms-1" href="{% url 'payables:vendor_create' %}">
+                    <i class="bi bi-building me-1"></i>Add a vendor
+                  </a>
+                </div>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% include "includes/pagination.html" %}
+{% endblock %}
