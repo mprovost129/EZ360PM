@@ -1,20 +1,17 @@
-{% extends "base_app.html" %}
-{% block title %}System status · Ops · EZ360PM{% endblock %}
-{% block content %}
-<div class="container-fluid py-3">
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <div>
-      <div class="ez-page-title">System status</div>
-      <div class="ez-page-subtitle">Runtime and migration state for the current environment.</div>
-    </div>
-    <div class="d-flex gap-2">
-      <a class="btn btn-outline-dark" href="{% url 'ops:dashboard' %}">Back to Ops</a>
-      <a class="btn btn-outline-dark" href="{% url 'ops:healthz' %}" target="_blank" rel="noopener">healthz</a>
-      <a class="btn btn-outline-dark" href="{% url 'version' %}" target="_blank" rel="noopener">version</a>
-    </div>
-  </div>
+{% extends "ops/_base.html" %}
+{% block title %}System · Ops · EZ360PM{% endblock %}
 
-  <div class="row g-3">
+{% block ops_title %}System{% endblock %}
+{% block ops_subtitle %}<div class="ez-ops-muted small">Runtime, environment, and migration state for the current deployment.</div>{% endblock %}
+{% block ops_actions %}
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-dark ez-ops-btn" href="{% url 'ops:healthz' %}" target="_blank" rel="noopener">healthz</a>
+    <a class="btn btn-outline-dark ez-ops-btn" href="{% url 'version' %}" target="_blank" rel="noopener">version</a>
+  </div>
+{% endblock %}
+
+{% block ops_content %}
+<div class="row g-3">
     <div class="col-12 col-lg-6">
       <div class="card shadow-sm border-0 rounded-3">
         <div class="card-body">

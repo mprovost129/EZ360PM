@@ -5,7 +5,7 @@ import re
 import io
 import csv
 import zipfile
-from datetime import timedelta
+from datetime import timedelta, datetime
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -13,9 +13,11 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.forms import modelformset_factory
 from django.db import models
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Sum
+from django.db.models import Max
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from django.core.management import call_command
@@ -40,6 +42,7 @@ from accounts.models import AccountLockout
 from companies.services import set_active_company_id
 from companies.services import get_active_company
 from core.support_mode import get_support_mode, set_support_mode
+from core.support_mode import clear_support_mode
 from billing.stripe_service import fetch_and_sync_subscription_from_stripe
 from core.launch_checks import run_launch_checks
 from core.retention import get_retention_days, run_prune_jobs
@@ -55,6 +58,61 @@ from .forms import (
 )
 
 from .services_alerts import create_ops_alert
+from .permissions import require_ops_role
+from .models import OpsRole, OutboundEmailLog, OutboundEmailStatus
+
+
+
+def _confirm_matches(value: str, expected: str) -> bool:
+    try:
+        return (value or "").strip().lower() == (expected or "").strip().lower()
+    except Exception:
+        return False
+
+
+def _require_typed_confirm(request: HttpRequest, *, expected: str, label: str = "") -> bool:
+    """Return True if confirmation passes; otherwise flashes a message and returns False."""
+    provided = (request.POST.get("confirm") or "").strip()
+    if not provided:
+        messages.error(request, f"Confirmation required{(': ' + label) if label else ''}.")
+        return False
+    if not _confirm_matches(provided, expected):
+        messages.error(request, f"Confirmation did not match. Type: {expected}")
+        return False
+    return True
+
+
+def _require_ops_2fa_if_configured(request: HttpRequest, *, label: str = "") -> bool:
+    """Enforce 2FA for critical ops actions when enabled in SiteConfig.
+
+    This is an operator safety control. We keep it best-effort and non-destructive:
+    if enforcement is enabled and the session is not 2FA-verified, we block the action.
+    """
+    try:
+        cfg = SiteConfig.get_solo()
+        if not getattr(cfg, "ops_require_2fa_for_critical_actions", False):
+            return True
+
+        from accounts.services_2fa import is_session_2fa_verified
+
+        if is_session_2fa_verified(request):
+            return True
+
+        messages.error(
+            request,
+            f"2FA is required for this action{(': ' + label) if label else ''}. Please verify 2FA and try again.",
+        )
+        return False
+    except Exception:
+        # Never block ops if config lookup fails.
+        return True
+
+
+def _client_ip(request: HttpRequest) -> str:
+    # X-Forwarded-For may contain multiple IPs; take the first.
+    xff = (request.META.get("HTTP_X_FORWARDED_FOR") or "").split(",")[0].strip()
+    return xff or (request.META.get("REMOTE_ADDR") or "")
+
 
 from .models import (
     OpsAlertEvent,
@@ -77,7 +135,81 @@ from .models import (
     SiteConfig,
     QAIssue,
     QAIssueStatus,
+    PlatformRevenueSnapshot,
+    CompanyLifecycleEvent,
+    LifecycleEventType,
 )
+
+
+def _money_to_decimal(value, default="0"):
+    """Best-effort conversion for numeric values that may be None."""
+    from decimal import Decimal
+
+    if value is None:
+        return Decimal(str(default))
+    try:
+        return Decimal(str(value))
+    except Exception:
+        return Decimal(str(default))
+
+
+def _subscription_monthly_equivalent(sub: CompanySubscription | None) -> tuple[object, object]:
+    """Return (mrr, arr) as Decimal for a CompanySubscription.
+
+    Rules (v1):
+    - Comped subscriptions contribute 0 revenue.
+    - Trialing contributes 0 revenue.
+    - ACTIVE and PAST_DUE contribute revenue based on PlanCatalog + SeatAddonConfig.
+    - Annual plans are normalized to monthly by /12 for MRR, and ARR is the annualized value.
+    - Discounts apply to the combined base + seat add-on total.
+    """
+    from decimal import Decimal
+
+    if not sub:
+        return Decimal("0"), Decimal("0")
+
+    if sub.is_comped_active():
+        return Decimal("0"), Decimal("0")
+
+    if sub.status == SubscriptionStatus.TRIALING:
+        return Decimal("0"), Decimal("0")
+
+    if sub.status not in {SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE}:
+        return Decimal("0"), Decimal("0")
+
+    plan = PlanCatalog.objects.filter(code=sub.plan).first()
+    seat_cfg = SeatAddonConfig.objects.filter(pk=1).first()
+
+    if not plan:
+        return Decimal("0"), Decimal("0")
+
+    base_monthly = _money_to_decimal(plan.monthly_price)
+    base_annual = _money_to_decimal(plan.annual_price)
+
+    seat_monthly = _money_to_decimal(getattr(seat_cfg, "monthly_price", None), default="0")
+    seat_annual = _money_to_decimal(getattr(seat_cfg, "annual_price", None), default="0")
+
+    extra_seats = int(sub.extra_seats or 0)
+
+    if sub.billing_interval == "year":
+        total_annual = base_annual + (seat_annual * extra_seats)
+        mrr = (total_annual / Decimal("12"))
+        arr = total_annual
+    else:
+        total_monthly = base_monthly + (seat_monthly * extra_seats)
+        mrr = total_monthly
+        arr = (total_monthly * Decimal("12"))
+
+    pct = int(sub.discount_percent or 0)
+    if pct > 0 and sub.discount_is_active():
+        discount_mult = (Decimal("100") - Decimal(str(pct))) / Decimal("100")
+        mrr = (mrr * discount_mult)
+        arr = (arr * discount_mult)
+
+    # Round to cents for display stability.
+    mrr = mrr.quantize(Decimal("0.01"))
+    arr = arr.quantize(Decimal("0.01"))
+    return mrr, arr
 
 
 def _go_live_runbook_snapshot() -> dict:
@@ -191,6 +323,10 @@ def version(request: HttpRequest) -> HttpResponse:
 @login_required
 @user_passes_test(_is_staff)
 def ops_dashboard(request: HttpRequest) -> HttpResponse:
+    if not require_ops_role(request, OpsRole.VIEWER):
+        return redirect('core:dashboard')
+    tab = (request.GET.get("tab") or "actions").strip()
+
     q = (request.GET.get("q") or "").strip()
     company_id = (request.GET.get("company_id") or "").strip()
 
@@ -314,12 +450,26 @@ def ops_dashboard(request: HttpRequest) -> HttpResponse:
             except Exception:
                 scheduler_warnings.append("SITE_BASE_URL parsing failed. Verify it is a full URL like https://ez360pm.com")
 
+    # Executive metrics (best-effort, DB-backed only)
+    subs_qs = CompanySubscription.objects.select_related("company").all()
+    mrr_total = 0
+    arr_total = 0
+    for s in subs_qs:
+        mrr, arr = _subscription_monthly_equivalent(s)
+        mrr_total += float(mrr)
+        arr_total += float(arr)
+
     metrics = {
         "companies_total": Company.objects.count(),
         "companies_with_subscription": CompanySubscription.objects.count(),
         "active_subscriptions": CompanySubscription.objects.filter(
             status__in=[SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING, SubscriptionStatus.PAST_DUE]
         ).count(),
+        "active_paid": CompanySubscription.objects.filter(status=SubscriptionStatus.ACTIVE).count(),
+        "trialing": CompanySubscription.objects.filter(status=SubscriptionStatus.TRIALING).count(),
+        "past_due": CompanySubscription.objects.filter(status=SubscriptionStatus.PAST_DUE).count(),
+        "mrr_total": round(mrr_total, 2),
+        "arr_total": round(arr_total, 2),
         "open_alerts": OpsAlertEvent.objects.filter(is_resolved=False).count(),
         "open_qa_issues": QAIssue.objects.filter(status__in=[QAIssueStatus.OPEN, QAIssueStatus.IN_PROGRESS]).count(),
     }
@@ -358,6 +508,7 @@ def ops_dashboard(request: HttpRequest) -> HttpResponse:
     except Exception:
         snooze_map = {}
 
+
     return render(
         request,
         "ops/dashboard.html",
@@ -379,14 +530,588 @@ def ops_dashboard(request: HttpRequest) -> HttpResponse:
     )
 
 
+@login_required
+@user_passes_test(_is_staff)
+
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_reports(request: HttpRequest) -> HttpResponse:
+    if not require_ops_role(request, OpsRole.VIEWER):
+        return redirect('core:dashboard')
+    """Operational reporting for the EZ360PM SaaS.
+
+    This is an operator-facing dashboard focused on high-signal, actionable metrics
+    (billing health, churn, trials, and webhook processing).
+    """
+    now = timezone.now()
+    start_30 = now - timedelta(days=30)
+    start_7 = now - timedelta(days=risk_trial_days)
+    start_1 = now - timedelta(days=1)
+
+    subs_qs = CompanySubscription.objects.select_related("company")
+
+    cfg = SiteConfig.get_solo()
+    stale_hours = int(getattr(cfg, "stripe_mirror_stale_after_hours", 48) or 48)
+    stale_cutoff = now - timedelta(hours=max(1, stale_hours))
+    stale_level = getattr(cfg, "stripe_mirror_stale_alert_level", "warn") or "warn"
+
+    stale_subs = subs_qs.filter(status__in=[SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING, SubscriptionStatus.PAST_DUE]).filter(
+        Q(last_stripe_event_at__lt=stale_cutoff) | Q(last_stripe_event_at__isnull=True)
+    )
+    stale_sub_count = stale_subs.count()
+    stale_sub_sample = list(stale_subs.order_by("last_stripe_event_at").values("company_id", "company__name", "status", "last_stripe_event_at")[:10])
+
+    # Lifecycle events (authoritative as we log them consistently).
+    churn_30 = CompanyLifecycleEvent.objects.filter(event_type=LifecycleEventType.SUBSCRIPTION_CANCELED, occurred_at__gte=start_30).count()
+    conversions_30 = CompanyLifecycleEvent.objects.filter(event_type=LifecycleEventType.TRIAL_CONVERTED, occurred_at__gte=start_30).count()
+    trials_active_30 = CompanyLifecycleEvent.objects.filter(event_type=LifecycleEventType.TRIAL_STARTED, occurred_at__gte=start_30).count()
+    reactivations_30 = CompanyLifecycleEvent.objects.filter(event_type=LifecycleEventType.SUBSCRIPTION_REACTIVATED, occurred_at__gte=start_30).count()
+    starts_30 = CompanyLifecycleEvent.objects.filter(event_type=LifecycleEventType.SUBSCRIPTION_STARTED, occurred_at__gte=start_30).count()
+    lifecycle_recent = list(
+        CompanyLifecycleEvent.objects.select_related("company")
+        .order_by("-occurred_at")[:25]
+    )
+
+    # Stripe webhook processing health (system reliability)
+    wh_total_24h = BillingWebhookEvent.objects.filter(received_at__gte=start_1).count()
+    wh_failed_24h = BillingWebhookEvent.objects.filter(received_at__gte=start_1, ok=False).count()
+
+    last_wh = BillingWebhookEvent.objects.order_by('-received_at').first()
+    last_wh_received_at = last_wh.received_at if last_wh else None
+    last_wh_ok = bool(last_wh.ok) if last_wh else None
+
+    wh_total_7d = BillingWebhookEvent.objects.filter(received_at__gte=start_7).count()
+    wh_failed_7d = BillingWebhookEvent.objects.filter(received_at__gte=start_7, ok=False).count()
+
+    # Payment failure signals (business health) from Stripe event types
+    payment_fail_types = [
+        "invoice.payment_failed",
+        "payment_intent.payment_failed",
+        "charge.failed",
+    ]
+    payment_failed_7d = BillingWebhookEvent.objects.filter(
+        received_at__gte=start_7,
+        event_type__in=payment_fail_types,
+    ).count()
+
+    payment_failed_30d = BillingWebhookEvent.objects.filter(
+        received_at__gte=start_30,
+        event_type__in=payment_fail_types,
+    ).count()
+
+    # Revenue intelligence is sourced from daily PlatformRevenueSnapshot (Stripe-authoritative mirror).
+    latest_snapshot = PlatformRevenueSnapshot.objects.order_by('-date').first()
+    recent_snapshots = list(PlatformRevenueSnapshot.objects.order_by('-date')[:30])
+    recent_snapshots.reverse()
+
+    recent_snapshots_display = [
+        {
+            'date': s.date,
+            'mrr': (s.mrr_cents / 100.0),
+            'arr': (s.arr_cents / 100.0),
+            'at_risk': (s.revenue_at_risk_cents / 100.0),
+        }
+        for s in recent_snapshots
+    ]
+
+    total_mrr = (latest_snapshot.mrr_cents / 100.0) if latest_snapshot else 0.0
+    total_arr = (latest_snapshot.arr_cents / 100.0) if latest_snapshot else 0.0
+    paid_count = (latest_snapshot.active_subscriptions if latest_snapshot else 0)
+    conversion_rate_30 = (conversions_30 / trials_active_30) if trials_active_30 else 0.0
+    churn_rate_30 = (churn_30 / paid_count) if paid_count else 0.0
+    net_growth_30 = int(starts_30 + reactivations_30 - churn_30)
+    revenue_at_risk = (latest_snapshot.revenue_at_risk_cents / 100.0) if latest_snapshot else 0.0
+
+    # Alerts: unresolved counts by source over 7d
+    alerts_7d = (
+        OpsAlertEvent.objects.filter(created_at__gte=start_7, is_resolved=False)
+        .values("source")
+        .annotate(count=Count("id"))
+        .order_by("-count")
+    )
+
+    ctx = {
+        "now": now,
+        "churn_30": churn_30,
+        "conversions_30": conversions_30,
+        "trials_started_30": trials_active_30,
+        "reactivations_30": reactivations_30,
+        "starts_30": starts_30,
+        "conversion_rate_30": conversion_rate_30,
+        "churn_rate_30": churn_rate_30,
+        "net_growth_30": net_growth_30,
+        "wh_total_24h": wh_total_24h,
+        "wh_failed_24h": wh_failed_24h,
+        "wh_total_7d": wh_total_7d,
+        "wh_failed_7d": wh_failed_7d,
+        "payment_failed_7d": payment_failed_7d,
+        "payment_failed_30d": payment_failed_30d,
+        "total_mrr": total_mrr,
+        "total_arr": total_arr,
+        "revenue_at_risk": revenue_at_risk,
+        "latest_snapshot": latest_snapshot,
+        "recent_snapshots": recent_snapshots,
+        "recent_snapshots_display": recent_snapshots_display,
+        "paid_count": paid_count,
+        "alerts_7d": alerts_7d,
+
+        "lifecycle_recent": lifecycle_recent,
+
+        "stripe_mirror_stale_after_hours": stale_hours,
+        "stripe_mirror_stale_alert_level": stale_level,
+        "stripe_mirror_stale_cutoff": stale_cutoff,
+        "stripe_mirror_stale_sub_count": stale_sub_count,
+        "stripe_mirror_stale_sub_sample": stale_sub_sample,
+        "last_wh_received_at": last_wh_received_at,
+        "last_wh_ok": last_wh_ok,
+
+        "sentry_enabled": bool(getattr(settings, "SENTRY_DSN", "") or ""),
+        "sentry_dashboard_url": getattr(settings, "SENTRY_DASHBOARD_URL", "") or "",
+
+    }
+    return render(request, "ops/reports.html", ctx)
+
+
+def ops_webhook_health(request: HttpRequest) -> HttpResponse:
+    if not require_ops_role(request, OpsRole.VIEWER):
+        return redirect('core:dashboard')
+    """Stripe webhook health & mirror drift dashboard (operator-facing)."""
+    now = timezone.now()
+    cfg = SiteConfig.get_solo()
+    stale_hours = int(getattr(cfg, "stripe_mirror_stale_after_hours", 48) or 48)
+    stale_cutoff = now - timedelta(hours=max(1, stale_hours))
+
+    start_24h = now - timedelta(days=1)
+    start_7d = now - timedelta(days=risk_trial_days)
+
+    wh_qs = BillingWebhookEvent.objects.all()
+    wh_total_24h = wh_qs.filter(received_at__gte=start_24h).count()
+    wh_failed_24h = wh_qs.filter(received_at__gte=start_24h, ok=False).count()
+    wh_total_7d = wh_qs.filter(received_at__gte=start_7d).count()
+    wh_failed_7d = wh_qs.filter(received_at__gte=start_7d, ok=False).count()
+
+    last_wh = wh_qs.order_by("-received_at").first()
+
+    # Top event types (7d)
+    top_types_7d = (
+        wh_qs.filter(received_at__gte=start_7d)
+        .values("event_type")
+        .annotate(count=Count("id"))
+        .order_by("-count")[:15]
+    )
+
+    recent_failures = list(wh_qs.filter(ok=False).order_by("-received_at")[:50])
+
+    subs_qs = CompanySubscription.objects.select_related("company")
+    stale_subs = subs_qs.filter(status__in=[SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING, SubscriptionStatus.PAST_DUE]).filter(
+        Q(last_stripe_event_at__lt=stale_cutoff) | Q(last_stripe_event_at__isnull=True)
+    )
+    stale_sub_count = stale_subs.count()
+    stale_sub_sample = list(
+        stale_subs.order_by("last_stripe_event_at").values(
+            "company_id", "company__name", "status", "last_stripe_event_at", "stripe_subscription_id", "stripe_customer_id"
+        )[:20]
+    )
+
+    ctx = {
+        "now": now,
+        "stale_hours": stale_hours,
+        "stale_cutoff": stale_cutoff,
+        "wh_total_24h": wh_total_24h,
+        "wh_failed_24h": wh_failed_24h,
+        "wh_total_7d": wh_total_7d,
+        "wh_failed_7d": wh_failed_7d,
+        "last_wh": last_wh,
+        "top_types_7d": top_types_7d,
+        "recent_failures": recent_failures,
+        "stale_sub_count": stale_sub_count,
+        "stale_sub_sample": stale_sub_sample,
+    }
+    return render(request, "ops/webhook_health.html", ctx)
+
+
+def _compute_tenant_risk(
+    company: Company,
+    sub: CompanySubscription | None,
+    *,
+    cfg: SiteConfig,
+    now: datetime,
+    failed_customer_ids: set[str],
+    failed_subscription_ids: set[str],
+) -> dict:
+    # Wrapper retained for this module; implementation lives in services_risk.
+    from .services_risk import compute_tenant_risk
+
+    return compute_tenant_risk(
+        company,
+        sub,
+        cfg=cfg,
+        now=now,
+        failed_customer_ids=failed_customer_ids,
+        failed_subscription_ids=failed_subscription_ids,
+    )
+
+
+def ops_companies(request: HttpRequest) -> HttpResponse:
+    if not require_ops_role(request, OpsRole.VIEWER):
+        return redirect('core:dashboard')
+    """Company directory for SaaS operations.
+
+    Filters are subscription-aware (best-effort) and designed for day-to-day ops:
+    - status: active|trialing|past_due|canceled|ended|all
+    - comped: 1
+    - q: name/email search
+    """
+    # Saved presets (per-operator)
+    presets_qs = OpsCompanyViewPreset.objects.filter(is_active=True).filter(Q(owner=request.user) | Q(owner__isnull=True)).order_by("name")
+    preset_id = (request.GET.get("preset") or "").strip()
+    selected_preset = None
+    params = request.GET.copy()
+    if preset_id.isdigit():
+        selected_preset = presets_qs.filter(id=int(preset_id)).first()
+        if selected_preset:
+            for k, v in (selected_preset.query_params or {}).items():
+                if not params.get(k):
+                    params[k] = str(v)
+
+    # Save preset
+    if request.method == "POST" and (request.POST.get("action") or "").strip().lower() == "save_preset":
+        if not require_ops_role(request, OpsRole.SUPPORT):
+            return redirect("ops:companies")
+        name = (request.POST.get("preset_name") or "").strip()
+        make_default = (request.POST.get("make_default") or "") == "1"
+        if not name:
+            messages.error(request, "Preset name is required.")
+            return redirect(request.path)
+
+        qp_source = params if params else request.POST
+        qp = {k: qp_source.get(k) for k in {"segment", "status", "comped", "q"} if qp_source.get(k)}
+        preset, _created = OpsCompanyViewPreset.objects.update_or_create(
+            owner=request.user,
+            name=name,
+            defaults={"query_params": qp, "is_active": True},
+        )
+        if make_default:
+            OpsCompanyViewPreset.objects.filter(owner=request.user).update(is_default=False)
+            preset.is_default = True
+            preset.save(update_fields=["is_default"])
+        messages.success(request, f"Saved preset: {preset.name}")
+        return redirect(f"{request.path}?preset={preset.id}")
+
+    q = (params.get("q") or "").strip()
+    segment = (params.get("segment") or "active").strip().lower()
+    status = (params.get("status") or "").strip().lower()
+    comped = (params.get("comped") or "").strip()
+    export = (params.get("export") or "").strip().lower()
+
+    companies = (
+        Company.objects.all()
+        .annotate(
+            employee_count=Count("employees", filter=Q(employees__deleted_at__isnull=True), distinct=True),
+            last_login=Max("employees__user__last_login"),
+        )
+        .select_related("owner")
+        .order_by("name")
+    )
+
+    if q:
+        companies = companies.filter(
+            Q(name__icontains=q)
+            | Q(owner__email__icontains=q)
+            | Q(employees__user__email__icontains=q)
+        ).distinct()
+
+    subs = {s.company_id: s for s in CompanySubscription.objects.select_related("company")}
+
+    # Risk inputs
+    now = timezone.now()
+    cfg = SiteConfig.get_solo()
+
+    stale_hours = int(getattr(cfg, "stripe_mirror_stale_after_hours", 48) or 48)
+    stale_cutoff = now - timedelta(hours=max(1, stale_hours))
+
+    risk_payment_days = int(getattr(cfg, "risk_payment_failed_window_days", 14) or 14)
+    risk_payment_days = max(1, min(90, risk_payment_days))
+    start_fail_window = now - timedelta(days=risk_payment_days)
+
+    risk_trial_days = int(getattr(cfg, "risk_trial_ends_within_days", 7) or 7)
+    risk_trial_days = max(1, min(30, risk_trial_days))
+
+    # Risk weights (operator-tunable, clamped)
+    w_past_due = int(getattr(cfg, "risk_weight_past_due", 60) or 0)
+    w_mirror_stale = int(getattr(cfg, "risk_weight_mirror_stale", 25) or 0)
+    w_payment_failed = int(getattr(cfg, "risk_weight_payment_failed", 25) or 0)
+    w_payment_failed_sub_only = int(getattr(cfg, "risk_weight_payment_failed_sub_only", 10) or 0)
+    w_canceling = int(getattr(cfg, "risk_weight_canceling", 15) or 0)
+    w_trial_ends_soon = int(getattr(cfg, "risk_weight_trial_ends_soon", 15) or 0)
+
+    w_past_due = max(0, min(100, w_past_due))
+    w_mirror_stale = max(0, min(100, w_mirror_stale))
+    w_payment_failed = max(0, min(100, w_payment_failed))
+    w_payment_failed_sub_only = max(0, min(100, w_payment_failed_sub_only))
+    w_canceling = max(0, min(100, w_canceling))
+    w_trial_ends_soon = max(0, min(100, w_trial_ends_soon))
+
+    medium_threshold = int(getattr(cfg, "risk_level_medium_threshold", 40) or 40)
+    high_threshold = int(getattr(cfg, "risk_level_high_threshold", 80) or 80)
+    medium_threshold = max(0, min(100, medium_threshold))
+    high_threshold = max(0, min(100, high_threshold))
+    if high_threshold < medium_threshold:
+        high_threshold = min(100, medium_threshold + 1)
+
+    payment_fail_types = ["invoice.payment_failed", "payment_intent.payment_failed", "charge.failed"]
+    failed_customer_ids_14d: set[str] = set()
+    failed_sub_ids_14d: set[str] = set()
+    for e in BillingWebhookEvent.objects.filter(received_at__gte=start_fail_window, event_type__in=payment_fail_types).only("payload_json", "event_type"):
+        try:
+            obj = (e.payload_json or {}).get("data", {}).get("object", {}) or {}
+            cust = obj.get("customer") or obj.get("customer_id") or ""
+            subid = obj.get("subscription") or obj.get("subscription_id") or ""
+            if isinstance(cust, str) and cust:
+                failed_customer_ids_14d.add(cust)
+            if isinstance(subid, str) and subid:
+                failed_sub_ids_14d.add(subid)
+        except Exception:
+            continue
+
+
+    # Segment presets (exec-ops friendly)
+    # Segment sets defaults but still allows manual override via status/comped controls.
+    if not status:
+        status = "active" if segment == "active" else segment
+
+    if segment == "suspended":
+        companies = companies.filter(is_suspended=True)
+        status = "all"
+    elif segment == "comped":
+        comped = "1"
+        status = "all"
+    elif segment == "discounted":
+        status = "all"
+    elif segment in {"trialing", "past_due", "canceled", "ended", "all", "active"}:
+        # Handled by subscription status logic below.
+        pass
+    else:
+        segment = "active"
+        status = "active"
+
+    rows = []
+    for c in companies:
+        sub = subs.get(c.id)
+
+        # Segment-specific filters that depend on subscription
+        if segment == "discounted":
+            if not sub or not sub.discount_is_active() or int(sub.discount_percent or 0) <= 0:
+                continue
+        if status and status != "all":
+            st = (getattr(sub, "status", "") or "").lower()
+            if status == "active":
+                if st not in {SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE}:
+                    continue
+            elif status == "trialing":
+                if st != SubscriptionStatus.TRIALING:
+                    continue
+            elif status == "past_due":
+                if st != SubscriptionStatus.PAST_DUE:
+                    continue
+            elif status == "canceled":
+                if st != SubscriptionStatus.CANCELED:
+                    continue
+            elif status == "ended":
+                if st != SubscriptionStatus.ENDED:
+                    continue
+
+        if comped == "1":
+            if not sub or not sub.is_comped_active():
+                continue
+
+        mrr, arr = _subscription_monthly_equivalent(sub)
+        seats_limit = seats_limit_for(sub) if sub else 1
+
+        # Tenant risk scoring (ops triage)
+        risk = _compute_tenant_risk(
+            c,
+            sub,
+            cfg=cfg,
+            now=now,
+            failed_customer_ids=failed_customer_ids_14d,
+            failed_subscription_ids=failed_sub_ids_14d,
+        )
+        risk_score = risk["score"]
+        risk_level = risk["level"]
+        risk_flags = risk["flags"]
+        rows.append(
+            {
+                "company": c,
+                "subscription": sub,
+                "employee_count": getattr(c, "employee_count", 0) or 0,
+                "last_login": getattr(c, "last_login", None),
+                "mrr": mrr,
+                "arr": arr,
+                "seats_limit": seats_limit,
+                "risk_score": risk_score,
+                "risk_level": risk_level,
+                "risk_flags": risk_flags,
+            }
+        )
+
+    # Export (CSV) for ops workflows
+    if export == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(
+            [
+                "company_id",
+                "company_name",
+                "owner_email",
+                "is_suspended",
+                "subscription_status",
+                "plan",
+                "interval",
+                "extra_seats",
+                "comped",
+                "discount_percent",
+                "mrr",
+                "arr",
+                "users",
+                "last_login",
+            ]
+        )
+        for r in rows:
+            c = r["company"]
+            sub = r["subscription"]
+            writer.writerow(
+                [
+                    str(c.id),
+                    c.name,
+                    getattr(c.owner, "email", ""),
+                    "1" if c.is_suspended else "0",
+                    getattr(sub, "status", "") if sub else "",
+                    getattr(sub, "plan", "") if sub else "",
+                    getattr(sub, "billing_interval", "") if sub else "",
+                    str(getattr(sub, "extra_seats", "") if sub else ""),
+                    "1" if (sub and sub.is_comped_active()) else "0",
+                    str(getattr(sub, "discount_percent", "") if sub else ""),
+                    str(r["mrr"]),
+                    str(r["arr"]),
+                    str(r["employee_count"]),
+                    r["last_login"].isoformat() if r["last_login"] else "",
+                ]
+            )
+
+        resp = HttpResponse(output.getvalue(), content_type="text/csv")
+        resp["Content-Disposition"] = "attachment; filename=ez360pm_companies.csv"
+        return resp
+
+    paginator = Paginator(rows, 50)
+    page_obj = paginator.get_page(request.GET.get("page") or 1)
+
+
+    return render(
+        request,
+        "ops/companies.html",
+        {
+            "q": q,
+            "segment": segment,
+            "status": status,
+            "comped": comped,
+            "page_obj": page_obj,
+            "support_mode": get_support_mode(request),
+            "presets": presets_qs,
+            "selected_preset": selected_preset,
+            "preset_id": preset_id,
+        },
+    )
+
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_company_presets(request: HttpRequest) -> HttpResponse:
+    """Manage saved company directory presets (exec ops workflow)."""
+    if not require_ops_role(request, OpsRole.SUPPORT):
+        return redirect("ops:dashboard")
+
+    from .models import OpsCompanyViewPreset
+
+    can_manage_global = require_ops_role(request, OpsRole.SUPEROPS)
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip().lower()
+        try:
+            preset_id = int(request.POST.get("preset_id") or 0)
+        except Exception:
+            preset_id = 0
+
+        preset = get_object_or_404(OpsCompanyViewPreset, pk=preset_id)
+
+        # Ownership guard: users can manage their own presets; SUPEROPS can manage global presets.
+        if preset.owner_id and preset.owner_id != request.user.id:
+            messages.error(request, "You can only manage your own presets.")
+            return redirect("ops:company_presets")
+        if preset.owner_id is None and not can_manage_global:
+            messages.error(request, "Only SUPEROPS can manage global presets.")
+            return redirect("ops:company_presets")
+
+        if action == "rename":
+            name = (request.POST.get("name") or "").strip()
+            if not name:
+                messages.error(request, "Preset name is required.")
+            else:
+                preset.name = name[:64]
+                preset.save(update_fields=["name", "updated_at"])
+                messages.success(request, "Preset renamed.")
+
+        elif action == "toggle_active":
+            preset.is_active = not bool(preset.is_active)
+            preset.save(update_fields=["is_active", "updated_at"])
+            messages.success(request, "Preset updated.")
+
+        elif action == "set_default":
+            # Clear default on other presets for this owner scope.
+            if preset.owner_id:
+                OpsCompanyViewPreset.objects.filter(owner=request.user, is_default=True).exclude(pk=preset.id).update(is_default=False)
+            else:
+                OpsCompanyViewPreset.objects.filter(owner__isnull=True, is_default=True).exclude(pk=preset.id).update(is_default=False)
+            preset.is_default = True
+            preset.save(update_fields=["is_default", "updated_at"])
+            messages.success(request, "Default preset set.")
+
+        elif action == "delete":
+            preset.delete()
+            messages.success(request, "Preset deleted.")
+
+        else:
+            messages.error(request, "Invalid action.")
+
+        return redirect("ops:company_presets")
+
+    my_presets = list(OpsCompanyViewPreset.objects.filter(owner=request.user).order_by("-is_default", "name"))
+    global_presets = list(OpsCompanyViewPreset.objects.filter(owner__isnull=True, is_active=True).order_by("-is_default", "name"))
+
+    return render(
+        request,
+        "ops/company_presets.html",
+        {
+            "my_presets": my_presets,
+            "global_presets": global_presets,
+            "can_manage_global": can_manage_global,
+        },
+    )
+
+
 @staff_only
 def ops_settings_home(request: HttpRequest) -> HttpResponse:
+    if not require_ops_role(request, OpsRole.SUPEROPS):
+        return redirect('ops:dashboard')
     """Staff settings hub (keeps operational configuration out of Django admin)."""
     return render(request, "ops/settings_home.html")
 
 
 @staff_only
 def ops_settings_site(request: HttpRequest) -> HttpResponse:
+    if not require_ops_role(request, OpsRole.SUPEROPS):
+        return redirect('ops:dashboard')
     """Platform-level settings (SiteConfig), managed from Ops UI."""
     config = SiteConfig.get_solo()
 
@@ -404,6 +1129,8 @@ def ops_settings_site(request: HttpRequest) -> HttpResponse:
 
 @staff_only
 def ops_settings_billing(request: HttpRequest) -> HttpResponse:
+    if not require_ops_role(request, OpsRole.SUPEROPS):
+        return redirect('ops:dashboard')
     """Edit plan catalog + seat add-on pricing in-app (not Django admin)."""
 
     PlanFormSet = modelformset_factory(
@@ -428,6 +1155,26 @@ def ops_settings_billing(request: HttpRequest) -> HttpResponse:
     else:
         plan_formset = PlanFormSet(queryset=plans_qs, prefix="plans")
         seat_form = SeatAddonConfigForm(instance=seat_cfg, prefix="seat")
+
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
 
     return render(
         request,
@@ -493,6 +1240,8 @@ def ops_alert_snoozes(request: HttpRequest) -> HttpResponse:
 
     now = timezone.now()
     status = (request.GET.get("status") or "active").strip().lower()
+    tab = (request.GET.get("tab") or "actions").strip()
+
     q = (request.GET.get("q") or "").strip()
 
     qs = OpsAlertSnooze.objects.select_related("company").all()
@@ -517,6 +1266,26 @@ def ops_alert_snoozes(request: HttpRequest) -> HttpResponse:
 
     paginator = Paginator(qs, 50)
     page_obj = paginator.get_page(request.GET.get("page") or 1)
+
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
 
     return render(
         request,
@@ -572,6 +1341,8 @@ def ops_alerts_export_csv(request: HttpRequest) -> HttpResponse:
     """
     source = (request.GET.get("source") or "").strip()
     level = (request.GET.get("level") or "").strip()
+    tab = (request.GET.get("tab") or "actions").strip()
+
     q = (request.GET.get("q") or "").strip()
     company_id = (request.GET.get("company_id") or "").strip()
 
@@ -618,6 +1389,8 @@ def ops_alerts_export_csv(request: HttpRequest) -> HttpResponse:
 
     return resp
 def ops_alert_routing(request: HttpRequest) -> HttpResponse:
+    if not require_ops_role(request, OpsRole.SUPEROPS):
+        return redirect('ops:dashboard')
     """Configure where Ops alerts route (email/webhook)."""
     config = SiteConfig.get_solo()
 
@@ -762,6 +1535,26 @@ def ops_smoke_tests(request: HttpRequest) -> HttpResponse:
         }
     )
 
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
+
     return render(
         request,
         "ops/smoke_tests.html",
@@ -809,6 +1602,26 @@ def ops_slo_dashboard(request: HttpRequest) -> HttpResponse:
         .annotate(active_users=Count("user", distinct=True))
         .order_by("-active_users", "company__name")[:30]
     )
+
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
 
     return render(
         request,
@@ -927,6 +1740,26 @@ def ops_email_test(request: HttpRequest) -> HttpResponse:
         "email_use_ssl": getattr(settings, "EMAIL_USE_SSL", False),
         "email_timeout": getattr(settings, "EMAIL_TIMEOUT", ""),
     }
+
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
 
     return render(
         request,
@@ -1133,6 +1966,26 @@ def ops_checks(request: HttpRequest) -> HttpResponse:
             messages.info(request, "Select at least one check to run.")
 
         recent_runs = OpsCheckRun.objects.select_related("company").all()[:25]
+
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
 
     return render(
         request,
@@ -1342,6 +2195,8 @@ def ops_alerts(request: HttpRequest) -> HttpResponse:
     status = (request.GET.get("status") or "open").strip().lower()
     source = (request.GET.get("source") or "").strip()
     level = (request.GET.get("level") or "").strip()
+    tab = (request.GET.get("tab") or "actions").strip()
+
     q = (request.GET.get("q") or "").strip()
     company_id = (request.GET.get("company_id") or "").strip()
 
@@ -1424,6 +2279,26 @@ def ops_alerts(request: HttpRequest) -> HttpResponse:
     qs_no_page.pop("page", None)
     qs_no_page_str = qs_no_page.urlencode()
 
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
+
     return render(
         request,
         "ops/alerts.html",
@@ -1494,6 +2369,26 @@ def ops_alert_detail(request: HttpRequest, alert_id: int) -> HttpResponse:
         or ""
     )
     request_id = str(request_id).strip()[:128]
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
+
     return render(
         request,
         "ops/alert_detail.html",
@@ -1505,7 +2400,7 @@ def ops_alert_detail(request: HttpRequest, alert_id: int) -> HttpResponse:
 @require_POST
 def ops_alert_snooze(request: HttpRequest) -> HttpResponse:
     """Snooze a source (optionally company-scoped) for a short window."""
-    from datetime import timedelta
+    from datetime import timedelta, datetime
 
     src = (request.POST.get("source") or "").strip()
     minutes_raw = (request.POST.get("minutes") or "").strip()
@@ -1619,6 +2514,7 @@ def ops_launch_checks(request: HttpRequest) -> HttpResponse:
         "warn": sum(1 for r in results if not r["ok"] and r["level"] == "warn"),
         "ok": sum(1 for r in results if r["ok"]),
     }
+
     return render(
         request,
         "ops/launch_checks.html",
@@ -1653,6 +2549,26 @@ def ops_launch_gate(request: HttpRequest) -> HttpResponse:
     items = LaunchGateItem.objects.all()
     total = items.count()
     complete = items.filter(is_complete=True).count()
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
+
     return render(
         request,
         "ops/launch_gate.html",
@@ -1675,6 +2591,26 @@ def ops_go_live_runbook(request: HttpRequest) -> HttpResponse:
     - Quick verification checklist (manual)
     """
     snap = _go_live_runbook_snapshot()
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
+
     return render(
         request,
         "ops/go_live_runbook.html",
@@ -1905,21 +2841,375 @@ def ops_launch_gate_toggle(request: HttpRequest, item_id: int) -> HttpResponse:
     return redirect("ops:launch_gate")
 
 
+@login_required
+@user_passes_test(_is_staff)
 def ops_company_detail(request: HttpRequest, company_id: int) -> HttpResponse:
+    if not require_ops_role(request, OpsRole.VIEWER):
+        return redirect('ops:dashboard')
     company = get_object_or_404(Company, pk=company_id)
     subscription = getattr(company, "subscription", None)
+
+    tab = (request.GET.get("tab") or "overview").strip().lower()
+    if tab not in {"overview", "billing", "users", "audit", "activity"}:
+        tab = "overview"
+
     employees = (
         EmployeeProfile.objects.filter(company=company, deleted_at__isnull=True)
         .select_related("user")
         .order_by("role", "user__email")
     )
 
-    # Support mode shortcut: staff can enter support mode for this company.
+    last_login = (
+        EmployeeProfile.objects.filter(company=company, deleted_at__isnull=True)
+        .aggregate(last=Max("user__last_login"))
+        .get("last")
+    )
+
+    mrr, arr = _subscription_monthly_equivalent(subscription)
+    recent_webhooks = _recent_webhooks_for_company(company, limit=12)
+
+    cfg = SiteConfig.get_solo()
+    now = timezone.now()
+
+    # Risk drill-down (uses same operator-tunable weights as Companies directory)
+    payment_fail_types = ["invoice.payment_failed", "payment_intent.payment_failed", "charge.failed"]
+    risk_payment_days = int(getattr(cfg, "risk_payment_failed_window_days", 14) or 14)
+    risk_payment_days = max(1, min(90, risk_payment_days))
+    start_fail_window = now - timedelta(days=risk_payment_days)
+    failed_customer_ids: set[str] = set()
+    failed_subscription_ids: set[str] = set()
+    for e in BillingWebhookEvent.objects.filter(received_at__gte=start_fail_window, event_type__in=payment_fail_types).only("payload_json", "event_type"):
+        try:
+            obj = (e.payload_json or {}).get("data", {}).get("object", {}) or {}
+            cust = obj.get("customer") or obj.get("customer_id") or ""
+            subid = obj.get("subscription") or obj.get("subscription_id") or ""
+            if isinstance(cust, str) and cust:
+                failed_customer_ids.add(cust)
+            if isinstance(subid, str) and subid:
+                failed_subscription_ids.add(subid)
+        except Exception:
+            continue
+
+    risk = _compute_tenant_risk(
+        company,
+        subscription,
+        cfg=cfg,
+        now=now,
+        failed_customer_ids=failed_customer_ids,
+        failed_subscription_ids=failed_subscription_ids,
+    )
+
+    # Risk trend (best-effort daily snapshots)
+    try:
+        from .models import CompanyRiskSnapshot
+
+        risk_history = list(
+            CompanyRiskSnapshot.objects.filter(company=company)
+            .order_by("-date")
+            .only("date", "risk_score", "risk_level")[:30]
+        )
+    except Exception:
+        risk_history = []
+
+
+    def _ops_log(action: str, *, summary: str = "", meta: dict | None = None) -> None:
+        try:
+            from .models import OpsActionLog
+
+            OpsActionLog.objects.create(
+                actor=request.user if getattr(request, "user", None) and request.user.is_authenticated else None,
+                actor_email=getattr(request.user, "email", "") if getattr(request, "user", None) else "",
+                company=company,
+                action=action,
+                summary=(summary or "")[:240],
+                meta=meta or {},
+                ip_address=_client_ip(request),
+                user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:255],
+            )
+        except Exception:
+            pass
+
+    # Support mode + company controls
     if request.method == "POST":
-        set_support_mode(request, company_id=str(company.id), reason="ops_console")
-        set_active_company_id(request, str(company.id))
-        log_event(request, "ops.support_mode_enabled", company=company)
-        # NOTE: We intentionally keep the user in the normal app UI. Support mode affects permissions elsewhere.
+        action = (request.POST.get("action") or "").strip().lower()
+
+        # Ops role enforcement (separation of duties)
+        if action in {"enter_support", "exit_support"}:
+            if not require_ops_role(request, OpsRole.SUPPORT):
+                return redirect('ops:company_detail', company_id=company.id)
+        if action in {"disable_user", "enable_user", "force_logout"}:
+            if not require_ops_role(request, OpsRole.SUPPORT):
+                return redirect('ops:company_detail', company_id=company.id)
+        if action in {"suspend_company", "reactivate_company"}:
+            if not require_ops_role(request, OpsRole.SUPEROPS):
+                return redirect('ops:company_detail', company_id=company.id)
+
+        # Support mode shortcuts: staff can enter/exit support mode for this company.
+        if action in {"enter_support", "exit_support"}:
+            if action == "exit_support":
+                clear_support_mode(request)
+                log_event(request, "ops.support_mode_disabled", company=company)
+                _ops_log("support_mode.exit", summary="Support mode disabled")
+                messages.success(request, "Support mode disabled.")
+            else:
+                try:
+                    minutes = int(request.POST.get("minutes") or 30)
+                except Exception:
+                    minutes = 30
+                minutes = max(5, min(240, minutes))
+
+                reason_preset = (request.POST.get("reason_preset") or "").strip()
+                reason_custom = (request.POST.get("reason_custom") or "").strip()
+
+                if reason_preset == "custom":
+                    reason = reason_custom
+                else:
+                    reason = reason_preset
+
+                reason = (reason or "").strip()[:200]
+                if not reason:
+                    messages.error(request, "Support mode requires a reason.")
+                    return redirect("ops:company_detail", company_id=company.id)
+
+                set_support_mode(request, company_id=str(company.id), minutes=minutes, reason=reason)
+                set_active_company_id(request, str(company.id))
+                log_event(request, "ops.support_mode_enabled", company=company)
+                _ops_log("support_mode.enter", summary=f"Support mode enabled ({minutes}m)", meta={"minutes": minutes, "reason": reason})
+                messages.success(request, "Support mode enabled.")
+            return redirect("ops:company_detail", company_id=company.id)
+
+        # Tenant status controls
+        if action == "suspend_company":
+            if not _require_ops_2fa_if_configured(request, label="Suspend company"):
+                return redirect("ops:company_detail", company_id=company.id)
+            if not _require_typed_confirm(request, expected=company.name, label="Suspend company"):
+                return redirect("ops:company_detail", company_id=company.id)
+
+            reason = (request.POST.get("reason") or "").strip()[:255]
+            company.is_suspended = True
+            company.suspended_at = timezone.now()
+            company.suspended_reason = reason
+            company.save(update_fields=["is_suspended", "suspended_at", "suspended_reason"])
+            try:
+                CompanyLifecycleEvent.objects.create(company=company, event_type=LifecycleEventType.COMPANY_SUSPENDED, details={'reason': reason})
+            except Exception:
+                pass
+            _ops_log("company.suspend", summary="Company suspended", meta={"reason": reason})
+            messages.success(request, "Company suspended.")
+            return redirect("ops:company_detail", company_id=company.id)
+
+        if action == "reactivate_company":
+            if not _require_ops_2fa_if_configured(request, label="Reactivate company"):
+                return redirect("ops:company_detail", company_id=company.id)
+            if not _require_typed_confirm(request, expected=company.name, label="Reactivate company"):
+                return redirect("ops:company_detail", company_id=company.id)
+
+            company.is_suspended = False
+            company.suspended_at = None
+            company.suspended_reason = ""
+            company.save(update_fields=["is_suspended", "suspended_at", "suspended_reason"])
+            try:
+                CompanyLifecycleEvent.objects.create(company=company, event_type=LifecycleEventType.COMPANY_REACTIVATED)
+            except Exception:
+                pass
+            _ops_log("company.reactivate", summary="Company reactivated")
+            messages.success(request, "Company reactivated.")
+            return redirect("ops:company_detail", company_id=company.id)
+
+        if action == "force_logout":
+            if not _require_ops_2fa_if_configured(request, label="Force logout"):
+                return redirect("ops:company_detail", company_id=company.id)
+            if not _require_typed_confirm(request, expected="LOGOUT", label="Force logout"):
+                return redirect("ops:company_detail", company_id=company.id)
+
+            now = timezone.now()
+            user_ids = list(employees.values_list("user_id", flat=True))
+            from accounts.models import User
+            User.objects.filter(id__in=user_ids).update(force_logout_at=now)
+            _ops_log("company.force_logout", summary="Forced logout for all company users", meta={"user_count": len(user_ids)})
+            messages.success(request, "Forced logout requested. Users will be required to sign in again.")
+            return redirect("ops:company_detail", company_id=company.id)
+
+        # Per-user controls
+        if action in {"disable_user", "enable_user"}:
+            user_id = (request.POST.get("user_id") or "").strip()
+            try:
+                from accounts.models import User
+                u = User.objects.get(pk=user_id)
+            except Exception:
+                messages.error(request, "User not found.")
+                return redirect("ops:company_detail", company_id=company.id)
+
+            if action == "disable_user":
+                u.is_active = False
+                u.save(update_fields=["is_active"])
+                _ops_log("company.user_disable", summary="User disabled", meta={"user_id": str(u.id), "email": u.email})
+                messages.success(request, "User disabled.")
+            else:
+                u.is_active = True
+                u.save(update_fields=["is_active"])
+                _ops_log("company.user_enable", summary="User enabled", meta={"user_id": str(u.id), "email": u.email})
+                messages.success(request, "User enabled.")
+            return redirect(f"{reverse('ops:company_detail', kwargs={'company_id': company.id})}?tab=users")
+
+        # Billing overrides (app-side; Stripe remains source of truth for actual billing)
+        if action in {"set_comped", "clear_comped"}:
+            if not _require_ops_2fa_if_configured(request, label="Billing override"):
+                return redirect(f"{reverse('ops:company_detail', kwargs={'company_id': company.id})}?tab=billing")
+            if not subscription:
+                messages.error(request, "No subscription row found for this company.")
+                return redirect(f"{reverse('ops:company_detail', kwargs={'company_id': company.id})}?tab=billing")
+
+            if action == "clear_comped":
+                subscription.is_comped = False
+                subscription.comped_until = None
+                subscription.comped_reason = ""
+                subscription.save(update_fields=["is_comped", "comped_until", "comped_reason"])
+                _ops_log("billing.comped_clear", summary="Comped cleared")
+                messages.success(request, "Comped cleared.")
+            else:
+                until = (request.POST.get("comped_until") or "").strip()
+                reason = (request.POST.get("comped_reason") or "").strip()[:200]
+                comped_until = None
+                if until:
+                    try:
+                        comped_until = datetime.fromisoformat(until)
+                        if comped_until.tzinfo is None:
+                            comped_until = timezone.make_aware(comped_until)
+                    except Exception:
+                        comped_until = None
+                subscription.is_comped = True
+                subscription.comped_until = comped_until
+                subscription.comped_reason = reason
+                subscription.save(update_fields=["is_comped", "comped_until", "comped_reason"])
+                _ops_log("billing.comped_set", summary="Comped set", meta={"comped_until": until, "reason": reason})
+                messages.success(request, "Comped updated.")
+            return redirect(f"{reverse('ops:company_detail', kwargs={'company_id': company.id})}?tab=billing")
+
+        if action in {"set_discount", "clear_discount"}:
+            if not subscription:
+                messages.error(request, "No subscription row found for this company.")
+                return redirect(f"{reverse('ops:company_detail', kwargs={'company_id': company.id})}?tab=billing")
+
+            if action == "clear_discount":
+                subscription.discount_percent = 0
+                subscription.discount_ends_at = None
+                subscription.discount_note = ""
+                subscription.save(update_fields=["discount_percent", "discount_ends_at", "discount_note"])
+                _ops_log("billing.discount_clear", summary="Discount cleared")
+                messages.success(request, "Discount cleared.")
+            else:
+                pct_raw = (request.POST.get("discount_percent") or "0").strip()
+                ends_raw = (request.POST.get("discount_ends_at") or "").strip()
+                note = (request.POST.get("discount_note") or "").strip()[:200]
+
+                try:
+                    pct = int(pct_raw)
+                except Exception:
+                    pct = 0
+                pct = max(0, min(100, pct))
+
+                ends_at = None
+                if ends_raw:
+                    try:
+                        ends_at = datetime.fromisoformat(ends_raw)
+                        if ends_at.tzinfo is None:
+                            ends_at = timezone.make_aware(ends_at)
+                    except Exception:
+                        ends_at = None
+
+                subscription.discount_percent = pct
+                subscription.discount_ends_at = ends_at
+                subscription.discount_note = note
+                subscription.save(update_fields=["discount_percent", "discount_ends_at", "discount_note"])
+                _ops_log("billing.discount_set", summary=f"Discount set ({pct}%)", meta={"percent": pct, "ends_at": ends_raw, "note": note})
+                messages.success(request, "Discount updated.")
+            return redirect(f"{reverse('ops:company_detail', kwargs={'company_id': company.id})}?tab=billing")
+
+
+        # Stripe actions (queued + auditable). Stripe remains authority.
+        if action in {"queue_stripe_cancel", "queue_stripe_resume", "queue_stripe_change_plan"}:
+            if not subscription or not subscription.stripe_subscription_id:
+                messages.error(request, "No Stripe subscription is linked to this company.")
+                return redirect(f"{reverse('ops:company_detail', kwargs={'company_id': company.id})}?tab=billing")
+
+            try:
+                from .models import OpsStripeAction, OpsStripeActionType, OpsStripeActionStatus
+                action_type = ""
+                payload: dict = {}
+                if action == "queue_stripe_cancel":
+                    action_type = OpsStripeActionType.CANCEL_AT_PERIOD_END
+                elif action == "queue_stripe_resume":
+                    action_type = OpsStripeActionType.RESUME
+                elif action == "queue_stripe_change_plan":
+                    action_type = OpsStripeActionType.CHANGE_PLAN
+                    payload = {
+                        "plan": (request.POST.get("plan") or "").strip(),
+                        "interval": (request.POST.get("interval") or "").strip(),
+                    }
+
+                OpsStripeAction.objects.create(
+                    company=company,
+                    subscription_id_snapshot=str(subscription.stripe_subscription_id or ""),
+                    action_type=action_type,
+                    status=OpsStripeActionStatus.PENDING,
+                    payload=payload,
+                    requested_by=request.user if request.user.is_authenticated else None,
+                    requested_by_email=getattr(request.user, "email", "") or "",
+                    requires_approval=True,
+                )
+                _ops_log("billing.stripe_action.queue", summary=f"Queued {action_type}", meta={"action_type": action_type, "payload": payload})
+                messages.success(request, "Stripe action queued (pending approval).")
+                return redirect(f"{reverse('ops:company_detail', kwargs={'company_id': company.id})}?tab=billing")
+            except Exception as e:
+                messages.error(request, f"Could not queue action: {e}")
+                return redirect(f"{reverse('ops:company_detail', kwargs={'company_id': company.id})}?tab=billing")
+
+        messages.error(request, "Unknown action.")
+        return redirect("ops:company_detail", company_id=company.id)
+
+    # Tab data
+    ops_actions = []
+    if tab == "audit":
+        try:
+            from .models import OpsActionLog
+            ops_actions = OpsActionLog.objects.filter(company=company).select_related("actor").order_by("-created_at")[:250]
+        except Exception:
+            ops_actions = []
+
+    recent_docs = []
+    recent_payments = []
+    if tab == "activity":
+        try:
+            from documents.models import Document
+            recent_docs = Document.objects.filter(company=company).select_related("client", "project").order_by("-created_at")[:25]
+        except Exception:
+            recent_docs = []
+        try:
+            from payments.models import Payment
+            recent_payments = Payment.objects.filter(company=company).select_related("client", "invoice").order_by("-created_at")[:25]
+        except Exception:
+            recent_payments = []
+
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
 
     return render(
         request,
@@ -1930,8 +3220,114 @@ def ops_company_detail(request: HttpRequest, company_id: int) -> HttpResponse:
             "employees": employees,
             "seats_limit": seats_limit_for(subscription) if subscription else 1,
             "support": get_support_mode(request),
+            "support_for_company": (lambda s: getattr(s, "is_active", False) and str(getattr(s, "company_id", "")) == str(company.id))(get_support_mode(request)),
+            "last_login": last_login,
+            "mrr": mrr,
+            "arr": arr,
+            "recent_webhooks": recent_webhooks,
+            "stripe_actions": stripe_actions,
+            "stripe_actions_pending": stripe_actions_pending,
+            "plan_rows": plan_rows,
+            "tab": tab,
+            "ops_actions": ops_actions,
+            "recent_docs": recent_docs,
+            "recent_payments": recent_payments,
+            "risk": risk,
+            "risk_history": risk_history,
         },
     )
+
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_company_jump(request: HttpRequest, company_id: str, dest: str) -> HttpResponse:
+    """Set active company (support context) then deep-link into the tenant workspace.
+
+    This keeps the Ops Center as the control plane while allowing staff to
+    operate inside the tenant UI in a scoped, auditable manner.
+
+    Requirements:
+    - Staff only
+    - Ops SUPPORT (or SUPEROPS) role
+    - Support mode must be active for this company
+    """
+    from companies.services import set_active_company_id
+
+    # Role gate (customer data access)
+    if not require_ops_role(request, OpsRole.SUPPORT):
+        return redirect('ops:company_detail', company_id=company_id)
+
+    try:
+        company = Company.objects.get(pk=company_id)
+    except Exception:
+        messages.error(request, 'Company not found.')
+        return redirect('ops:companies')
+
+    support = get_support_mode(request)
+    if not getattr(support, 'is_active', False) or str(getattr(support, 'company_id', '')) != str(company.id):
+        messages.warning(request, 'Enable Support Mode for this company to access the tenant workspace.')
+        return redirect('ops:company_detail', company_id=company.id)
+
+    # Set active company for tenant UI routing
+    set_active_company_id(request, str(company.id))
+
+    # Destination routing
+    dest = (dest or '').strip().lower()
+    dest_map = {
+        'dashboard': 'core:app_dashboard',
+        'clients': 'crm:client_list',
+        'projects': 'projects:project_list',
+        'invoices': 'documents:invoice_list',
+        'payments': 'payments:payment_list',
+        'time': 'timetracking:entry_list',
+                'expenses': 'expenses:expense_list',
+    }
+
+    url_name = dest_map.get(dest)
+    if not url_name:
+        # Fallback to app dashboard
+        url_name = 'core:app_dashboard'
+
+    try:
+        target = reverse(url_name)
+    except Exception:
+        target = reverse('core:app_dashboard')
+
+    # Best-effort audit log
+    try:
+        from .models import OpsActionLog
+        OpsActionLog.objects.create(
+            actor=request.user if request.user.is_authenticated else None,
+            actor_email=getattr(request.user, 'email', '')[:254],
+            company=company,
+            action='ops.company_jump',
+            summary=f'Jump to tenant workspace: {dest}',
+            meta={'dest': dest, 'target': target},
+            ip_address=_client_ip(request),
+            user_agent=(request.META.get('HTTP_USER_AGENT') or '')[:255],
+        )
+    except Exception:
+        pass
+
+    return redirect(target)
+
+
+@login_required
+@user_passes_test(_is_staff)
+@require_POST
+def ops_support_mode_clear(request: HttpRequest) -> HttpResponse:
+    """Global 'panic button' to clear support mode."""
+    state = get_support_mode(request)
+    clear_support_mode(request)
+    if state.company_id:
+        try:
+            company = Company.objects.filter(pk=state.company_id).first()
+        except Exception:
+            company = None
+        if company:
+            log_event(request, "ops.support_mode_disabled", company=company)
+    messages.success(request, "Support mode cleared.")
+    return redirect("ops:dashboard")
 
 
 @login_required
@@ -1976,6 +3372,26 @@ def ops_company_timeline(request: HttpRequest, company_id: int) -> HttpResponse:
             "event": wh,
         })
     items.sort(key=lambda x: x["ts"], reverse=True)
+
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
 
     return render(
         request,
@@ -2039,6 +3455,26 @@ def ops_retention(request: HttpRequest) -> HttpResponse:
     # Dry-run counts for display
     results = run_prune_jobs(dry_run=True)
     by_label = {r.label: r for r in results}
+
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
 
     return render(
         request,
@@ -2135,6 +3571,26 @@ def ops_reconciliation(request: HttpRequest) -> HttpResponse:
         except Exception as e:
             messages.error(request, f"Could not run reconciliation: {e}")
 
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
+
     return render(
         request,
         "ops/reconciliation.html",
@@ -2213,6 +3669,26 @@ def ops_drift_tools(request: HttpRequest) -> HttpResponse:
 
     action_form = DriftCompanyActionForm(initial={"company_id": company.id if company else ""})
     link_form = DriftLinkPaymentForm(initial={"company_id": company.id if company else ""})
+
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
 
     return render(
         request,
@@ -2396,12 +3872,17 @@ def healthz(request):
 
 @login_required
 @user_passes_test(_is_staff)
+@login_required
+@user_passes_test(_is_staff)
 def ops_backups(request: HttpRequest) -> HttpResponse:
     """Backups/restore status page.
 
-    Note: EZ360PM does not execute backups. This page provides configuration visibility
-    and a place to record backup runs / restore tests.
+    This page exists to make **recoverability** visible and enforceable:
+    - show the latest backup evidence (BackupRun)
+    - show restore test evidence (BackupRestoreTest)
+    - show the latest automated verification run (OpsCheckRun: backup_verify)
     """
+
     cfg = {
         "backup_enabled": bool(getattr(settings, "BACKUP_ENABLED", False)),
         "backup_retention_days": int(getattr(settings, "BACKUP_RETENTION_DAYS", 14)),
@@ -2409,11 +3890,22 @@ def ops_backups(request: HttpRequest) -> HttpResponse:
         "backup_notify_emails": list(getattr(settings, "BACKUP_NOTIFY_EMAILS", [])),
         "backup_s3_bucket": str(getattr(settings, "BACKUP_S3_BUCKET", "")),
         "backup_s3_prefix": str(getattr(settings, "BACKUP_S3_PREFIX", "")),
+        "verify_max_age_hours": int(getattr(settings, "BACKUP_VERIFY_MAX_AGE_HOURS", 26) or 26),
+        "verify_min_size_bytes": int(getattr(settings, "BACKUP_VERIFY_MIN_SIZE_BYTES", 1024) or 1024),
+        "restore_test_required_days": int(getattr(settings, "BACKUP_RESTORE_TEST_REQUIRED_DAYS", 30) or 30),
     }
 
     backup_runs = BackupRun.objects.all()[:25]
     restore_tests = BackupRestoreTest.objects.all()[:10]
     latest_restore = restore_tests[0] if restore_tests else None
+
+    latest_verify = None
+    try:
+        from ops.models import OpsCheckRun, OpsCheckKind
+
+        latest_verify = OpsCheckRun.objects.filter(kind=OpsCheckKind.BACKUP_VERIFY).order_by("-created_at").first()
+    except Exception:
+        latest_verify = None
 
     return render(
         request,
@@ -2423,6 +3915,7 @@ def ops_backups(request: HttpRequest) -> HttpResponse:
             "backup_runs": backup_runs,
             "restore_tests": restore_tests,
             "latest_restore": latest_restore,
+            "latest_verify": latest_verify,
         },
     )
 
@@ -2518,6 +4011,8 @@ def ops_backup_prune(request: HttpRequest) -> HttpResponse:
 @user_passes_test(_is_staff)
 def ops_releases(request: HttpRequest) -> HttpResponse:
     """Staff release notes + current build metadata."""
+
+    tab = (request.GET.get("tab") or "actions").strip()
 
     q = (request.GET.get("q") or "").strip()
     company_id = (request.GET.get("company_id") or "").strip()
@@ -2668,6 +4163,8 @@ def ops_pii_export(request: HttpRequest) -> HttpResponse:
 
 @staff_only
 def ops_qa_issues(request: HttpRequest) -> HttpResponse:
+    tab = (request.GET.get("tab") or "actions").strip()
+
     q = (request.GET.get("q") or "").strip()
     status = (request.GET.get("status") or "").strip()
     severity = (request.GET.get("severity") or "").strip()
@@ -2831,6 +4328,26 @@ def ops_security(request):
         "open_throttle": OpsAlertEvent.objects.filter(source=OpsAlertSource.THROTTLE, is_resolved=False).count(),
     }
 
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
+
     return render(
         request,
         "ops/security.html",
@@ -2842,3 +4359,766 @@ def ops_security(request):
         },
     )
 
+
+
+
+# =========================
+# Billing Control (Pack 4)
+# =========================
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_billing_actions(request: HttpRequest) -> HttpResponse:
+    if not require_ops_role(request, OpsRole.FINANCE):
+        return redirect('ops:dashboard')
+    """Queued Stripe actions.
+
+    Purpose: provide a professional-grade, auditable control surface for subscription operations.
+    Stripe is the authority; this page records intent + approvals + execution results.
+    """
+    from .models import OpsStripeAction, OpsStripeActionStatus, OpsStripeActionType, OpsCompanyViewPreset
+    from companies.models import Company
+    from billing.models import CompanySubscription
+
+    status = (request.GET.get("status") or "").strip().lower()
+    company_id = (request.GET.get("company") or "").strip()
+    tab = (request.GET.get("tab") or "actions").strip()
+
+    q = (request.GET.get("q") or "").strip()
+
+    qs = OpsStripeAction.objects.select_related("company").all()
+    if status in {s for s, _ in OpsStripeActionStatus.choices}:
+        qs = qs.filter(status=status)
+    if company_id:
+        qs = qs.filter(company_id=company_id)
+    if q:
+        qs = qs.filter(models.Q(company__name__icontains=q) | models.Q(requested_by_email__icontains=q) | models.Q(approved_by_email__icontains=q))
+
+    actions = qs.order_by("-created_at")[:250]
+
+    presets = OpsCompanyViewPreset.objects.filter(is_active=True).order_by("name")
+
+
+    stripe_actions = []
+    stripe_actions_pending = 0
+    if tab in {"billing", "overview"}:
+        try:
+            from .models import OpsStripeAction, OpsStripeActionStatus
+            stripe_actions = OpsStripeAction.objects.filter(company=company).order_by("-created_at")[:25]
+            stripe_actions_pending = OpsStripeAction.objects.filter(company=company, status=OpsStripeActionStatus.PENDING).count()
+        except Exception:
+            stripe_actions = []
+            stripe_actions_pending = 0
+
+    plan_rows = []
+    if tab == "billing":
+        try:
+            plan_rows = list(PlanCatalog.objects.filter(is_active=True).order_by("sort_order", "code"))
+        except Exception:
+            plan_rows = []
+
+
+    return render(
+        request,
+        "ops/billing_actions.html",
+        {
+            "actions": actions,
+            "filters": {"status": status, "company": company_id, "q": q},
+            "presets": presets,
+        },
+    )
+
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_billing_action_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    if not require_ops_role(request, OpsRole.FINANCE):
+        return redirect('ops:dashboard')
+    from .models import OpsStripeAction
+    action = get_object_or_404(OpsStripeAction.objects.select_related("company", "requested_by", "approved_by", "executed_by"), pk=pk)
+    return render(request, "ops/billing_action_detail.html", {"action": action})
+
+
+@login_required
+@user_passes_test(_is_staff)
+@require_POST
+def ops_billing_action_approve(request: HttpRequest, pk: int) -> HttpResponse:
+    if not require_ops_role(request, OpsRole.FINANCE):
+        return redirect('ops:billing_actions')
+    from .models import OpsStripeAction, OpsStripeActionStatus, OpsActionLog
+
+    action = get_object_or_404(OpsStripeAction, pk=pk)
+    cfg = SiteConfig.get_solo()
+    if getattr(cfg, "ops_two_person_approval_enabled", False) and action.requested_by_id and action.requested_by_id == request.user.id:
+        messages.error(request, "Two-person approval is enabled: the requester cannot approve this Stripe action.")
+        return redirect("ops:billing_action_detail", pk=action.id)
+    if not _require_ops_2fa_if_configured(request, label="Approve Stripe action"):
+        return redirect("ops:billing_action_detail", pk=action.id)
+    if not _require_typed_confirm(request, expected=action.company.name, label="Approve Stripe action"):
+        return redirect("ops:billing_action_detail", pk=action.id)
+
+
+    if action.status != OpsStripeActionStatus.PENDING:
+        messages.info(request, "This action is not pending.")
+        return redirect("ops:billing_action_detail", pk=action.id)
+
+    action.status = OpsStripeActionStatus.APPROVED
+    action.approved_at = timezone.now()
+    action.approved_by = request.user
+    action.approved_by_email = getattr(request.user, "email", "") or ""
+    action.save(update_fields=["status", "approved_at", "approved_by", "approved_by_email", "updated_at"])
+
+    # Audit
+    try:
+        OpsActionLog.objects.create(
+            actor=request.user,
+            actor_email=getattr(request.user, "email", "") or "",
+            company=action.company,
+            action="billing.stripe_action.approve",
+            summary=f"Approved {action.action_type}",
+            meta={"ops_stripe_action_id": action.id, "action_type": action.action_type},
+            ip_address=_client_ip(request),
+            user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:255],
+        )
+    except Exception:
+        pass
+
+    messages.success(request, "Action approved.")
+    return redirect("ops:billing_action_detail", pk=action.id)
+
+
+def _stripe_idempotency_key(action_id: int) -> str:
+    return f"ez360pm_ops_{action_id}"
+
+
+@login_required
+@user_passes_test(_is_staff)
+@require_POST
+def ops_billing_action_run(request: HttpRequest, pk: int) -> HttpResponse:
+    if not require_ops_role(request, OpsRole.FINANCE):
+        return redirect('ops:billing_actions')
+    """Execute a queued Stripe action immediately."""
+    from .models import OpsStripeAction, OpsStripeActionStatus, OpsStripeActionType, OpsActionLog
+    from billing.stripe_service import stripe_client, get_base_plan_price_id, fetch_and_sync_subscription_from_stripe
+    from billing.services import ensure_company_subscription
+
+    action = get_object_or_404(OpsStripeAction, pk=pk)
+    cfg = SiteConfig.get_solo()
+    if getattr(cfg, "ops_two_person_approval_enabled", False) and action.requested_by_id and action.requested_by_id == request.user.id:
+        messages.error(request, "Two-person approval is enabled: the requester cannot run this Stripe action.")
+        return redirect("ops:billing_action_detail", pk=action.id)
+    if not _require_ops_2fa_if_configured(request, label="Run Stripe action"):
+        return redirect("ops:billing_action_detail", pk=action.id)
+    if not _require_typed_confirm(request, expected=action.company.name, label="Run Stripe action"):
+        return redirect("ops:billing_action_detail", pk=action.id)
+
+
+    if action.status not in {OpsStripeActionStatus.PENDING, OpsStripeActionStatus.APPROVED}:
+        messages.info(request, "This action is not runnable.")
+        return redirect("ops:billing_action_detail", pk=action.id)
+
+    if action.requires_approval and action.status != OpsStripeActionStatus.APPROVED:
+        messages.error(request, "Approval required before running this action.")
+        return redirect("ops:billing_action_detail", pk=action.id)
+
+    sub = ensure_company_subscription(action.company)
+    if not sub.stripe_subscription_id:
+        messages.error(request, "Company has no Stripe subscription id.")
+        return redirect("ops:billing_action_detail", pk=action.id)
+
+    # Mark running
+    action.status = OpsStripeActionStatus.RUNNING
+    action.executed_at = timezone.now()
+    action.executed_by = request.user
+    action.executed_by_email = getattr(request.user, "email", "") or ""
+    action.subscription_id_snapshot = str(sub.stripe_subscription_id or "")
+    action.idempotency_key = _stripe_idempotency_key(action.id)
+    action.error = ""
+    action.save(update_fields=["status", "executed_at", "executed_by", "executed_by_email", "subscription_id_snapshot", "idempotency_key", "error", "updated_at"])
+
+    stripe = stripe_client()
+
+    try:
+        if action.action_type == OpsStripeActionType.CANCEL_AT_PERIOD_END:
+            stripe.Subscription.modify(
+                sub.stripe_subscription_id,
+                cancel_at_period_end=True,
+                idempotency_key=action.idempotency_key,
+            )
+
+        elif action.action_type == OpsStripeActionType.RESUME:
+            stripe.Subscription.modify(
+                sub.stripe_subscription_id,
+                cancel_at_period_end=False,
+                idempotency_key=action.idempotency_key,
+            )
+
+        elif action.action_type == OpsStripeActionType.CHANGE_PLAN:
+            plan = str((action.payload or {}).get("plan") or "").strip()
+            interval = str((action.payload or {}).get("interval") or "").strip()
+
+            price_id = get_base_plan_price_id(plan, interval)
+            if not price_id:
+                raise RuntimeError("Could not resolve Stripe price_id for requested plan/interval.")
+
+            stripe_sub = stripe.Subscription.retrieve(sub.stripe_subscription_id)
+            items = (stripe_sub.get("items") or {}).get("data") or []
+            if not items:
+                raise RuntimeError("Stripe subscription has no items to update.")
+
+            # Best-effort: update the first subscription item (base plan item).
+            item_id = str(items[0].get("id") or "")
+            if not item_id:
+                raise RuntimeError("Stripe subscription item id missing.")
+
+            stripe.Subscription.modify(
+                sub.stripe_subscription_id,
+                items=[{"id": item_id, "price": price_id}],
+                proration_behavior="create_prorations",
+                idempotency_key=action.idempotency_key,
+            )
+
+        else:
+            raise RuntimeError("Unsupported action type in Pack 4.")
+
+        # Sync local subscription after mutation
+        try:
+            fetch_and_sync_subscription_from_stripe(company=action.company)
+        except Exception:
+            # Do not fail the action if sync fails; it can be resynced separately.
+            pass
+
+        action.status = OpsStripeActionStatus.SUCCEEDED
+        action.save(update_fields=["status", "updated_at"])
+
+        try:
+            OpsActionLog.objects.create(
+                actor=request.user,
+                actor_email=getattr(request.user, "email", "") or "",
+                company=action.company,
+                action="billing.stripe_action.run",
+                summary=f"Executed {action.action_type}",
+                meta={"ops_stripe_action_id": action.id, "action_type": action.action_type},
+                ip_address=_client_ip(request),
+                user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:255],
+            )
+        except Exception:
+            pass
+
+        messages.success(request, "Stripe action executed.")
+        return redirect("ops:billing_action_detail", pk=action.id)
+
+    except Exception as e:
+        action.status = OpsStripeActionStatus.FAILED
+        action.error = str(e)[:2000]
+        action.save(update_fields=["status", "error", "updated_at"])
+        messages.error(request, f"Stripe action failed: {e}")
+        return redirect("ops:billing_action_detail", pk=action.id)
+
+
+@login_required
+@user_passes_test(_is_staff)
+@require_POST
+def ops_billing_action_cancel(request: HttpRequest, pk: int) -> HttpResponse:
+    if not require_ops_role(request, OpsRole.FINANCE):
+        return redirect('ops:billing_actions')
+    from .models import OpsStripeAction, OpsStripeActionStatus, OpsActionLog
+
+    action = get_object_or_404(OpsStripeAction, pk=pk)
+    if not _require_ops_2fa_if_configured(request, label="Cancel Stripe action"):
+        return redirect("ops:billing_action_detail", pk=action.id)
+    if not _require_typed_confirm(request, expected=action.company.name, label="Cancel Stripe action"):
+        return redirect("ops:billing_action_detail", pk=action.id)
+    if action.status not in {OpsStripeActionStatus.PENDING, OpsStripeActionStatus.APPROVED}:
+        messages.info(request, "This action cannot be canceled.")
+        return redirect("ops:billing_action_detail", pk=action.id)
+
+    action.status = OpsStripeActionStatus.CANCELED
+    action.save(update_fields=["status", "updated_at"])
+
+    try:
+        OpsActionLog.objects.create(
+            actor=request.user,
+            actor_email=getattr(request.user, "email", "") or "",
+            company=action.company,
+            action="billing.stripe_action.cancel",
+            summary=f"Canceled {action.action_type}",
+            meta={"ops_stripe_action_id": action.id, "action_type": action.action_type},
+            ip_address=_client_ip(request),
+            user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:255],
+        )
+    except Exception:
+        pass
+
+    messages.success(request, "Action canceled.")
+    return redirect("ops:billing_actions")
+
+
+# =========================
+# Ops Access Control (Pack 13)
+# =========================
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_access(request: HttpRequest) -> HttpResponse:
+    """Manage Ops Center role assignments (enterprise governance)."""
+    from accounts.models import User
+    from .models import OpsRoleAssignment, OpsRole
+
+    if not require_ops_role(request, OpsRole.SUPEROPS):
+        return redirect("ops:dashboard")
+
+    assignments = (
+        OpsRoleAssignment.objects.select_related("user", "granted_by")
+        .order_by("role", "user__email")
+    )
+
+    from .forms import OpsRoleGrantForm
+
+    if request.method == "POST":
+        form = OpsRoleGrantForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data["email"].strip().lower()
+            role = form.cleaned_data["role"]
+            notes = (form.cleaned_data.get("notes") or "").strip()[:240]
+
+            try:
+                u = User.objects.get(email__iexact=email)
+            except User.DoesNotExist:
+                messages.error(request, "No user found with that email.")
+                return redirect("ops:access")
+
+            if not u.is_staff:
+                messages.error(request, "User must be staff to receive ops roles.")
+                return redirect("ops:access")
+
+            obj, created = OpsRoleAssignment.objects.get_or_create(
+                user=u,
+                role=role,
+                defaults={
+                    "granted_by": request.user,
+                    "granted_by_email": getattr(request.user, "email", "") or "",
+                    "notes": notes,
+                },
+            )
+            if not created:
+                # Update notes/granting metadata
+                obj.granted_by = request.user
+                obj.granted_by_email = getattr(request.user, "email", "") or ""
+                obj.notes = notes
+                obj.save(update_fields=["granted_by", "granted_by_email", "notes"])  # created_at stays original
+
+            try:
+                from .models import OpsActionLog
+                OpsActionLog.objects.create(
+                    actor=request.user,
+                    actor_email=getattr(request.user, "email", "") or "",
+                    company=None,
+                    action="ops.access.grant",
+                    summary=f"Granted {role} to {u.email}",
+                    meta={"user_id": str(u.id), "role": role},
+                    ip_address=_client_ip(request),
+                    user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:255],
+                )
+            except Exception:
+                pass
+
+            messages.success(request, "Role assignment saved.")
+            return redirect("ops:access")
+    else:
+        form = OpsRoleGrantForm()
+
+    return render(
+        request,
+        "ops/access.html",
+        {
+            "assignments": assignments,
+            "form": form,
+            "roles": OpsRole,
+        },
+    )
+
+
+@login_required
+@user_passes_test(_is_staff)
+@require_POST
+def ops_access_revoke(request: HttpRequest, pk: int) -> HttpResponse:
+    from .models import OpsRoleAssignment, OpsRole
+
+    if not require_ops_role(request, OpsRole.SUPEROPS):
+        return redirect("ops:dashboard")
+
+    assignment = get_object_or_404(OpsRoleAssignment, pk=pk)
+    target_email = getattr(assignment.user, "email", "")
+    role = assignment.role
+    assignment.delete()
+
+    try:
+        from .models import OpsActionLog
+        OpsActionLog.objects.create(
+            actor=request.user,
+            actor_email=getattr(request.user, "email", "") or "",
+            company=None,
+            action="ops.access.revoke",
+            summary=f"Revoked {role} from {target_email}",
+            meta={"role": role, "target_email": target_email},
+            ip_address=_client_ip(request),
+            user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:255],
+        )
+    except Exception:
+        pass
+
+    messages.success(request, "Role assignment revoked.")
+    return redirect("ops:access")
+
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_activity(request: HttpRequest) -> HttpResponse:
+    """Executive activity feed.
+
+    This is the operator's "what just happened" view across:
+    - OpsActionLog (staff actions)
+    - OpsCheckRun (readiness/smoke evidence)
+
+    We keep it intentionally simple + fast (server-rendered, filterable, exportable).
+    """
+
+    if not require_ops_role(request, OpsRole.VIEWER):
+        return redirect("core:dashboard")
+
+    from datetime import timedelta
+    from django.core.paginator import Paginator
+    from django.utils import timezone
+
+    from .models import OpsActionLog, OpsCheckRun
+
+    tab = (request.GET.get("tab") or "actions").strip()  # actions | checks | stripe
+    tab = (request.GET.get("tab") or "actions").strip()
+
+    q = (request.GET.get("q") or "").strip()
+    company_id = (request.GET.get("company_id") or "").strip()
+    actor_email = (request.GET.get("actor") or "").strip()
+    action = (request.GET.get("action") or "").strip()
+    status = (request.GET.get("status") or "").strip()
+    action_type = (request.GET.get("action_type") or "").strip()
+    kind = (request.GET.get("kind") or "").strip()
+    ok = (request.GET.get("ok") or "").strip()  # true | false
+
+    try:
+        days = int((request.GET.get("days") or "30").strip())
+    except ValueError:
+        days = 30
+    days = max(1, min(days, 365))
+    since = timezone.now() - timedelta(days=days)
+
+    context: dict = {
+        "tab": tab,
+        "q": q,
+        "company_id": company_id,
+        "actor": actor_email,
+        "action": action,
+        "kind": kind,
+        "ok": ok,
+        "days": days,
+    }
+
+    if tab == "checks":
+        runs = OpsCheckRun.objects.select_related("company").filter(created_at__gte=since)
+        if company_id:
+            runs = runs.filter(company_id=company_id)
+        if kind:
+            runs = runs.filter(kind=kind)
+        if ok.lower() in {"true", "false"}:
+            runs = runs.filter(is_ok=(ok.lower() == "true"))
+        if q:
+            runs = runs.filter(
+                Q(created_by_email__icontains=q)
+                | Q(output_text__icontains=q)
+                | Q(company__name__icontains=q)
+            )
+
+        paginator = Paginator(runs.order_by("-created_at"), 50)
+        page_obj = paginator.get_page(request.GET.get("page"))
+        context["checks"] = page_obj
+        context["checks_total"] = runs.count()
+    elif tab == "stripe":
+        from django.core.paginator import Paginator
+        from .models import OpsStripeAction
+
+        qs = OpsStripeAction.objects.select_related("company").filter(created_at__gte=since)
+        if company_id:
+            qs = qs.filter(company_id=company_id)
+        if status:
+            qs = qs.filter(status__icontains=status)
+        if action_type:
+            qs = qs.filter(action_type__icontains=action_type)
+        if q:
+            qs = qs.filter(
+                Q(company__name__icontains=q)
+                | Q(requested_by_email__icontains=q)
+                | Q(action_type__icontains=q)
+                | Q(status__icontains=q)
+            )
+
+        paginator = Paginator(qs.order_by("-created_at"), 50)
+        page_obj = paginator.get_page(request.GET.get("page"))
+        context["stripe_actions"] = page_obj
+        context["stripe_total"] = qs.count()
+
+    else:
+        logs = OpsActionLog.objects.select_related("company", "actor").filter(created_at__gte=since)
+        if company_id:
+            logs = logs.filter(company_id=company_id)
+        if actor_email:
+            logs = logs.filter(actor_email__icontains=actor_email)
+        if action:
+            logs = logs.filter(action__icontains=action)
+        if q:
+            logs = logs.filter(
+                Q(action__icontains=q)
+                | Q(summary__icontains=q)
+                | Q(actor_email__icontains=q)
+                | Q(company__name__icontains=q)
+            )
+
+        paginator = Paginator(logs.order_by("-created_at"), 50)
+        page_obj = paginator.get_page(request.GET.get("page"))
+        context["actions"] = page_obj
+        context["actions_total"] = logs.count()
+
+    return render(request, "ops/activity.html", context)
+
+
+@login_required
+@user_passes_test(_is_staff)
+def ops_activity_export_csv(request: HttpRequest) -> HttpResponse:
+    """CSV export for Ops activity (filtered)."""
+
+    if not require_ops_role(request, OpsRole.VIEWER):
+        return redirect("core:dashboard")
+
+    from datetime import timedelta
+    from django.utils import timezone
+
+    from .models import OpsActionLog
+
+    tab = (request.GET.get("tab") or "actions").strip()
+
+    q = (request.GET.get("q") or "").strip()
+    company_id = (request.GET.get("company_id") or "").strip()
+    actor_email = (request.GET.get("actor") or "").strip()
+    action = (request.GET.get("action") or "").strip()
+    status = (request.GET.get("status") or "").strip()
+    action_type = (request.GET.get("action_type") or "").strip()
+    try:
+        days = int((request.GET.get("days") or "30").strip())
+    except ValueError:
+        days = 30
+    days = max(1, min(days, 365))
+    since = timezone.now() - timedelta(days=days)
+
+    
+    if tab == "stripe":
+        from .models import OpsStripeAction
+        qs = OpsStripeAction.objects.select_related("company").filter(created_at__gte=since)
+        if company_id:
+            qs = qs.filter(company_id=company_id)
+        if status:
+            qs = qs.filter(status__icontains=status)
+        if action_type:
+            qs = qs.filter(action_type__icontains=action_type)
+        if q:
+            qs = qs.filter(
+                Q(company__name__icontains=q)
+                | Q(requested_by_email__icontains=q)
+                | Q(action_type__icontains=q)
+                | Q(status__icontains=q)
+            )
+
+        resp = HttpResponse(content_type="text/csv")
+        resp["Content-Disposition"] = 'attachment; filename="ops_stripe_actions.csv"'
+        w = csv.writer(resp)
+        w.writerow(["created_at", "company", "subscription_id", "action_type", "status", "requested_by", "approved_by", "executed_by", "error"])
+        for row in qs.order_by("-created_at")[:50000]:
+            w.writerow([
+                row.created_at.isoformat(),
+                getattr(row.company, "name", ""),
+                row.subscription_id_snapshot,
+                row.action_type,
+                row.status,
+                row.requested_by_email,
+                row.approved_by_email,
+                row.executed_by_email,
+                (row.error or "")[:2000],
+            ])
+        return resp
+
+    logs = OpsActionLog.objects.select_related("company").filter(created_at__gte=since)
+    if company_id:
+        logs = logs.filter(company_id=company_id)
+    if actor_email:
+        logs = logs.filter(actor_email__icontains=actor_email)
+    if action:
+        logs = logs.filter(action__icontains=action)
+    if q:
+        logs = logs.filter(
+            Q(action__icontains=q)
+            | Q(summary__icontains=q)
+            | Q(actor_email__icontains=q)
+            | Q(company__name__icontains=q)
+        )
+
+    resp = HttpResponse(content_type="text/csv")
+    resp["Content-Disposition"] = 'attachment; filename="ops_activity.csv"'
+    w = csv.writer(resp)
+    w.writerow(["created_at", "actor_email", "company", "action", "summary", "ip", "user_agent"])
+    for row in logs.order_by("-created_at")[:50000]:
+        w.writerow([
+            row.created_at.isoformat(),
+            row.actor_email,
+            getattr(row.company, "name", ""),
+            row.action,
+            row.summary,
+            row.ip_address,
+            row.user_agent,
+        ])
+    return resp
+
+
+# --------------------------------------------------------------------
+# Executive Ops Tools (QuickBooks-style operator console actions)
+# --------------------------------------------------------------------
+
+@login_required
+@user_passes_test(_is_staff)
+@require_POST
+def ops_run_snapshot_now(request: HttpRequest) -> HttpResponse:
+    """Run the daily platform revenue snapshot command on-demand.
+
+    Note: In production this is typically executed via cron. This button is for
+    operator triage / verification.
+    """
+    if not require_ops_role(request, OpsRole.SUPEROPS):
+        return redirect(request.META.get("HTTP_REFERER") or "ops:dashboard")
+
+    try:
+        call_command("ez360_snapshot_platform_revenue")
+        log_event(
+            request,
+            company=None,
+            action="ops.run_snapshot_now",
+            summary="Ran platform revenue snapshot on-demand.",
+            meta={},
+        )
+        messages.success(request, "Revenue snapshot completed.")
+    except Exception as e:
+        log_event(
+            request,
+            company=None,
+            action="ops.run_snapshot_now_failed",
+            summary="Revenue snapshot failed.",
+            meta={"error": str(e)},
+        )
+        messages.error(request, f"Revenue snapshot failed: {e}")
+    return redirect(request.META.get("HTTP_REFERER") or "ops:dashboard")
+
+
+@login_required
+@user_passes_test(_is_staff)
+@require_POST
+def ops_run_desync_scan(request: HttpRequest) -> HttpResponse:
+    """Run the Stripe mirror staleness/desync scan on-demand."""
+    if not require_ops_role(request, OpsRole.SUPEROPS):
+        return redirect(request.META.get("HTTP_REFERER") or "ops:dashboard")
+
+    hours = 0
+    try:
+        hours = int((request.POST.get("hours") or "0").strip() or "0")
+    except Exception:
+        hours = 0
+
+    try:
+        call_command("ez360_stripe_desync_scan", hours=hours)
+        log_event(
+            request,
+            company=None,
+            action="ops.run_desync_scan",
+            summary="Ran Stripe desync scan on-demand.",
+            meta={"hours": hours},
+        )
+        messages.success(request, "Stripe desync scan completed.")
+    except Exception as e:
+        log_event(
+            request,
+            company=None,
+            action="ops.run_desync_scan_failed",
+            summary="Stripe desync scan failed.",
+            meta={"hours": hours, "error": str(e)},
+        )
+        messages.error(request, f"Stripe desync scan failed: {e}")
+
+    return redirect(request.META.get("HTTP_REFERER") or "ops:dashboard")
+
+
+@login_required
+def ops_email_health(request: HttpRequest) -> HttpResponse:
+    """Outbound email delivery observability dashboard."""
+    if not require_ops_role(request, OpsRole.VIEWER):
+        return redirect('core:dashboard')
+
+    now = timezone.now()
+    start_24h = now - timedelta(days=1)
+    start_7d = now - timedelta(days=7)
+
+    qs = OutboundEmailLog.objects.all()
+
+    sent_24h = qs.filter(created_at__gte=start_24h, status=OutboundEmailStatus.SENT).count()
+    fail_24h = qs.filter(created_at__gte=start_24h, status=OutboundEmailStatus.ERROR).count()
+    total_24h = sent_24h + fail_24h
+    fail_rate_24h = (fail_24h / total_24h) if total_24h else 0.0
+    fail_rate_24h_pct = fail_rate_24h * 100.0
+
+    sent_7d = qs.filter(created_at__gte=start_7d, status=OutboundEmailStatus.SENT).count()
+    fail_7d = qs.filter(created_at__gte=start_7d, status=OutboundEmailStatus.ERROR).count()
+
+    last_error_row = qs.filter(status=OutboundEmailStatus.ERROR).order_by('-created_at').first()
+    last_error_at = last_error_row.created_at if last_error_row else None
+    last_error_msg = (last_error_row.error_message[:500] if last_error_row else "")
+
+    failures_by_template = list(
+        qs.filter(created_at__gte=start_7d, status=OutboundEmailStatus.ERROR)
+        .values('template_type')
+        .annotate(count=Count('id'))
+        .order_by('-count')[:12]
+    )
+
+    recent_failures = list(
+        qs.filter(created_at__gte=start_7d, status=OutboundEmailStatus.ERROR)
+        .select_related('company')
+        .order_by('-created_at')[:50]
+    )
+
+    # Simple executive health color
+    if fail_24h == 0:
+        health = 'green'
+    elif fail_rate_24h >= 0.20:
+        health = 'red'
+    else:
+        health = 'yellow'
+
+    ctx = {
+        'now': now,
+        'health': health,
+        'sent_24h': sent_24h,
+        'fail_24h': fail_24h,
+        'total_24h': total_24h,
+        'fail_rate_24h_pct': fail_rate_24h_pct,
+        'sent_7d': sent_7d,
+        'fail_7d': fail_7d,
+        'last_error_at': last_error_at,
+        'last_error_msg': last_error_msg,
+        'failures_by_template': failures_by_template,
+        'recent_failures': recent_failures,
+    }
+    return render(request, 'ops/email_health.html', ctx)

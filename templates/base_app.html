@@ -23,6 +23,34 @@
     <!-- NAVBAR (top, fixed) -->
     {% include "partials/navbar_app.html" %}
 
+    {% if support_mode and support_mode.is_active %}
+      <div class="container-fluid px-3 px-lg-4 mt-2">
+        <div class="alert alert-warning d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-0" role="alert" style="border-left: 4px solid var(--bs-warning);">
+          <div class="small">
+            <div class="fw-semibold">
+              <i class="bi bi-shield-exclamation me-1"></i>
+              Support Mode Active
+            </div>
+            <div class="text-muted">
+              Company: {% if support_mode_company %}<span class="fw-semibold">{{ support_mode_company.name }}</span>{% else %}<span class="fw-semibold">(unknown)</span>{% endif %} (<span class="font-monospace">{{ support_mode.company_id }}</span>) <a class="ms-2" href="{% url 'ops:company_detail' support_mode.company_id %}?tab=overview">Company 360</a>
+              {% if support_mode.expires_at %}
+                • Expires: {{ support_mode.expires_at|date:"M j, Y" }} {{ support_mode.expires_at|time:"g:i A" }}
+              {% endif %}
+              {% if support_mode.reason %}
+                • Reason: {{ support_mode.reason }}
+              {% endif %}
+            </div>
+          </div>
+          <form method="post" action="{% url 'ops:support_mode_clear' %}" class="m-0">
+            {% csrf_token %}
+            <button class="btn btn-sm btn-outline-dark" type="submit">
+              Exit Support Mode
+            </button>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+
     <!-- APP ROW: sidebar + centered content -->
     <div class="app-shell">
       {% include "partials/sidebar_app.html" %}

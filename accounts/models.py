@@ -66,6 +66,10 @@ class User(AbstractUser):
     email_verified = models.BooleanField(default=False)
     email_verified_at = models.DateTimeField(null=True, blank=True)
 
+    # Ops control: force all sessions to re-authenticate.
+    # When set, any session whose auth time is older than this timestamp is logged out.
+    force_logout_at = models.DateTimeField(null=True, blank=True)
+
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS: list[str] = []
 

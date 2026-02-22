@@ -13,6 +13,7 @@ from .models import (
     ReleaseNote,
     UserPresence,
     OpsEmailTest,
+    OutboundEmailLog,
     OpsProbeEvent,
     SiteConfig,
     QAIssue,
@@ -83,6 +84,15 @@ class OpsEmailTestAdmin(admin.ModelAdmin):
     list_display = ("created_at", "status", "to_email", "subject", "backend", "latency_ms")
     list_filter = ("status", "created_at")
     search_fields = ("to_email", "subject", "error", "initiated_by_email")
+    readonly_fields = ("created_at",)
+    ordering = ("-created_at",)
+
+
+@admin.register(OutboundEmailLog)
+class OutboundEmailLogAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "status", "to_email", "company", "template_type")
+    list_filter = ("status", "created_at", "template_type", "company")
+    search_fields = ("to_email", "subject", "template_type", "company__name", "error_message")
     readonly_fields = ("created_at",)
     ordering = ("-created_at",)
 

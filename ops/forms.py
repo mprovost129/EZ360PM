@@ -178,6 +178,27 @@ class OpsAlertRoutingForm(forms.ModelForm):
             "maintenance_message",
             "maintenance_allow_staff",
             "billing_trial_days",
+
+            # Stripe mirror health / drift detection
+            "stripe_mirror_stale_after_hours",
+            "stripe_mirror_stale_alert_level",
+
+            # Ops governance
+            "ops_require_2fa_for_critical_actions",
+            "ops_two_person_approval_enabled",
+
+            # Tenant risk scoring
+            "risk_payment_failed_window_days",
+            "risk_trial_ends_within_days",
+            "risk_weight_past_due",
+            "risk_weight_mirror_stale",
+            "risk_weight_payment_failed",
+            "risk_weight_payment_failed_sub_only",
+            "risk_weight_canceling",
+            "risk_weight_trial_ends_soon",
+            "risk_level_medium_threshold",
+            "risk_level_high_threshold",
+
             "ops_notify_email_enabled",
             "ops_notify_email_recipients",
             "ops_notify_on_company_signup",
@@ -199,6 +220,22 @@ class OpsAlertRoutingForm(forms.ModelForm):
             "maintenance_allow_staff": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "maintenance_message": forms.Textarea(attrs={"class": "form-control", "rows": 4, "placeholder": "Optional message shown during maintenance…"}),
             "billing_trial_days": forms.NumberInput(attrs={"class": "form-control", "min": "0", "max": "365"}),
+
+            "stripe_mirror_stale_after_hours": forms.NumberInput(attrs={"class": "form-control", "min": "1", "max": "720"}),
+            "stripe_mirror_stale_alert_level": forms.Select(attrs={"class": "form-select"}),
+            "ops_require_2fa_for_critical_actions": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "ops_two_person_approval_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "risk_payment_failed_window_days": forms.NumberInput(attrs={"class": "form-control", "min": "1", "max": "90"}),
+            "risk_trial_ends_within_days": forms.NumberInput(attrs={"class": "form-control", "min": "1", "max": "30"}),
+            "risk_weight_past_due": forms.NumberInput(attrs={"class": "form-control", "min": "0", "max": "100"}),
+            "risk_weight_mirror_stale": forms.NumberInput(attrs={"class": "form-control", "min": "0", "max": "100"}),
+            "risk_weight_payment_failed": forms.NumberInput(attrs={"class": "form-control", "min": "0", "max": "100"}),
+            "risk_weight_payment_failed_sub_only": forms.NumberInput(attrs={"class": "form-control", "min": "0", "max": "100"}),
+            "risk_weight_canceling": forms.NumberInput(attrs={"class": "form-control", "min": "0", "max": "100"}),
+            "risk_weight_trial_ends_soon": forms.NumberInput(attrs={"class": "form-control", "min": "0", "max": "100"}),
+            "risk_level_medium_threshold": forms.NumberInput(attrs={"class": "form-control", "min": "0", "max": "100"}),
+            "risk_level_high_threshold": forms.NumberInput(attrs={"class": "form-control", "min": "0", "max": "100"}),
+
             "ops_notify_email_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "ops_notify_email_recipients": forms.Textarea(attrs={"class": "form-control", "rows": 2, "placeholder": "ops@example.com, admin@example.com"}),
             "ops_notify_on_company_signup": forms.CheckboxInput(attrs={"class": "form-check-input"}),
@@ -262,3 +299,24 @@ class SeatAddonConfigForm(forms.ModelForm):
             "stripe_monthly_price_id": forms.TextInput(attrs={"class": "form-control", "placeholder": "price_..."}),
             "stripe_annual_price_id": forms.TextInput(attrs={"class": "form-control", "placeholder": "price_..."}),
         }
+
+class OpsRoleGrantForm(forms.Form):
+    email = forms.EmailField(
+        required=True,
+        widget=forms.EmailInput(attrs={"class": "form-control", "placeholder": "staff@ez360pm.com"}),
+        help_text="Email of an existing staff user.",
+    )
+    role = forms.ChoiceField(
+        required=True,
+        choices=[],
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    notes = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Optional notes"}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        from .models import OpsRole
+        super().__init__(*args, **kwargs)
+        self.fields["role"].choices = OpsRole.choices

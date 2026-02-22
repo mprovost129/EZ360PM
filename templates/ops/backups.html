@@ -1,22 +1,12 @@
-{% extends "base_app.html" %}
-{% load static %}
+{% extends "ops/_base.html" %}
 {% block title %}Backups · Ops · EZ360PM{% endblock %}
 
-{% block content %}
-<div class="container-fluid" style="max-width: 1200px;">
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-    <div>
-      <h1 class="h4 mb-1">Backups</h1>
-      <div class="text-secondary small">Configuration visibility + records of backup runs and restore tests.</div>
-    </div>
-    <div class="d-flex gap-2">
-      <a class="btn btn-outline-dark btn-sm" href="{% url 'ops:dashboard' %}">
-        <i class="bi bi-arrow-left me-1"></i>Ops Dashboard
-      </a>
-    </div>
-  </div>
+{% block ops_title %}Backups{% endblock %}
+{% block ops_subtitle %}<div class="ez-ops-muted small">Backup status, recent runs, and restore testing.</div>{% endblock %}
+{% block ops_actions %}<a class="btn btn-outline-dark ez-ops-btn" href="{% url 'ops:backup_run_now' %}"><i class="bi bi-play-fill me-1"></i>Run now</a>{% endblock %}
 
-  <div class="row g-3 mb-3">
+{% block ops_content %}
+<div class="row g-3 mb-3">
     <div class="col-12 col-lg-6">
       <div class="card shadow-sm">
         <div class="card-body">
@@ -112,6 +102,57 @@
     </div>
 
   </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="fw-semibold">Automated backup verification</div>
+            {% if latest_verify %}
+              {% if latest_verify.is_ok %}
+                <span class="badge text-bg-success">OK</span>
+              {% else %}
+                <span class="badge text-bg-danger">FAILED</span>
+              {% endif %}
+            {% else %}
+              <span class="badge text-bg-secondary">No runs yet</span>
+            {% endif %}
+          </div>
+          <hr class="my-3">
+
+          <div class="small text-secondary mb-2">
+            This is the executive gate: a daily job verifies a **recent** backup exists and performs a best-effort integrity check
+            (disk readability or S3 object HEAD).
+          </div>
+
+          <div class="small">
+            <div class="d-flex justify-content-between"><span class="text-secondary">Max age</span><span class="fw-semibold">{{ cfg.verify_max_age_hours }}h</span></div>
+            <div class="d-flex justify-content-between"><span class="text-secondary">Min size</span><span class="fw-semibold">{{ cfg.verify_min_size_bytes }} bytes</span></div>
+            <div class="d-flex justify-content-between"><span class="text-secondary">Restore test window</span><span class="fw-semibold">{{ cfg.restore_test_required_days }}d</span></div>
+          </div>
+
+          {% if latest_verify %}
+            <div class="mt-3 small">
+              <div class="d-flex justify-content-between"><span class="text-secondary">Last run</span><span class="fw-semibold">{{ latest_verify.created_at }}</span></div>
+              <div class="d-flex justify-content-between"><span class="text-secondary">Duration</span><span class="fw-semibold">{{ latest_verify.duration_ms }} ms</span></div>
+            </div>
+            <details class="mt-3">
+              <summary class="small fw-semibold">Show verification output</summary>
+              <pre class="mt-2 mb-0"><code>{{ latest_verify.output_text }}</code></pre>
+            </details>
+          {% else %}
+            <div class="mt-2 text-secondary small">No verification runs recorded yet. Wire this command into your daily scheduler.</div>
+          {% endif %}
+
+          <div class="mt-3">
+            <div class="small fw-semibold mb-1">Verify backups (daily)</div>
+            <pre class="mb-0"><code>python manage.py ez360_verify_backups</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   
   <div class="row g-3 mb-3">
     <div class="col-12">
@@ -130,6 +171,10 @@
             <div class="col-12 col-lg-6">
               <div class="small fw-semibold mb-1">Retention prune</div>
               <pre class="mb-0"><code>python manage.py ez360_prune_backups --storage {{ cfg.backup_storage }}</code></pre>
+            </div>
+            <div class="col-12 col-lg-6">
+              <div class="small fw-semibold mb-1">Daily verification</div>
+              <pre class="mb-0"><code>python manage.py ez360_verify_backups</code></pre>
             </div>
             <div class="col-12">
               <div class="small fw-semibold mb-1">Record restore test evidence</div>

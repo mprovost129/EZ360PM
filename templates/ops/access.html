@@ -1,0 +1,95 @@
+{% extends "ops/_base.html" %}
+
+{% block ops_content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h4 mb-1">Ops Access</h1>
+    <div class="text-muted">Role-based access control for the Ops Center.</div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h6 mb-3">Grant role</h2>
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label">Staff user email</label>
+            {{ form.email }}
+            {% if form.email.help_text %}<div class="form-text">{{ form.email.help_text }}</div>{% endif %}
+            {% for e in form.email.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Role</label>
+            {{ form.role }}
+            {% for e in form.role.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Notes</label>
+            {{ form.notes }}
+            {% for e in form.notes.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <button class="btn btn-primary" type="submit">Grant / Update</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h2 class="h6 mb-0">Assignments</h2>
+          <span class="badge text-bg-light">{{ assignments|length }}</span>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Role</th>
+                <th>Granted</th>
+                <th>Notes</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in assignments %}
+                <tr>
+                  <td>
+                    <div class="fw-semibold">{{ a.user.email }}</div>
+                    <div class="text-muted small">ID: {{ a.user_id }}</div>
+                  </td>
+                  <td>
+                    <span class="badge text-bg-secondary">{{ a.get_role_display }}</span>
+                  </td>
+                  <td>
+                    <div class="small">{{ a.created_at|date:"Y-m-d H:i" }}</div>
+                    {% if a.granted_by_email %}<div class="text-muted small">by {{ a.granted_by_email }}</div>{% endif %}
+                  </td>
+                  <td class="text-muted">{{ a.notes }}</td>
+                  <td class="text-end">
+                    <form method="post" action="{% url 'ops:access_revoke' a.pk %}" onsubmit="return confirm('Revoke this role?');">
+                      {% csrf_token %}
+                      <button class="btn btn-sm btn-outline-danger" type="submit">Revoke</button>
+                    </form>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="text-muted">No assignments yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="text-muted small mt-2">
+          Superusers implicitly have all roles.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

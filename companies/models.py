@@ -51,6 +51,11 @@ class Company(SyncModel):
 
     is_active = models.BooleanField(default=True)
 
+    # Ops controls
+    is_suspended = models.BooleanField(default=False)
+    suspended_at = models.DateTimeField(null=True, blank=True)
+    suspended_reason = models.CharField(max_length=255, blank=True, default="")
+
     # Security policy
     require_2fa_for_admins_managers = models.BooleanField(default=False)
     require_2fa_for_all = models.BooleanField(default=False)

@@ -13,7 +13,9 @@ SUPPORT_MODE_EXPIRES_AT_KEY = "support_mode_expires_at"
 SUPPORT_MODE_REASON_KEY = "support_mode_reason"
 
 DEFAULT_SUPPORT_MINUTES = 30
-MAX_SUPPORT_MINUTES = 120
+# Allow longer investigations but keep a hard cap so support mode never
+# lingers indefinitely due to operator error.
+MAX_SUPPORT_MINUTES = 240
 
 
 @dataclass(frozen=True)

@@ -230,6 +230,7 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
                         stripe_subscription_id=stripe_subscription_id,
                         plan=plan,
                         interval=interval,
+                        stripe_event_created=int(event.get("created") or 0) or None,
                     )
                     try:
                         fetch_and_sync_subscription_from_stripe(company=company)
@@ -238,6 +239,12 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
                         pass
 
             elif event_type in {"customer.subscription.created", "customer.subscription.updated"}:
+                old_sub = None
+                try:
+                    old_sub = getattr(company, "subscription", None)
+                except Exception:
+                    old_sub = None
+
                 stripe_customer_id = str(data_object.get("customer") or "")
                 stripe_subscription_id = str(data_object.get("id") or "")
                 status = str(data_object.get("status") or "")
@@ -264,9 +271,33 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
                     cancel_at_period_end=bool(data_object.get("cancel_at_period_end") or False),
                     cancel_at=data_object.get("cancel_at"),
                     canceled_at=data_object.get("canceled_at"),
+                    stripe_event_created=int(event.get("created") or 0) or None,
                 )
 
+                # Lifecycle event recording (best-effort).
+                try:
+                    from ops.services_lifecycle import record_subscription_transition
+                    company.refresh_from_db()
+                    record_subscription_transition(
+                        company=company,
+                        old_sub=old_sub,
+                        new_sub=getattr(company, "subscription", None),
+                        stripe_event_id=event_id,
+                        occurred_at=timezone.datetime.fromtimestamp(int(event.get("created") or 0), tz=timezone.utc)
+                        if event.get("created")
+                        else timezone.now(),
+                        details={"stripe_event_type": event_type},
+                    )
+                except Exception:
+                    pass
+
             elif event_type in {"customer.subscription.deleted"}:
+                old_sub = None
+                try:
+                    old_sub = getattr(company, "subscription", None)
+                except Exception:
+                    old_sub = None
+
                 stripe_customer_id = str(data_object.get("customer") or "")
                 stripe_subscription_id = str(data_object.get("id") or "")
                 sync_subscription_from_stripe(
@@ -276,15 +307,43 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
                     status="canceled",
                     cancel_at_period_end=False,
                     canceled_at=data_object.get("canceled_at"),
+                    stripe_event_created=int(event.get("created") or 0) or None,
                 )
+
+                # Lifecycle event recording (best-effort).
+                try:
+                    from ops.services_lifecycle import record_subscription_transition
+                    company.refresh_from_db()
+                    record_subscription_transition(
+                        company=company,
+                        old_sub=old_sub,
+                        new_sub=getattr(company, "subscription", None),
+                        stripe_event_id=event_id,
+                        occurred_at=timezone.datetime.fromtimestamp(int(event.get("created") or 0), tz=timezone.utc)
+                        if event.get("created")
+                        else timezone.now(),
+                        details={"stripe_event_type": event_type},
+                    )
+                except Exception:
+                    pass
 
             elif event_type in {"invoice.payment_failed"}:
                 stripe_customer_id = str(data_object.get("customer") or "")
-                sync_subscription_from_stripe(company=company, stripe_customer_id=stripe_customer_id, status="past_due")
+                sync_subscription_from_stripe(
+                    company=company,
+                    stripe_customer_id=stripe_customer_id,
+                    status="past_due",
+                    stripe_event_created=int(event.get("created") or 0) or None,
+                )
 
             elif event_type in {"invoice.payment_succeeded"}:
                 stripe_customer_id = str(data_object.get("customer") or "")
-                sync_subscription_from_stripe(company=company, stripe_customer_id=stripe_customer_id, status="active")
+                sync_subscription_from_stripe(
+                    company=company,
+                    stripe_customer_id=stripe_customer_id,
+                    status="active",
+                    stripe_event_created=int(event.get("created") or 0) or None,
+                )
 
         ok = True
 

@@ -18,7 +18,7 @@ from core.models import SyncModel
 from core.pagination import paginate
 
 from .decorators import company_context_required, require_min_role
-from .forms import CompanyCreateForm, CompanyInviteForm, CompanySettingsForm
+from .forms import CompanyCreateForm, CompanyInviteForm, CompanySettingsForm, NumberingSchemeForm
 from .models import Company, CompanyInvite, EmployeeProfile, EmployeeRole
 from .services import (
     build_login_redirect_with_next,
@@ -169,17 +169,28 @@ def company_settings(request: HttpRequest) -> HttpResponse:
     role = getattr(employee, "role", None)
     can_edit = role in {EmployeeRole.OWNER, EmployeeRole.ADMIN}
 
+    from documents.models import NumberingScheme
+
+    scheme, _ = NumberingScheme.objects.get_or_create(company=company)
+
     if request.method == "POST":
         form = CompanySettingsForm(request.POST, request.FILES, instance=company)
+        scheme_form = NumberingSchemeForm(request.POST, instance=scheme)
         if not can_edit:
             for f in form.fields.values():
                 f.disabled = True
+            for f in scheme_form.fields.values():
+                f.disabled = True
             messages.warning(request, "You can view settings, but only an Owner or Admin can edit.")
         else:
-            if form.is_valid():
+            if form.is_valid() and scheme_form.is_valid():
                 updated = form.save(commit=False)
                 updated.updated_by_user = request.user
                 updated.save()
+
+                updated_scheme = scheme_form.save(commit=False)
+                updated_scheme.updated_by_user = request.user
+                updated_scheme.save()
 
                 try:
                     log_event(
@@ -198,9 +209,12 @@ def company_settings(request: HttpRequest) -> HttpResponse:
                 return redirect("companies:settings")
     else:
         form = CompanySettingsForm(instance=company)
+        scheme_form = NumberingSchemeForm(instance=scheme)
 
     if not can_edit:
         for f in form.fields.values():
+            f.disabled = True
+        for f in scheme_form.fields.values():
             f.disabled = True
 
     return render(
@@ -209,6 +223,7 @@ def company_settings(request: HttpRequest) -> HttpResponse:
         {
             "company": company,
             "form": form,
+            "scheme_form": scheme_form,
             "can_edit": can_edit,
         },
     )
@@ -422,3 +437,16 @@ def employee_unlock(request: HttpRequest, employee_id: int) -> HttpResponse:
 
     messages.success(request, f"Unlocked login for {emp.user.email}.")
     return redirect("companies:team_list_list")
+
+
+@login_required
+def account_suspended(request: HttpRequest) -> HttpResponse:
+    """Landing page when a tenant account is suspended."""
+    company = get_active_company(request)
+    return render(
+        request,
+        "companies/account_suspended.html",
+        {
+            "company": company,
+        },
+    )

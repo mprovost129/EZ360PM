@@ -215,6 +215,34 @@ def document_list(request, doc_type: str):
 
     paged = paginate(request, qs)
 
+    templates = []
+    recent_docs = []
+    if employee.role in {EmployeeRole.MANAGER, EmployeeRole.ADMIN, EmployeeRole.OWNER}:
+        try:
+            templates = list(
+                DocumentTemplate.objects.filter(
+                    company=company,
+                    doc_type=doc_type,
+                    is_active=True,
+                    deleted_at__isnull=True,
+                ).order_by("name")
+            )
+        except Exception:
+            templates = []
+
+        try:
+            recent_docs = list(
+                Document.objects.filter(
+                    company=company,
+                    doc_type=doc_type,
+                    deleted_at__isnull=True,
+                )
+                .select_related("client", "project")
+                .order_by("-created_at")[:25]
+            )
+        except Exception:
+            recent_docs = []
+
     ctx = {
         "doc_type": doc_type,
         "doc_label": _doc_label(doc_type),
@@ -225,6 +253,8 @@ def document_list(request, doc_type: str):
         "page_obj": paged.page_obj,
         "per_page": paged.per_page,
         "status_choices": DocumentStatus.choices,
+        "templates": templates,
+        "recent_docs": recent_docs,
     }
     return render(request, "documents/document_list.html", ctx)
 
@@ -234,6 +264,10 @@ def document_list(request, doc_type: str):
 def document_wizard(request, doc_type: str):
     company = request.active_company
     employee = request.active_employee
+
+    # Wizard page removed: GET routes back to list where the "New" dropdown + modals live.
+    if request.method == "GET":
+        return redirect("documents:%s_list" % doc_type)
 
     if request.method == "POST":
         form = DocumentWizardForm(company=company, doc_type=doc_type, data=request.POST)

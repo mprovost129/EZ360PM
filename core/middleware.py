@@ -70,6 +70,87 @@ class SubscriptionLockMiddleware(MiddlewareMixin):
         return redirect("billing:locked")
 
 
+
+class CompanySuspensionMiddleware(MiddlewareMixin):
+    """Lock tenant routes when a company is suspended by staff."""
+
+    ALLOW_PREFIXES = [
+        _Allowlist("/accounts/"),
+        _Allowlist("/billing/"),
+        _Allowlist("/companies/switch"),
+        _Allowlist("/companies/switch/"),
+        _Allowlist("/companies/switch/set/"),
+        _Allowlist("/ops/"),
+        _Allowlist("/admin/"),
+        _Allowlist("/api/"),
+        _Allowlist("/static/"),
+        _Allowlist("/media/"),
+    ]
+
+    def process_request(self, request: HttpRequest):
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return None
+
+        # Staff in support mode can still access tenant pages to investigate/fix.
+        try:
+            support = getattr(request, "support_mode", None)
+            if support and getattr(support, "is_active", False) and getattr(user, "is_staff", False):
+                return None
+        except Exception:
+            pass
+
+        path = request.path or "/"
+        for item in self.ALLOW_PREFIXES:
+            if path.startswith(item.prefix):
+                return None
+
+        company = get_active_company(request)
+        if not company:
+            return None
+
+        if not getattr(company, "is_active", True) or getattr(company, "is_suspended", False):
+            messages.error(request, "This company account is currently suspended. Please contact support.")
+            return redirect("companies:account_suspended")
+
+        return None
+
+
+class ForceLogoutMiddleware(MiddlewareMixin):
+    """Force user logout when staff sets User.force_logout_at."""
+
+    AUTH_TIME_KEY = "auth_time_iso"
+
+    def process_request(self, request: HttpRequest):
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return None
+
+        force_at = getattr(user, "force_logout_at", None)
+        if not force_at:
+            return None
+
+        auth_iso = request.session.get(self.AUTH_TIME_KEY)
+        if not auth_iso:
+            # No marker => treat as stale and force re-auth
+            from django.contrib.auth import logout
+            logout(request)
+            messages.info(request, "Please sign in again to continue.")
+            return redirect("accounts:login")
+
+        try:
+            from django.utils.dateparse import parse_datetime
+            auth_dt = parse_datetime(str(auth_iso))
+        except Exception:
+            auth_dt = None
+
+        if not auth_dt or auth_dt < force_at:
+            from django.contrib.auth import logout
+            logout(request)
+            messages.info(request, "Please sign in again to continue.")
+            return redirect("accounts:login")
+
+        return None
 class RequestIDMiddleware:
     """Attach a request id to each request/response for traceability."""
 
@@ -529,3 +610,64 @@ class ScannerShieldMiddleware(MiddlewareMixin):
                 return HttpResponseNotFound("Not Found")
 
         return None
+
+
+class SentryContextMiddleware:
+    """Attach user + company context to Sentry events.
+
+    Safe no-op when Sentry SDK is not installed or not configured.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        try:
+            import sentry_sdk
+
+            with sentry_sdk.configure_scope() as scope:
+                try:
+                    scope.set_tag("environment", getattr(settings, "ENVIRONMENT", "") or getattr(settings, "APP_ENVIRONMENT", ""))
+                except Exception:
+                    pass
+                try:
+                    release = getattr(settings, "SENTRY_RELEASE", "") or getattr(settings, "RELEASE_SHA", "")
+                    if release:
+                        scope.set_tag("release", release)
+                except Exception:
+                    pass
+
+                try:
+                    user = getattr(request, "user", None)
+                    if user and getattr(user, "is_authenticated", False):
+                        scope.set_user({"id": user.pk, "email": getattr(user, "email", "")})
+                except Exception:
+                    pass
+
+                try:
+                    # Best-effort active company detection
+                    company = None
+                    try:
+                        from companies.services import get_active_company
+
+                        company = get_active_company(request)
+                    except Exception:
+                        company = getattr(request, "company", None)
+
+                    if company and getattr(company, "pk", None):
+                        scope.set_context(
+                            "company",
+                            {
+                                "id": str(company.pk),
+                                "name": getattr(company, "name", ""),
+                            },
+                        )
+                        scope.set_tag("company_id", str(company.pk))
+                except Exception:
+                    pass
+
+        except Exception:
+            # no sentry, or any other failure
+            pass
+
+        return self.get_response(request)

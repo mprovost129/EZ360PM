@@ -4,6 +4,11 @@ from django import forms
 
 from .models import Company, CompanyInvite, EmployeeRole
 
+try:
+    from documents.models import NumberingScheme
+except Exception:  # pragma: no cover
+    NumberingScheme = None  # type: ignore
+
 
 class CompanyCreateForm(forms.ModelForm):
     class Meta:
@@ -76,3 +81,44 @@ class CompanySettingsForm(forms.ModelForm):
             "state": forms.TextInput(attrs={"class": "form-control", "maxlength": "2"}),
             "zip_code": forms.TextInput(attrs={"class": "form-control"}),
         }
+
+
+class NumberingSchemeForm(forms.ModelForm):
+    """Company document numbering configuration (invoice/estimate/proposal)."""
+
+    class Meta:
+        model = NumberingScheme
+        fields = [
+            "invoice_pattern",
+            "invoice_reset",
+            "invoice_seq",
+            "estimate_pattern",
+            "estimate_reset",
+            "estimate_seq",
+            "proposal_pattern",
+            "proposal_reset",
+            "proposal_seq",
+        ]
+        widgets = {
+            "invoice_pattern": forms.TextInput(attrs={"class": "form-control", "placeholder": "{YY}/{MM}/{SEQ:3}"}),
+            "estimate_pattern": forms.TextInput(attrs={"class": "form-control", "placeholder": "{YY}/{MM}/{SEQ:3}"}),
+            "proposal_pattern": forms.TextInput(attrs={"class": "form-control", "placeholder": "{YY}/{MM}/{SEQ:3}"}),
+            "invoice_reset": forms.Select(attrs={"class": "form-select"}),
+            "estimate_reset": forms.Select(attrs={"class": "form-select"}),
+            "proposal_reset": forms.Select(attrs={"class": "form-select"}),
+            "invoice_seq": forms.NumberInput(attrs={"class": "form-control", "min": "1"}),
+            "estimate_seq": forms.NumberInput(attrs={"class": "form-control", "min": "1"}),
+            "proposal_seq": forms.NumberInput(attrs={"class": "form-control", "min": "1"}),
+        }
+
+    def clean_invoice_seq(self):
+        v = int(self.cleaned_data.get("invoice_seq") or 1)
+        return max(v, 1)
+
+    def clean_estimate_seq(self):
+        v = int(self.cleaned_data.get("estimate_seq") or 1)
+        return max(v, 1)
+
+    def clean_proposal_seq(self):
+        v = int(self.cleaned_data.get("proposal_seq") or 1)
+        return max(v, 1)

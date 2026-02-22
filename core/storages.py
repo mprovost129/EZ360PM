@@ -26,10 +26,14 @@ class PublicMediaStorage(_BaseStorage):
             # Bucket has ACLs disabled -> do not send ACL headers
             kwargs.setdefault("default_acl", None)
 
-            # If you truly want "public-ish", that must be done via bucket policy / CloudFront,
-            # not ACLs.
+            # IMPORTANT: We run S3 with Block Public Access + ACLs disabled.
+            # That means "public" media must still be served via presigned URLs unless you
+            # add CloudFront or a private/public split with policy exceptions.
             kwargs.setdefault("querystring_auth", True)
-            kwargs.setdefault("querystring_expire", int(getattr(settings, "S3_PUBLIC_MEDIA_EXPIRE_SECONDS", 86400)))
+            kwargs.setdefault(
+                "querystring_expire",
+                int(getattr(settings, "S3_PUBLIC_MEDIA_EXPIRE_SECONDS", 86400)),
+            )
         super().__init__(*args, **kwargs)
 
 
@@ -56,6 +60,5 @@ class PrivateMediaStorage(_BaseStorage):
         
             # Private objects served via signed URLs.
             kwargs.setdefault("querystring_auth", True)
-            kwargs.setdefault("querystring_expire", int(getattr(settings, "S3_PUBLIC_MEDIA_EXPIRE_SECONDS", 86400)))
             kwargs.setdefault("querystring_expire", int(getattr(settings, "S3_PRIVATE_MEDIA_EXPIRE_SECONDS", 600)))
         super().__init__(*args, **kwargs)

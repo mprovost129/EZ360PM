@@ -1,94 +1,245 @@
-{% extends "base_app.html" %}
-{% load static %}
-{% block title %}{{ company.name }} · Ops · EZ360PM{% endblock %}
-{% block content %}
-<div class="container-fluid" style="max-width: 1100px;">
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-    <div>
-      <div class="text-secondary small">Company</div>
-      <h1 class="h4 mb-1">{{ company.name }}</h1>
-      <div class="text-secondary small">Owner: {{ company.owner.email }}</div>
-    </div>
-    <div class="d-flex gap-2">
-      <a class="btn btn-outline-dark" href="{% url 'ops:dashboard' %}">
-        <i class="bi bi-arrow-left me-1"></i>Back
-      </a>
-      <form method="post">
-        {% csrf_token %}
-        <button class="btn btn-ez" type="submit">
-          <i class="bi bi-headset me-1"></i>Enter support mode for this company
-        </button>
-      </form>
-      <a class="btn btn-outline-primary" href="{% url 'ops:company_timeline' company.id %}">
-        <i class="bi bi-clock-history me-1"></i>Timeline
-      </a>
-      <form method="post" action="{% url 'ops:resync_subscription' company.id %}">
-        {% csrf_token %}
-        <button class="btn btn-outline-danger" type="submit">
-          <i class="bi bi-arrow-repeat me-1"></i>Resync from Stripe
-        </button>
-      </form>
-    </div>
-  </div>
+{% extends "ops/_base.html" %}
+{% load money %}
 
-  <div class="row g-3 mb-3">
-    <div class="col-md-6">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <div class="text-secondary small">Subscription</div>
-          {% if subscription %}
-            <div class="d-flex flex-wrap gap-2 align-items-center">
-              <span class="badge text-bg-dark text-uppercase">{{ subscription.plan }}</span>
-              <span class="badge text-bg-secondary text-uppercase">{{ subscription.status }}</span>
-              <span class="text-secondary small">{{ subscription.billing_interval }}</span>
-            </div>
-            <div class="mt-2 text-secondary small">
-              Seats limit: <strong>{{ seats_limit }}</strong>
-              · Extra seats: <strong>{{ subscription.extra_seats }}</strong>
-            </div>
-          {% else %}
-            <div class="text-secondary">No subscription row found.</div>
-          {% endif %}
+{% block title %}{{ company.name }} · Companies · Ops · EZ360PM{% endblock %}
+
+{% block ops_title %}{{ company.name }}{% endblock %}
+{% block ops_subtitle %}
+  <div class="ez-ops-muted small">Customer account profile, billing state, and operational controls for this tenant.</div>
+{% endblock %}
+
+{% block ops_actions %}
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-dark ez-ops-btn" href="{% url 'ops:companies' %}"><i class="bi bi-arrow-left me-1"></i>Companies</a>
+    <a class="btn btn-outline-dark ez-ops-btn" href="{% url 'ops:company_timeline' company.id %}"><i class="bi bi-clock-history me-1"></i>Timeline</a>
+    <a class="btn btn-outline-dark ez-ops-btn" href="{% url 'ops:resync_subscription' company.id %}"><i class="bi bi-arrow-repeat me-1"></i>Resync Stripe</a>
+  </div>
+{% endblock %}
+
+{% block ops_content %}
+
+{% if support.is_active %}
+  <div class="alert alert-warning d-flex align-items-center justify-content-between">
+    <div>
+      <div class="fw-semibold"><i class="bi bi-life-preserver me-1"></i>Support mode is active</div>
+      <div class="small">Company: {{ support.company_id }} · Expires: {{ support.expires_at }} · Reason: {{ support.reason|default:"" }}</div>
+    </div>
+    <form method="post" action="{% url 'ops:support_mode_clear' %}">
+      {% csrf_token %}
+      <button class="btn btn-sm btn-outline-dark" type="submit">Clear</button>
+    </form>
+  </div>
+{% endif %}
+
+{% if company.is_suspended %}
+  <div class="alert alert-danger">
+    <div class="fw-semibold"><i class="bi bi-exclamation-triangle me-1"></i>Company is suspended</div>
+    <div class="small">{% if company.suspended_reason %}{{ company.suspended_reason }}{% else %}No reason provided.{% endif %}</div>
+  </div>
+{% endif %}
+
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item"><a class="nav-link {% if tab == 'overview' %}active{% endif %}" href="{% url 'ops:company_detail' company.id %}?tab=overview">Overview</a></li>
+  <li class="nav-item"><a class="nav-link {% if tab == 'billing' %}active{% endif %}" href="{% url 'ops:company_detail' company.id %}?tab=billing">Billing</a></li>
+  <li class="nav-item"><a class="nav-link {% if tab == 'users' %}active{% endif %}" href="{% url 'ops:company_detail' company.id %}?tab=users">Users</a></li>
+  <li class="nav-item"><a class="nav-link {% if tab == 'activity' %}active{% endif %}" href="{% url 'ops:company_detail' company.id %}?tab=activity">Activity</a></li>
+  <li class="nav-item"><a class="nav-link {% if tab == 'audit' %}active{% endif %}" href="{% url 'ops:company_detail' company.id %}?tab=audit">Ops audit</a></li>
+</ul>
+
+{% if tab == 'overview' %}
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="card ez-ops-card mb-3">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <div class="fw-semibold">Account overview</div>
+          <div class="small ez-ops-muted">Created {{ company.created_at|date:"Y-m-d" }}</div>
         </div>
-      
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-md-6">
+              <div class="small ez-ops-muted">Company ID</div>
+              <div class="fw-semibold">{{ company.id }}</div>
+            </div>
+            <div class="col-md-6">
+              <div class="small ez-ops-muted">Owner</div>
+              <div class="fw-semibold">{{ company.owner.email }}</div>
+            </div>
+            <div class="col-md-6">
+              <div class="small ez-ops-muted">Users</div>
+              <div class="fw-semibold">{{ employees|length }}</div>
+            </div>
+            <div class="col-md-6">
+              <div class="small ez-ops-muted">Last login</div>
+              <div class="fw-semibold">{% if last_login %}{{ last_login|date:"Y-m-d H:i" }}{% else %}—{% endif %}</div>
+            </div>
+          </div>
+
+          <hr>
+
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div>
+              <div class="small ez-ops-muted">Revenue (estimated)</div>
+              <div class="d-flex gap-3">
+                <div><span class="ez-ops-muted small">MRR</span> <span class="fw-semibold">${{ mrr }}</span></div>
+                <div><span class="ez-ops-muted small">ARR</span> <span class="fw-semibold">${{ arr }}</span></div>
+              </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+              <form method="post" class="d-flex flex-wrap gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="enter_support">
+                <input class="form-control form-control-sm" name="minutes" value="30" style="max-width: 90px;" title="Minutes">
+                <select class="form-select form-select-sm" name="reason_preset" style="max-width: 220px;" required>
+                  <option value="" selected disabled>Reason…</option>
+                  <option value="billing_issue">Billing issue</option>
+                  <option value="customer_request">Customer request</option>
+                  <option value="bug_repro">Bug reproduction</option>
+                  <option value="data_fix">Data fix</option>
+                  <option value="fraud_review">Fraud review</option>
+                  <option value="custom">Other (custom)</option>
+                </select>
+                <input class="form-control form-control-sm" name="reason_custom" placeholder="Custom reason" style="max-width: 220px;">
+                <button class="btn btn-sm btn-dark" type="submit"><i class="bi bi-life-preserver me-1"></i>Enter support</button>
+              </form>
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="exit_support">
+                <button class="btn btn-sm btn-outline-dark" type="submit">Exit</button>
+              </form>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="card shadow-sm mt-3">
+      <div class="card ez-ops-card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <div class="fw-semibold">Tenant controls</div>
+          <div class="small ez-ops-muted">High-impact actions</div>
+        </div>
         <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between">
-            <div>
-              <div class="text-secondary small">Recent Stripe webhooks</div>
-              <div class="small text-secondary">Best-effort match by Stripe customer/subscription IDs.</div>
-            </div>
-            <a class="btn btn-sm btn-outline-dark" href="{% url 'billing:webhook_history' %}">All webhooks</a>
+          <div class="d-flex flex-wrap gap-2">
+            {% if company.is_suspended %}
+              <form method="post" class="d-flex gap-2 align-items-center">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="reactivate_company">
+                <input class="form-control" name="confirm" placeholder="Type {{ company.name }} to confirm" style="max-width: 260px;" required>
+                <button class="btn btn-outline-success" type="submit"><i class="bi bi-unlock me-1"></i>Reactivate</button>
+              </form>
+            {% else %}
+              <form method="post" class="d-flex gap-2 align-items-center">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="suspend_company">
+                <input class="form-control" name="reason" placeholder="Suspension reason (optional)" style="max-width: 240px;">
+                <input class="form-control" name="confirm" placeholder="Type {{ company.name }} to confirm" style="max-width: 260px;" required>
+                <button class="btn btn-outline-danger" type="submit"><i class="bi bi-slash-circle me-1"></i>Suspend</button>
+              </form>
+            {% endif %}
+
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="force_logout">
+              <div class="d-flex gap-2 align-items-center">
+                <input class="form-control" name="confirm" placeholder="Type LOGOUT to confirm" style="max-width: 220px;" required>
+                <button class="btn btn-outline-dark" type="submit"><i class="bi bi-arrow-counterclockwise me-1"></i>Force logout</button>
+              </div>
+            </form>
           </div>
 
-          {% if recent_webhooks %}
-            <div class="table-responsive mt-2">
-              <table class="table table-sm align-middle mb-0">
+          <div class="text-secondary small mt-3">
+            Note: Suspension blocks tenant access. Support mode (staff) can still enter for investigation.
+          </div>
+        </div>
+
+
+      <div class="card ez-ops-card mt-3">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <div class="fw-semibold">Company workspace</div>
+          <div class="small ez-ops-muted">Tenant-scoped navigation</div>
+        </div>
+        <div class="card-body">
+          {% if support_for_company %}
+            <div class="d-flex flex-wrap gap-2">
+              <a class="btn btn-outline-dark btn-sm" href="{% url 'ops:company_jump' company.id 'dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+              <a class="btn btn-outline-dark btn-sm" href="{% url 'ops:company_jump' company.id 'clients' %}"><i class="bi bi-people me-1"></i>Clients</a>
+              <a class="btn btn-outline-dark btn-sm" href="{% url 'ops:company_jump' company.id 'projects' %}"><i class="bi bi-kanban me-1"></i>Projects</a>
+              <a class="btn btn-outline-dark btn-sm" href="{% url 'ops:company_jump' company.id 'invoices' %}"><i class="bi bi-receipt me-1"></i>Invoices</a>
+              <a class="btn btn-outline-dark btn-sm" href="{% url 'ops:company_jump' company.id 'payments' %}"><i class="bi bi-credit-card me-1"></i>Payments</a>
+              <a class="btn btn-outline-dark btn-sm" href="{% url 'ops:company_jump' company.id 'time' %}"><i class="bi bi-clock me-1"></i>Time</a>
+            </div>
+            <div class="text-muted small mt-2">These links open the tenant UI with this company set as the active company (Support Mode scoped).</div>
+          {% else %}
+            <div class="text-muted">Enable <strong>Support Mode</strong> above to access the tenant workspace links.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card ez-ops-card mb-3">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <div class="fw-semibold">Tenant risk</div>
+          <span class="ez-ops-badge {% if risk.level == 'high' %}bg-danger text-white{% elif risk.level == 'medium' %}bg-warning{% elif risk.level == 'low' %}bg-info text-white{% else %}bg-light{% endif %}">
+            {{ risk.level|capfirst }}
+          </span>
+        </div>
+        <div class="card-body">
+          <div class="d-flex align-items-end justify-content-between">
+            <div>
+              <div class="small ez-ops-muted">Risk score</div>
+              <div class="display-6 fw-semibold lh-1">{{ risk.score }}<span class="fs-6 ez-ops-muted">/100</span></div>
+            </div>
+            <div class="text-end">
+              <div class="small ez-ops-muted">Thresholds</div>
+              <div class="small"><span class="ez-ops-muted">Medium</span> {{ risk.medium_threshold }} · <span class="ez-ops-muted">High</span> {{ risk.high_threshold }}</div>
+            </div>
+          </div>
+
+          <hr class="my-3">
+
+          {% if risk.breakdown %}
+            <div class="small fw-semibold mb-2">Signals</div>
+            <ul class="list-unstyled mb-0">
+              {% for item in risk.breakdown %}
+                <li class="d-flex justify-content-between gap-3 py-1 border-bottom">
+                  <span class="small">{{ item.label }}</span>
+                  <span class="small fw-semibold">+{{ item.points }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="ez-ops-muted small">No risk signals detected for this tenant.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card ez-ops-card mb-3">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <div class="fw-semibold">Risk trend</div>
+          <span class="text-secondary small">Last 30 days</span>
+        </div>
+        <div class="card-body p-0">
+          {% if risk_history %}
+            <div class="table-responsive">
+              <table class="table table-sm mb-0 align-middle">
                 <thead>
-                  <tr>
-                    <th>When</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th></th>
+                  <tr class="small text-secondary">
+                    <th class="ps-3">Date</th>
+                    <th>Score</th>
+                    <th class="pe-3">Level</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {% for e in recent_webhooks %}
+                  {% for row in risk_history %}
                     <tr>
-                      <td class="text-secondary small">{{ e.received_at|date:"Y-m-d H:i" }}</td>
-                      <td class="small">{{ e.event_type }}</td>
-                      <td>
-                        {% if e.ok %}
-                          <span class="badge text-bg-success">OK</span>
-                        {% else %}
-                          <span class="badge text-bg-danger">ERR</span>
-                        {% endif %}
-                      </td>
-                      <td class="text-end">
-                        <a class="btn btn-sm btn-outline-dark" href="{% url 'billing:webhook_event_detail' e.pk %}">View</a>
+                      <td class="ps-3 small">{{ row.date }}</td>
+                      <td class="small fw-semibold">{{ row.risk_score }}</td>
+                      <td class="pe-3">
+                        <span class="ez-ops-badge {% if row.risk_level == 'high' %}bg-danger text-white{% elif row.risk_level == 'medium' %}bg-warning{% elif row.risk_level == 'low' %}bg-info text-white{% else %}bg-light{% endif %}">
+                          {{ row.risk_level|default:"none"|capfirst }}
+                        </span>
                       </td>
                     </tr>
                   {% endfor %}
@@ -96,49 +247,436 @@
               </table>
             </div>
           {% else %}
-            <div class="text-secondary small mt-2">No recent events found for this company yet.</div>
+            <div class="p-3 text-secondary small">No risk snapshots yet. Run the daily snapshot job to populate history.</div>
           {% endif %}
         </div>
       </div>
-</div>
-    </div>
 
-    <div class="col-md-6">
-      <div class="card shadow-sm">
+      <div class="card ez-ops-card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <div class="fw-semibold">Billing snapshot</div>
+          <a class="btn btn-sm btn-outline-dark ez-ops-btn" href="{% url 'ops:company_detail' company.id %}?tab=billing">Manage</a>
+        </div>
         <div class="card-body">
-          <div class="text-secondary small">Employees</div>
-          <div class="mt-1">Active employees: <strong>{{ employees|length }}</strong></div>
+          {% if subscription %}
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+              <span class="ez-ops-badge">{{ subscription.get_plan_display }}</span>
+              <span class="ez-ops-badge">{{ subscription.get_status_display }}</span>
+              <span class="text-secondary small">{{ subscription.get_billing_interval_display }}</span>
+              {% if subscription.is_comped_active %}<span class="ez-ops-badge">Comped</span>{% endif %}
+              {% if subscription.discount_is_active %}<span class="ez-ops-badge">{{ subscription.discount_percent }}% discount</span>{% endif %}
+            </div>
+            <div class="small text-secondary">Seats limit: <strong>{{ seats_limit }}</strong> · Extra seats: <strong>{{ subscription.extra_seats }}</strong></div>
+            <div class="small text-secondary mt-1">Stripe customer: <strong>{{ subscription.stripe_customer_id|default:"—" }}</strong></div>
+            <div class="small text-secondary">Stripe subscription: <strong>{{ subscription.stripe_subscription_id|default:"—" }}</strong></div>
+          {% else %}
+            <div class="text-secondary">No subscription row found for this company.</div>
+          {% endif %}
         </div>
       </div>
     </div>
   </div>
+{% endif %}
 
-  <div class="card shadow-sm">
+{% if tab == 'billing' %}
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="card ez-ops-card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <div class="fw-semibold">Billing & Stripe</div>
+          <a class="btn btn-sm btn-outline-dark ez-ops-btn" href="{% url 'billing:webhook_history' %}"><i class="bi bi-lightning-charge me-1"></i>Webhook history</a>
+        </div>
+        <div class="card-body">
+          {% if subscription %}
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+              <span class="ez-ops-badge">{{ subscription.get_plan_display }}</span>
+              <span class="ez-ops-badge">{{ subscription.get_status_display }}</span>
+              <span class="text-secondary small">{{ subscription.get_billing_interval_display }}</span>
+              {% if subscription.is_comped_active %}<span class="ez-ops-badge">Comped</span>{% endif %}
+              {% if subscription.discount_is_active %}<span class="ez-ops-badge">{{ subscription.discount_percent }}% discount</span>{% endif %}
+            </div>
+            <div class="small text-secondary">
+              Seats limit: <strong>{{ seats_limit }}</strong> · Extra seats: <strong>{{ subscription.extra_seats }}</strong>
+            </div>
+            <div class="small text-secondary mt-1">
+              Stripe customer: <strong>{{ subscription.stripe_customer_id|default:"—" }}</strong>
+              · Stripe subscription: <strong>{{ subscription.stripe_subscription_id|default:"—" }}</strong>
+            </div>
+            {% if subscription.trial_ends_at %}<div class="small text-secondary mt-1">Trial ends: <strong>{{ subscription.trial_ends_at|date:"Y-m-d H:i" }}</strong></div>{% endif %}
+            {% if subscription.current_period_end %}<div class="small text-secondary">Current period ends: <strong>{{ subscription.current_period_end|date:"Y-m-d H:i" }}</strong></div>{% endif %}
+
+            <hr>
+
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="fw-semibold mb-2">Comped</div>
+                <form method="post" class="vstack gap-2">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="set_comped">
+                  <input class="form-control" name="comped_reason" placeholder="Reason" value="{{ subscription.comped_reason|default:'' }}">
+                  <input class="form-control" name="comped_until" type="datetime-local" value="{% if subscription.comped_until %}{{ subscription.comped_until|date:'Y-m-d\\TH:i' }}{% endif %}">
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-outline-dark" type="submit">Save</button>
+                    <button class="btn btn-outline-secondary" type="submit" name="action" value="clear_comped">Clear</button>
+                  </div>
+                  <div class="text-secondary small">App-side flag for support/accounting. Stripe still controls actual billing behavior.</div>
+                </form>
+              </div>
+              <div class="col-md-6">
+                <div class="fw-semibold mb-2">Discount</div>
+                <form method="post" class="vstack gap-2">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="set_discount">
+                  <input class="form-control" name="discount_percent" type="number" min="0" max="100" value="{{ subscription.discount_percent|default:0 }}">
+                  <input class="form-control" name="discount_ends_at" type="datetime-local" value="{% if subscription.discount_ends_at %}{{ subscription.discount_ends_at|date:'Y-m-d\\TH:i' }}{% endif %}">
+                  <input class="form-control" name="discount_note" placeholder="Note" value="{{ subscription.discount_note|default:'' }}">
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-outline-dark" type="submit">Save</button>
+                    <button class="btn btn-outline-secondary" type="submit" name="action" value="clear_discount">Clear</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <hr>
+
+            <div class="fw-semibold mb-2">Recent Stripe webhooks (best-effort match)</div>
+            {% if recent_webhooks %}
+              <div class="table-responsive">
+                <table class="table table-sm align-middle ez-ops-table mb-0">
+                  <thead>
+                    <tr>
+                      <th>When</th>
+                      <th>Type</th>
+                      <th>Status</th>
+                      <th class="text-end"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for e in recent_webhooks %}
+                      <tr>
+                        <td class="text-secondary small">{{ e.received_at|date:"Y-m-d H:i" }}</td>
+                        <td class="small">{{ e.event_type|default:"stripe.event" }}</td>
+                        <td>
+                          {% if e.ok %}
+                            <span class="badge text-bg-success">OK</span>
+                          {% else %}
+                            <span class="badge text-bg-danger">ERR</span>
+                          {% endif %}
+                        </td>
+                        <td class="text-end">
+                          <a class="btn btn-sm btn-outline-dark ez-ops-btn" href="{% url 'billing:webhook_event_detail' e.pk %}">View</a>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="text-secondary small">No recent events matched to this company yet.</div>
+            {% endif %}
+          {% else %}
+            <div class="text-secondary">No subscription row found for this company.</div>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card ez-ops-card mb-3">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <div class="fw-semibold">Tenant risk</div>
+          <span class="ez-ops-badge {% if risk.level == 'high' %}bg-danger text-white{% elif risk.level == 'medium' %}bg-warning{% elif risk.level == 'low' %}bg-info text-white{% else %}bg-light{% endif %}">
+            {{ risk.level|capfirst }}
+          </span>
+        </div>
+        <div class="card-body">
+          <div class="d-flex align-items-end justify-content-between">
+            <div>
+              <div class="small ez-ops-muted">Risk score</div>
+              <div class="display-6 fw-semibold lh-1">{{ risk.score }}<span class="fs-6 ez-ops-muted">/100</span></div>
+            </div>
+            <div class="text-end">
+              <div class="small ez-ops-muted">Thresholds</div>
+              <div class="small"><span class="ez-ops-muted">Medium</span> {{ risk.medium_threshold }} · <span class="ez-ops-muted">High</span> {{ risk.high_threshold }}</div>
+            </div>
+          </div>
+
+          <hr class="my-3">
+
+          {% if risk.breakdown %}
+            <div class="small fw-semibold mb-2">Signals</div>
+            <ul class="list-unstyled mb-0">
+              {% for item in risk.breakdown %}
+                <li class="d-flex justify-content-between gap-3 py-1 border-bottom">
+                  <span class="small">{{ item.label }}</span>
+                  <span class="small fw-semibold">+{{ item.points }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="ez-ops-muted small">No risk signals detected for this tenant.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card ez-ops-card mb-3">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <div class="fw-semibold">Stripe control panel</div>
+          <a class="btn btn-sm btn-outline-dark ez-ops-btn" href="{% url 'ops:billing_actions' %}?company={{ company.id }}"><i class="bi bi-inbox me-1"></i>Action queue</a>
+        </div>
+        <div class="card-body">
+          <div class="text-secondary small mb-3">
+            Actions are queued and require approval before execution. Stripe is the billing authority; this queue provides intent + auditability.
+          </div>
+
+          <div class="vstack gap-3">
+            <form method="post" class="d-flex gap-2 align-items-end flex-wrap">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="queue_stripe_cancel">
+              <div>
+                <div class="small text-secondary">Cancel</div>
+                <button class="btn btn-outline-danger" type="submit"><i class="bi bi-calendar-x me-1"></i>Cancel at period end</button>
+              </div>
+            </form>
+
+            <form method="post" class="d-flex gap-2 align-items-end flex-wrap">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="queue_stripe_resume">
+              <div>
+                <div class="small text-secondary">Resume</div>
+                <button class="btn btn-outline-dark" type="submit"><i class="bi bi-arrow-repeat me-1"></i>Un-cancel</button>
+              </div>
+            </form>
+
+            <form method="post" class="vstack gap-2">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="queue_stripe_change_plan">
+
+              <div class="fw-semibold">Change plan</div>
+              <div class="row g-2">
+                <div class="col-7">
+                  <select class="form-select" name="plan" required>
+                    <option value="" selected disabled>Select plan…</option>
+                    {% for p in plan_rows %}
+                      <option value="{{ p.code }}">{{ p.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-5">
+                  <select class="form-select" name="interval" required>
+                    <option value="month">Monthly</option>
+                    <option value="year">Yearly</option>
+                  </select>
+                </div>
+              </div>
+              <button class="btn btn-outline-dark" type="submit"><i class="bi bi-arrow-left-right me-1"></i>Queue plan change</button>
+              <div class="text-secondary small">This updates the base subscription item in Stripe and may prorate.</div>
+            </form>
+          </div>
+
+          <hr class="my-3">
+
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="fw-semibold">Recent queued actions</div>
+            {% if stripe_actions_pending %}
+              <span class="badge text-bg-warning">{{ stripe_actions_pending }} pending</span>
+            {% endif %}
+          </div>
+
+          {% if stripe_actions %}
+            <div class="list-group list-group-flush mt-2">
+              {% for a in stripe_actions|slice:":8" %}
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-start" href="{% url 'ops:billing_action_detail' a.id %}">
+                  <div>
+                    <div class="fw-semibold">{{ a.get_action_type_display }}</div>
+                    <div class="small text-secondary">{{ a.status|title }} · {{ a.created_at|date:"Y-m-d H:i" }}</div>
+                  </div>
+                  <div class="small text-secondary">{{ a.requested_by_email|default:"" }}</div>
+                </a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-secondary small mt-2">No queued actions for this company yet.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card ez-ops-card">
+        <div class="card-header"><div class="fw-semibold">Ops notes</div></div>
+        <div class="card-body">
+          <div class="text-secondary small">Billing overrides (comp/discount) are app-side flags. Stripe actions run through the queue above and are fully auditable.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+{% if tab == 'users' %}
+  <div class="card ez-ops-card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <div class="fw-semibold">Users</div>
+      <div class="d-flex gap-2">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="force_logout">
+          <button class="btn btn-sm btn-outline-dark" type="submit"><i class="bi bi-arrow-counterclockwise me-1"></i>Force logout</button>
+        </form>
+      </div>
+    </div>
     <div class="card-body p-0">
       <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle">
-          <thead class="table-light">
+        <table class="table table-sm align-middle ez-ops-table mb-0">
+          <thead>
             <tr>
-              <th>User</th>
+              <th>Email</th>
               <th>Role</th>
-              <th>Display</th>
+              <th>Status</th>
+              <th class="text-end">Actions</th>
             </tr>
           </thead>
           <tbody>
             {% for e in employees %}
               <tr>
                 <td class="fw-semibold">{{ e.user.email }}</td>
-                <td><span class="badge text-bg-light text-uppercase">{{ e.role }}</span></td>
-                <td class="text-secondary small">{{ e.display_name }}</td>
+                <td class="text-secondary small">{{ e.get_role_display|default:e.role }}</td>
+                <td>
+                  {% if e.user.is_active %}
+                    <span class="badge text-bg-success">Active</span>
+                  {% else %}
+                    <span class="badge text-bg-danger">Disabled</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  {% if e.user.is_active %}
+                    <form method="post" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="disable_user">
+                      <input type="hidden" name="user_id" value="{{ e.user.id }}">
+                      <button class="btn btn-sm btn-outline-danger" type="submit">Disable</button>
+                    </form>
+                  {% else %}
+                    <form method="post" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="enable_user">
+                      <input type="hidden" name="user_id" value="{{ e.user.id }}">
+                      <button class="btn btn-sm btn-outline-success" type="submit">Enable</button>
+                    </form>
+                  {% endif %}
+                </td>
               </tr>
             {% empty %}
-              <tr><td colspan="3" class="p-3 text-secondary">No employees.</td></tr>
+              <tr><td colspan="4" class="p-3 text-secondary">No employees.</td></tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
     </div>
   </div>
+{% endif %}
 
-</div>
+{% if tab == 'activity' %}
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <div class="card ez-ops-card">
+        <div class="card-header"><div class="fw-semibold">Recent documents</div></div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle ez-ops-table mb-0">
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Client</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for d in recent_docs %}
+                  <tr>
+                    <td class="text-secondary small">{{ d.created_at|date:"Y-m-d H:i" }}</td>
+                    <td class="small">{{ d.get_doc_type_display|default:d.doc_type }}</td>
+                    <td class="small">{{ d.get_status_display|default:d.status }}</td>
+                    <td class="small">{% if d.client %}{{ d.client.name }}{% else %}—{% endif %}</td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="4" class="p-3 text-secondary">No documents found.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card ez-ops-card">
+        <div class="card-header"><div class="fw-semibold">Recent payments</div></div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle ez-ops-table mb-0">
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Status</th>
+                  <th>Amount</th>
+                  <th>Client</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in recent_payments %}
+                  <tr>
+                    <td class="text-secondary small">{{ p.created_at|date:"Y-m-d H:i" }}</td>
+                    <td class="small">{{ p.get_status_display|default:p.status }}</td>
+                    <td class="small">{{ p.amount_cents|money }}</td>
+                    <td class="small">{% if p.client %}{{ p.client.name }}{% else %}—{% endif %}</td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="4" class="p-3 text-secondary">No payments found.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+{% if tab == 'audit' %}
+  <div class="card ez-ops-card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <div class="fw-semibold">Ops audit trail</div>
+      <div class="small ez-ops-muted">Staff actions taken in Ops Center</div>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle ez-ops-table mb-0">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Actor</th>
+              <th>Action</th>
+              <th>Summary</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in ops_actions %}
+              <tr>
+                <td class="text-secondary small">{{ a.created_at|date:"Y-m-d H:i" }}</td>
+                <td class="small">{% if a.actor_email %}{{ a.actor_email }}{% else %}—{% endif %}</td>
+                <td class="small"><code>{{ a.action }}</code></td>
+                <td class="small">{{ a.summary }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="p-3 text-secondary">No Ops actions logged for this company yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
 {% endblock %}

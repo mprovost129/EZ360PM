@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.db import models
+from django.conf import settings
 from django.utils import timezone
 
 from companies.models import Company
@@ -222,6 +223,7 @@ class OpsCheckKind(models.TextChoices):
     READINESS = "readiness", "Readiness Check"
     TEMPLATE_SANITY = "template_sanity", "Template sanity"
     URL_SANITY = "url_sanity", "URL sanity"
+    BACKUP_VERIFY = "backup_verify", "Backup verification"
 
 
 class OpsCheckRun(models.Model):
@@ -559,6 +561,80 @@ class SiteConfig(models.Model):
     )
 
     # ------------------------------------------------------------------
+    # Stripe mirror health / drift detection (operator safety)
+    # ------------------------------------------------------------------
+    stripe_mirror_stale_after_hours = models.PositiveSmallIntegerField(
+        default=48,
+        help_text="If no Stripe subscription event updates the mirror within this window, create a drift alert.",
+    )
+    stripe_mirror_stale_alert_level = models.CharField(
+        max_length=16,
+        choices=OpsAlertLevel.choices,
+        default=OpsAlertLevel.WARN,
+        help_text="Alert level used when Stripe mirror drift is detected.",
+    )
+
+    # ------------------------------------------------------------------
+    # Ops governance
+    # ------------------------------------------------------------------
+    ops_require_2fa_for_critical_actions = models.BooleanField(
+        default=False,
+        help_text="When enabled, critical ops actions require a valid 2FA session (in addition to typed confirmations).",
+    )
+
+    ops_two_person_approval_enabled = models.BooleanField(
+        default=False,
+        help_text="When enabled, Stripe ops actions require two different staff users (requester cannot approve/run).",
+    )
+
+    
+
+    # ------------------------------------------------------------------
+    # Tenant risk scoring (ops triage)
+    # ------------------------------------------------------------------
+    risk_payment_failed_window_days = models.PositiveSmallIntegerField(
+        default=14,
+        help_text="Lookback window (days) for Stripe payment failure signals used in tenant risk scoring.",
+    )
+    risk_trial_ends_within_days = models.PositiveSmallIntegerField(
+        default=7,
+        help_text="Count a trial as 'ending soon' if it ends within this many days.",
+    )
+
+    risk_weight_past_due = models.PositiveSmallIntegerField(
+        default=60,
+        help_text="Risk points added when a tenant subscription is past due.",
+    )
+    risk_weight_mirror_stale = models.PositiveSmallIntegerField(
+        default=25,
+        help_text="Risk points added when Stripe mirror appears stale for the tenant.",
+    )
+    risk_weight_payment_failed = models.PositiveSmallIntegerField(
+        default=25,
+        help_text="Risk points added when recent payment failure events are detected for the tenant.",
+    )
+    risk_weight_payment_failed_sub_only = models.PositiveSmallIntegerField(
+        default=10,
+        help_text="Additional risk points when a payment failure event references a subscription but not the customer.",
+    )
+    risk_weight_canceling = models.PositiveSmallIntegerField(
+        default=15,
+        help_text="Risk points added when the subscription is set to cancel at period end.",
+    )
+    risk_weight_trial_ends_soon = models.PositiveSmallIntegerField(
+        default=15,
+        help_text="Risk points added when a trial ends within the configured window.",
+    )
+
+    risk_level_medium_threshold = models.PositiveSmallIntegerField(
+        default=40,
+        help_text="Risk score threshold for medium risk level (inclusive).",
+    )
+    risk_level_high_threshold = models.PositiveSmallIntegerField(
+        default=80,
+        help_text="Risk score threshold for high risk level (inclusive).",
+    )
+# ------------------------------------------------------------------
     # Ops notification emails (high-signal events, not alerts)
     # ------------------------------------------------------------------
     ops_notify_email_enabled = models.BooleanField(
@@ -602,4 +678,340 @@ class SiteConfig(models.Model):
         raw = self.ops_notify_email_recipients or ""
         parts = [p.strip() for p in raw.split(",")]
         return [p for p in parts if p]
+
+
+
+class OpsActionLog(models.Model):
+    """Platform-level ops audit trail.
+
+    This captures staff actions taken from the Ops Center (tenant controls, billing overrides,
+    support-mode entry, etc.). It is separate from per-company `audit.AuditEvent` because
+    staff may not be a member of the tenant company.
+    """
+
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    actor = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="ops_actions",
+    )
+    actor_email = models.EmailField(blank=True, default="", db_index=True)
+
+    # Optional tenant scope for the action.
+    company = models.ForeignKey(Company, null=True, blank=True, on_delete=models.SET_NULL, related_name="ops_actions")
+
+    action = models.CharField(max_length=80, db_index=True)  # e.g. company.suspend, billing.comped_set
+    summary = models.CharField(max_length=240, blank=True, default="")
+    meta = models.JSONField(default=dict, blank=True)
+
+    ip_address = models.CharField(max_length=64, blank=True, default="")
+    user_agent = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["company", "created_at"]),
+            models.Index(fields=["action", "created_at"]),
+            models.Index(fields=["actor_email", "created_at"]),
+        ]
+
+    def __str__(self) -> str:  # pragma: no cover
+        co = self.company.name if self.company else "Platform"
+        return f"{self.action} ({co})"
+
+
+
+
+
+
+
+class OutboundEmailStatus(models.TextChoices):
+    SENT = "sent", "Sent"
+    ERROR = "error", "Error"
+
+
+class OutboundEmailLog(models.Model):
+    """Observability log for outbound transactional emails.
+
+    Provider-agnostic: SMTP/SES backends may not return a message id.
+    """
+
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    template_type = models.CharField(max_length=120, db_index=True)
+    to_email = models.EmailField(max_length=254, db_index=True)
+    subject = models.CharField(max_length=200, blank=True, default="")
+
+    company = models.ForeignKey(Company, null=True, blank=True, on_delete=models.SET_NULL, related_name="outbound_email_logs")
+
+    provider_response_id = models.CharField(max_length=200, blank=True, default="")
+    status = models.CharField(max_length=12, choices=OutboundEmailStatus.choices, db_index=True)
+    error_message = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["template_type", "created_at"]),
+            models.Index(fields=["company", "created_at"]),
+        ]
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"{self.status}:{self.to_email}:{self.template_type}"
+
+
+class OpsRole(models.TextChoices):
+    VIEWER = "viewer", "Viewer"
+    SUPPORT = "support", "Support"
+    FINANCE = "finance", "Finance"
+    SUPEROPS = "superops", "Super Ops"
+
+
+class OpsRoleAssignment(models.Model):
+    """Assign staff users roles for the Ops Center.
+
+    Goal: provide enterprise-grade separation of duties inside the SaaS Ops Center.
+    Superusers bypass role checks.
+    """
+
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="ops_role_assignments",
+    )
+    role = models.CharField(max_length=24, choices=OpsRole.choices, db_index=True)
+
+    granted_by = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="granted_ops_roles",
+    )
+    granted_by_email = models.EmailField(blank=True, default="", db_index=True)
+
+    notes = models.CharField(max_length=240, blank=True, default="")
+
+    class Meta:
+        unique_together = [("user", "role")]
+        ordering = ["role", "user__email"]
+        indexes = [
+            models.Index(fields=["role", "created_at"]),
+            models.Index(fields=["user", "created_at"]),
+        ]
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"{self.user_id}:{self.role}"
+
+
+class LifecycleEventType(models.TextChoices):
+    TRIAL_STARTED = "trial_started", "Trial started"
+    TRIAL_CONVERTED = "trial_converted", "Trial converted"
+    SUBSCRIPTION_STARTED = "subscription_started", "Subscription started"
+    SUBSCRIPTION_CANCELED = "subscription_canceled", "Subscription canceled"
+    SUBSCRIPTION_REACTIVATED = "subscription_reactivated", "Subscription reactivated"
+    COMPANY_SUSPENDED = "company_suspended", "Company suspended"
+    COMPANY_REACTIVATED = "company_reactivated", "Company reactivated"
+
+
+class CompanyLifecycleEvent(models.Model):
+    """First-class lifecycle events for accurate ops analytics.
+
+    Stripe remains billing authority; these events are derived from:
+    - Stripe webhooks (subscription created/updated/deleted)
+    - Ops Center actions (suspend/reactivate)
+
+    This enables accurate churn / conversion reporting over time.
+    """
+
+    occurred_at = models.DateTimeField(default=timezone.now, db_index=True)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="lifecycle_events")
+    event_type = models.CharField(max_length=48, choices=LifecycleEventType.choices, db_index=True)
+
+    # Optional linkage for traceability.
+    stripe_event_id = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    details = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-occurred_at"]
+        indexes = [
+            models.Index(fields=["event_type", "occurred_at"]),
+            models.Index(fields=["company", "event_type", "occurred_at"]),
+        ]
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"{self.event_type} ({self.company_id})"
+
+
+class PlatformRevenueSnapshot(models.Model):
+    """Daily platform revenue intelligence snapshot.
+
+    Stored as cents (integers). Stripe is authority; values are computed from the
+    locally mirrored subscription projection table (`billing.CompanySubscription`).
+    """
+
+    date = models.DateField(unique=True, db_index=True)
+
+    active_subscriptions = models.PositiveIntegerField(default=0)
+    trialing_subscriptions = models.PositiveIntegerField(default=0)
+    past_due_subscriptions = models.PositiveIntegerField(default=0)
+    canceled_subscriptions = models.PositiveIntegerField(default=0)
+
+    mrr_cents = models.BigIntegerField(default=0)
+    arr_cents = models.BigIntegerField(default=0)
+
+    new_subscriptions_30d = models.PositiveIntegerField(default=0)
+    churned_30d = models.PositiveIntegerField(default=0)
+    reactivations_30d = models.PositiveIntegerField(default=0)
+    net_growth_30d = models.IntegerField(default=0)
+
+    revenue_at_risk_cents = models.BigIntegerField(default=0)
+
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-date"]
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"Revenue snapshot {self.date:%Y-%m-%d}"
+
+
+class CompanyRiskSnapshot(models.Model):
+    """Daily tenant risk snapshot for explainability + trend reporting.
+
+    This is derived from Stripe-mirrored subscription state + operator-tunable risk scoring.
+    Stored daily (typically alongside PlatformRevenueSnapshot).
+    """
+
+    date = models.DateField(db_index=True)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="risk_snapshots")
+
+    risk_score = models.PositiveSmallIntegerField(default=0)
+    risk_level = models.CharField(max_length=16, blank=True, default="")
+    flags = models.JSONField(default=list, blank=True)
+    breakdown = models.JSONField(default=list, blank=True)
+
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-date", "company__name"]
+        constraints = [
+            models.UniqueConstraint(fields=["company", "date"], name="uniq_company_risk_snapshot_day"),
+        ]
+        indexes = [
+            models.Index(fields=["date", "risk_level"], name="ops_risk_date_level_idx"),
+        ]
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"Risk {self.company_id} {self.date:%Y-%m-%d}: {self.risk_score}"
+
+
+class OpsStripeActionType(models.TextChoices):
+    CANCEL_AT_PERIOD_END = "cancel_at_period_end", "Cancel at period end"
+    RESUME = "resume", "Resume (uncancel)"
+    CHANGE_PLAN = "change_plan", "Change plan"
+    CHANGE_SEATS = "change_seats", "Change extra seats"
+
+
+class OpsStripeActionStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    APPROVED = "approved", "Approved"
+    RUNNING = "running", "Running"
+    SUCCEEDED = "succeeded", "Succeeded"
+    FAILED = "failed", "Failed"
+    CANCELED = "canceled", "Canceled"
+
+
+class OpsStripeAction(models.Model):
+    """Queued, auditable Stripe actions initiated from the Ops Center.
+
+    Stripe remains the authority, but this queue provides:
+    - explicit intent records,
+    - approvals (optional),
+    - idempotency keys,
+    - an audit trail suitable for a financial SaaS operator console.
+    """
+
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="ops_stripe_actions")
+    subscription_id_snapshot = models.CharField(max_length=120, blank=True, default="", db_index=True)
+
+    action_type = models.CharField(max_length=40, choices=OpsStripeActionType.choices, db_index=True)
+    status = models.CharField(max_length=16, choices=OpsStripeActionStatus.choices, default=OpsStripeActionStatus.PENDING, db_index=True)
+
+    payload = models.JSONField(default=dict, blank=True)
+
+    requested_by = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="requested_ops_stripe_actions",
+    )
+    requested_by_email = models.EmailField(blank=True, default="", db_index=True)
+
+    requires_approval = models.BooleanField(default=True, db_index=True)
+    approved_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    approved_by = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="approved_ops_stripe_actions",
+    )
+    approved_by_email = models.EmailField(blank=True, default="", db_index=True)
+
+    executed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    executed_by = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="executed_ops_stripe_actions",
+    )
+    executed_by_email = models.EmailField(blank=True, default="", db_index=True)
+
+    idempotency_key = models.CharField(max_length=80, blank=True, default="", db_index=True)
+
+    error = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["company", "status", "created_at"]),
+            models.Index(fields=["action_type", "created_at"]),
+        ]
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"{self.action_type} ({self.company_id}) [{self.status}]"
+
+
+class OpsCompanyViewPreset(models.Model):
+    """Saved filters for the Companies directory in the Ops Center."""
+
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE, related_name='ops_company_presets')
+    name = models.CharField(max_length=80)
+    query_params = models.JSONField(default=dict, blank=True)  # e.g. {"status": "past_due", "comped": "1"}
+    is_default = models.BooleanField(default=False, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(fields=["owner", "name"], name="uniq_ops_company_preset_owner_name"),
+        ]
+
+    def __str__(self) -> str:  # pragma: no cover
+        return self.name
 

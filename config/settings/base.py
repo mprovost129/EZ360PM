@@ -107,6 +107,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
 
     # Project apps
+    "ezadmin.apps.EzAdminConfig",
     "accounts",
     "audit",
 
@@ -149,6 +150,8 @@ MIDDLEWARE = [
     "core.middleware.RequestIDMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.SentryContextMiddleware",
+    "core.middleware.PerformanceLoggingMiddleware",
     "core.middleware.UserPresenceMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
 
@@ -160,6 +163,8 @@ MIDDLEWARE = [
     "core.middleware.EmailVerificationGateMiddleware",
     "core.middleware.TwoFactorEnforcementMiddleware",
     "core.middleware.SubscriptionLockMiddleware",
+    "core.middleware.CompanySuspensionMiddleware",
+    "core.middleware.ForceLogoutMiddleware",
 
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "core.middleware.SecurityHeadersMiddleware",
@@ -179,6 +184,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.app_context",
+                "ops.context_processors.ops_status",
             ],
         },
     }
@@ -350,7 +356,6 @@ S3_PRIVATE_MEDIA_BUCKET = _getenv("S3_PRIVATE_MEDIA_BUCKET", "")
 S3_PUBLIC_MEDIA_LOCATION = _getenv("S3_PUBLIC_MEDIA_LOCATION", "public-media")
 S3_PRIVATE_MEDIA_LOCATION = _getenv("S3_PRIVATE_MEDIA_LOCATION", "private-media")
 S3_PRIVATE_MEDIA_EXPIRE_SECONDS = int(_getenv("S3_PRIVATE_MEDIA_EXPIRE_SECONDS", "600") or "600")
-S3_PUBLIC_MEDIA_EXPIRE_SECONDS = int(_getenv("S3_PUBLIC_MEDIA_EXPIRE_SECONDS", "86400") or "86400")
 
 S3_DIRECT_UPLOADS = _getenv_bool("S3_DIRECT_UPLOADS", False)
 S3_PRESIGN_EXPIRE_SECONDS = int(_getenv("S3_PRESIGN_EXPIRE_SECONDS", "120") or "120")
@@ -359,9 +364,6 @@ S3_PRESIGN_MAX_SIZE_MB = int(_getenv("S3_PRESIGN_MAX_SIZE_MB", "50") or "50")
 
 # Best-effort deletes when removing private media references (attachments/files).
 S3_DELETE_ON_REMOVE = _getenv_bool("S3_DELETE_ON_REMOVE", default=True)
-
-# If true, MEDIA_URL will point at a public bucket prefix. Default is OFF because bucket policies are blocked.
-S3_PUBLIC_MEDIA_PUBLIC = _getenv_bool("S3_PUBLIC_MEDIA_PUBLIC", False)
 
 STORAGES: dict[str, dict[str, str] | dict[str, object]] = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
@@ -394,14 +396,14 @@ if USE_S3:
         },
     }
 
-    if S3_PUBLIC_MEDIA_PUBLIC:
-        if AWS_S3_CUSTOM_DOMAIN:
-            MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{S3_PUBLIC_MEDIA_LOCATION.strip('/')}/"
-        elif public_bucket:
-            if AWS_S3_ENDPOINT_URL:
-                MEDIA_URL = f"{AWS_S3_ENDPOINT_URL.rstrip('/')}/{public_bucket}/{S3_PUBLIC_MEDIA_LOCATION.strip('/')}/"
-            else:
-                MEDIA_URL = f"https://{public_bucket}.s3.amazonaws.com/{S3_PUBLIC_MEDIA_LOCATION.strip('/')}/"
+    if AWS_S3_CUSTOM_DOMAIN:
+        MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{S3_PUBLIC_MEDIA_LOCATION.strip('/')}/"
+    elif public_bucket:
+        if AWS_S3_ENDPOINT_URL:
+            MEDIA_URL = f"{AWS_S3_ENDPOINT_URL.rstrip('/')}/{public_bucket}/{S3_PUBLIC_MEDIA_LOCATION.strip('/')}/"
+        else:
+            MEDIA_URL = f"https://{public_bucket}.s3.amazonaws.com/{S3_PUBLIC_MEDIA_LOCATION.strip('/')}/"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
@@ -513,6 +515,12 @@ BACKUP_S3_BUCKET = _getenv("BACKUP_S3_BUCKET", "").strip()
 BACKUP_S3_PREFIX = _getenv("BACKUP_S3_PREFIX", "ez360pm/backups/db").strip().strip("/")
 _backup_notify_raw = _getenv("BACKUP_NOTIFY_EMAILS", "").strip()
 BACKUP_NOTIFY_EMAILS = [e.strip() for e in _backup_notify_raw.split(",") if e.strip()]
+
+# Backup verification (Pack 22 - Backup & Recovery Gate)
+# These are used by: python manage.py ez360_verify_backups
+BACKUP_VERIFY_MAX_AGE_HOURS = _getenv_int("BACKUP_VERIFY_MAX_AGE_HOURS", 26)
+BACKUP_VERIFY_MIN_SIZE_BYTES = _getenv_int("BACKUP_VERIFY_MIN_SIZE_BYTES", 1024)
+BACKUP_RESTORE_TEST_REQUIRED_DAYS = _getenv_int("BACKUP_RESTORE_TEST_REQUIRED_DAYS", 30)
 
 EZ360_AUDIT_RETENTION_DAYS = _getenv_int("EZ360_AUDIT_RETENTION_DAYS", 365)
 EZ360_STRIPE_WEBHOOK_RETENTION_DAYS = _getenv_int("EZ360_STRIPE_WEBHOOK_RETENTION_DAYS", 90)
@@ -684,6 +692,31 @@ def init_sentry_if_configured() -> None:
     except Exception:
         return
 
+
+
+# ------------------------------------------------------------
+# Executive Hardening: Monitoring & Observability defaults
+# ------------------------------------------------------------
+
+# Slow request guardrail threshold (ms)
+SLOW_REQUEST_THRESHOLD_MS = int(os.environ.get("SLOW_REQUEST_THRESHOLD_MS", "1500") or "1500")
+
+# Performance logging middleware controls (prod-safe)
+EZ360_PERF_ENABLED = (os.environ.get("EZ360_PERF_ENABLED", "") or "").strip().lower() in {"1", "true", "yes", "on"}
+if os.environ.get("EZ360_PERF_ENABLED", "") == "":
+    EZ360_PERF_ENABLED = not DEBUG
+
+try:
+    EZ360_PERF_SAMPLE_RATE = float(os.environ.get("EZ360_PERF_SAMPLE_RATE", "") or ("1.0" if DEBUG else "0.25"))
+except Exception:
+    EZ360_PERF_SAMPLE_RATE = 1.0 if DEBUG else 0.25
+
+EZ360_PERF_STORE_DB = (os.environ.get("EZ360_PERF_STORE_DB", "") or "").strip().lower() in {"1", "true", "yes", "on"}
+if os.environ.get("EZ360_PERF_STORE_DB", "") == "":
+    EZ360_PERF_STORE_DB = not DEBUG
+
+# Optional: link displayed in Ops reports
+SENTRY_DASHBOARD_URL = (os.environ.get("SENTRY_DASHBOARD_URL", "") or "").strip()
 
 apply_runtime_defaults()
 

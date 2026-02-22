@@ -1,0 +1,265 @@
+{% extends "base_app.html" %}
+{% load static %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/ops_center.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="ez-ops-page">
+  <div class="ez-ops-header">
+    <div class="d-flex flex-wrap align-items-end justify-content-between gap-3">
+      <div>
+        <div class="ez-ops-eyebrow">EZ360PM</div>
+        <h1 class="ez-ops-title">{% block ops_title %}Executive Ops Center{% endblock %}</h1>
+        {% block ops_subtitle %}{% endblock %}
+
+        <div class="ez-ops-statusstrip" role="status" aria-label="Platform status">
+          <span class="ez-ops-chip" title="Environment">
+            <i class="bi bi-globe2"></i>
+            <span>{{ ops_status.env_label }}</span>
+          </span>
+
+          <span class="ez-ops-chip" title="Stripe mode">
+            <i class="bi bi-credit-card-2-front"></i>
+            <span>Stripe: {{ ops_status.stripe_mode }}</span>
+          </span>
+
+
+          {# Webhook health chip #}
+          <a class="ez-ops-chip ez-ops-chip--link {% if ops_status.webhook.health == "green" %}ez-ops-chip--ok{% elif ops_status.webhook.health == "red" %}ez-ops-chip--danger{% elif ops_status.webhook.health == "yellow" %}ez-ops-chip--warn{% endif %}" href="{% url "ops:webhook_health" %}" title="Stripe webhook health">
+            <i class="bi bi-plug"></i>
+            <span>Webhooks: {% if ops_status.webhook.failed_24h is None %}—{% else %}{{ ops_status.webhook.failed_24h }} fail/24h{% endif %}</span>
+          </a>
+
+          {# Email health chip #}
+          <a class="ez-ops-chip ez-ops-chip--link {% if ops_status.email.health == "green" %}ez-ops-chip--ok{% elif ops_status.email.health == "red" %}ez-ops-chip--danger{% elif ops_status.email.health == "yellow" %}ez-ops-chip--warn{% endif %}" href="{% url "ops:email_health" %}" title="Outbound email health">
+            <i class="bi bi-envelope"></i>
+            <span>Email: {% if ops_status.email.failed_24h is None %}—{% else %}{{ ops_status.email.failed_24h }} fail/24h{% endif %}</span>
+          </a>
+
+          {# Snapshot chip #}
+          <span class="ez-ops-chip" title="Last revenue snapshot">
+            <i class="bi bi-camera"></i>
+            <span>Snapshot: {% if ops_status.latest_snapshot_at %}{{ ops_status.latest_snapshot_at|date:"M j, g:ia" }}{% else %}—{% endif %}</span>
+          </span>
+
+          {# Backup health chip #}
+          <a class="ez-ops-chip ez-ops-chip--link {% if ops_status.backup.health == "green" %}ez-ops-chip--ok{% elif ops_status.backup.health == "red" %}ez-ops-chip--danger{% elif ops_status.backup.health == "yellow" %}ez-ops-chip--warn{% endif %}" href="{% url "ops:backups" %}" title="Backup health">
+            <i class="bi bi-hdd"></i>
+            <span>Backups: {% if ops_status.backup.last_success_at %}{{ ops_status.backup.last_success_at|date:"M j, g:ia" }}{% else %}—{% endif %}</span>
+          </a>
+
+          {# Mirror drift chip #}
+          <span class="ez-ops-chip" title="Stripe mirror drift count">
+            <i class="bi bi-arrow-repeat"></i>
+            <span>Drift: {% if ops_status.mirror_drift_count is None %}—{% else %}{{ ops_status.mirror_drift_count }}{% endif %}</span>
+          </span>
+
+          <a class="ez-ops-chip ez-ops-chip--link" href="{% url 'ops:alerts' %}" title="Open ops alerts">
+            <i class="bi bi-bell"></i>
+            <span>
+              Alerts:
+              {% if ops_status.open_alerts is None %}
+                —
+              {% else %}
+                {{ ops_status.open_alerts }}
+              {% endif %}
+            </span>
+          </a>
+
+          {% if ops_status.support_active %}
+            <a class="ez-ops-chip ez-ops-chip--warn ez-ops-chip--link" href="{% url 'ops:companies' %}" title="Support mode is active">
+              <i class="bi bi-life-preserver"></i>
+              <span>
+                Support mode
+                {% if ops_status.support.company_id %}· {{ ops_status.support.company_id }}{% endif %}
+                {% if ops_status.support_remaining_min is not None %}· {{ ops_status.support_remaining_min }}m{% endif %}
+              </span>
+            </a>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="ez-ops-actions">
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-secondary ez-ops-tools-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-lightning-charge"></i>
+            Ops Tools
+          </button>
+          <div class="dropdown-menu dropdown-menu-end ez-ops-tools-menu p-2">
+            <div class="px-2 pt-1 pb-2">
+              <div class="text-uppercase small text-muted fw-semibold">Quick actions</div>
+            </div>
+
+            <form method="post" action="{% url 'ops:run_snapshot_now' %}" class="px-2 pb-2">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-primary w-100" type="submit">
+                <i class="bi bi-graph-up-arrow"></i>
+                Run revenue snapshot now
+              </button>
+            </form>
+
+            <form method="post" action="{% url 'ops:run_desync_scan' %}" class="px-2 pb-2">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-outline-primary w-100" type="submit">
+                <i class="bi bi-shield-check"></i>
+                Run Stripe desync scan
+              </button>
+              <div class="form-text mt-1">Uses the SiteConfig staleness window.</div>
+            </form>
+
+            <div class="px-2 pb-2">
+              <a class="btn btn-sm btn-outline-secondary w-100" href="{% url 'ops:launch_checks' %}">
+                <i class="bi bi-check2-circle"></i>
+                Run readiness checks
+              </a>
+            </div>
+
+            <div class="px-2 pb-2">
+              <a class="btn btn-sm btn-outline-secondary w-100" href="{% url 'ops:smoke_tests' %}">
+                <i class="bi bi-wind"></i>
+                Run smoke checks
+              </a>
+            </div>
+
+            <form method="post" action="{% url 'ops:backup_run_now' %}" class="px-2 pb-2">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-outline-secondary w-100" type="submit">
+                <i class="bi bi-hdd-stack"></i>
+                Run DB backup now
+              </button>
+            </form>
+
+            <div class="dropdown-divider"></div>
+
+            <a class="dropdown-item" href="{% url 'ops:companies' %}">
+              <i class="bi bi-buildings me-2"></i>Companies
+            </a>
+            <a class="dropdown-item" href="{% url 'ops:reports' %}">
+              <i class="bi bi-bar-chart-line me-2"></i>Reports
+            </a>
+            <a class="dropdown-item" href="{% url 'ops:webhook_health' %}">
+              <i class="bi bi-diagram-3 me-2"></i>Webhook health
+            </a>
+            <a class="dropdown-item" href="{% url 'ops:activity' %}">
+              <i class="bi bi-clock-history me-2"></i>Activity
+            </a>
+
+            {% if ops_status.recent_ops_actions %}
+              <div class="dropdown-divider"></div>
+              <div class="px-3 pt-1 pb-2">
+                <div class="text-uppercase small text-muted fw-semibold">Recent ops actions</div>
+              </div>
+              <div class="px-2 pb-2" style="max-height: 260px; overflow:auto;">
+                {% for a in ops_status.recent_ops_actions %}
+                  <div class="border rounded-3 p-2 mb-2" style="background: var(--bs-body-bg);">
+                    <div class="d-flex justify-content-between gap-2">
+                      <div class="small fw-semibold" style="line-height: 1.2;">
+                        {{ a.action }}
+                      </div>
+                      <div class="small text-muted" style="white-space: nowrap;">
+                        {{ a.created_at|timesince }} ago
+                      </div>
+                    </div>
+                    <div class="small text-muted">{{ a.company_name }}</div>
+                    {% if a.summary %}
+                      <div class="small">{{ a.summary }}</div>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <div class="dropdown-divider"></div>
+
+            {% if ops_status.support_active %}
+              <form method="post" action="{% url 'ops:support_mode_clear' %}" class="px-2">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-danger w-100" type="submit">
+                  <i class="bi bi-x-circle"></i>
+                  Exit Support Mode
+                </button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+
+        {% block ops_actions %}{% endblock %}
+      </div>
+    </div>
+  </div>
+
+  <div class="ez-ops-layout">
+    <aside class="ez-ops-sidebar" aria-label="Ops navigation">
+      <div class="ez-ops-sidegroup">
+        <div class="ez-ops-sidegroup__title">Dashboard</div>
+        <a class="ez-ops-sidelink {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'ops:dashboard' %}">
+          <i class="bi bi-speedometer2"></i><span>Overview</span>
+        </a>
+        <a class="ez-ops-sidelink {% if request.resolver_match.url_name == 'reports' %}active{% endif %}" href="{% url 'ops:reports' %}">
+          <i class="bi bi-graph-up-arrow"></i><span>Reports</span>
+        </a>
+      </div>
+
+      <div class="ez-ops-sidegroup">
+        <div class="ez-ops-sidegroup__title">Tenants</div>
+        <a class="ez-ops-sidelink {% if request.resolver_match.url_name == 'companies' or request.resolver_match.url_name == 'company_detail' or request.resolver_match.url_name == 'company_timeline' or request.resolver_match.url_name == 'company_presets' %}active{% endif %}" href="{% url 'ops:companies' %}">
+          <i class="bi bi-buildings"></i><span>Companies</span>
+        </a>
+      </div>
+
+      <div class="ez-ops-sidegroup">
+        <div class="ez-ops-sidegroup__title">Billing Ops</div>
+        <a class="ez-ops-sidelink {% if request.resolver_match.url_name == 'billing_actions' or request.resolver_match.url_name == 'billing_action_detail' %}active{% endif %}" href="{% url 'ops:billing_actions' %}">
+          <i class="bi bi-credit-card"></i><span>Billing queue</span>
+        </a>
+        <a class="ez-ops-sidelink {% if request.resolver_match.url_name == 'webhook_health' %}active{% endif %}" href="{% url 'ops:webhook_health' %}">
+          <i class="bi bi-plug"></i><span>Webhook health</span>
+        </a>
+        <a class="ez-ops-sidelink {% if request.resolver_match.url_name == "email_health" %}active{% endif %}" href="{% url "ops:email_health" %}">
+          <i class="bi bi-envelope"></i><span>Email health</span>
+        </a>
+      </div>
+
+      <div class="ez-ops-sidegroup">
+        <div class="ez-ops-sidegroup__title">Security Ops</div>
+        <a class="ez-ops-sidelink {% if request.resolver_match.url_name == 'activity' %}active{% endif %}" href="{% url 'ops:activity' %}">
+          <i class="bi bi-clock-history"></i><span>Activity</span>
+        </a>
+        <a class="ez-ops-sidelink {% if request.resolver_match.url_name == 'alerts' or request.resolver_match.url_name == 'alert_detail' or request.resolver_match.url_name == 'alert_routing' or request.resolver_match.url_name == 'alert_snoozes' or request.resolver_match.url_name == 'alert_snooze_detail' %}active{% endif %}" href="{% url 'ops:alerts' %}">
+          <i class="bi bi-bell"></i><span>Alerts</span>
+        </a>
+        <a class="ez-ops-sidelink {% if request.resolver_match.url_name == 'security' %}active{% endif %}" href="{% url 'ops:security' %}">
+          <i class="bi bi-shield-lock"></i><span>Security</span>
+        </a>
+        <a class="ez-ops-sidelink {% if request.resolver_match.url_name == 'access' %}active{% endif %}" href="{% url 'ops:access' %}">
+          <i class="bi bi-person-badge"></i><span>Access</span>
+        </a>
+      </div>
+
+      <div class="ez-ops-sidegroup">
+        <div class="ez-ops-sidegroup__title">System Settings</div>
+        <a class="ez-ops-sidelink {% if request.resolver_match.url_name == 'system_status' %}active{% endif %}" href="{% url 'ops:system_status' %}">
+          <i class="bi bi-activity"></i><span>System status</span>
+        </a>
+        <a class="ez-ops-sidelink {% if request.resolver_match.url_name == 'settings_home' or request.resolver_match.url_name == 'settings_site' or request.resolver_match.url_name == 'settings_billing' %}active{% endif %}" href="{% url 'ops:settings_home' %}">
+          <i class="bi bi-gear"></i><span>Settings</span>
+        </a>
+        <a class="ez-ops-sidelink {% if request.resolver_match.url_name == 'launch_checks' or request.resolver_match.url_name == 'launch_gate' or request.resolver_match.url_name == 'go_live_runbook' %}active{% endif %}" href="{% url 'ops:launch_checks' %}">
+          <i class="bi bi-rocket-takeoff"></i><span>Launch</span>
+        </a>
+        <a class="ez-ops-sidelink {% if request.resolver_match.url_name == 'backups' or request.resolver_match.url_name == 'retention' or request.resolver_match.url_name == 'storage' %}active{% endif %}" href="{% url 'ops:backups' %}">
+          <i class="bi bi-hdd-stack"></i><span>Backups</span>
+        </a>
+      </div>
+    </aside>
+
+    <main class="ez-ops-body" role="main">
+      {% block ops_content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% endblock %}
+ 

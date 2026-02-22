@@ -11,6 +11,11 @@ EZ360PM also records restore test evidence:
 
 > Important: EZ360PM does not schedule jobs by itself. Use your host scheduler.
 
+Pack 22 adds an executive-grade **Backup & Recovery Gate**:
+
+- `python manage.py ez360_verify_backups` (daily verification + integrity check)
+- `python manage.py ez360_restore_drill` (prints a restore drill checklist; optional evidence recording)
+
 ---
 
 ## Recommended schedules
@@ -34,6 +39,10 @@ Then run:
 - `python manage.py ez360_backup_db --gzip --storage s3`
 - `python manage.py ez360_prune_backups --storage s3`
 
+Also verify daily:
+
+- `python manage.py ez360_verify_backups`
+
 ### Weekly prune (optional)
 If you prefer pruning weekly:
 
@@ -52,6 +61,7 @@ Example (daily backup at 2:15am, daily prune at 2:45am):
 ```
 15 2 * * * cd /srv/ez360pm && /srv/ez360pm/.venv/bin/python manage.py ez360_backup_db --gzip >> /var/log/ez360pm_backup.log 2>&1
 45 2 * * * cd /srv/ez360pm && /srv/ez360pm/.venv/bin/python manage.py ez360_prune_backups >> /var/log/ez360pm_backup.log 2>&1
+55 2 * * * cd /srv/ez360pm && /srv/ez360pm/.venv/bin/python manage.py ez360_verify_backups >> /var/log/ez360pm_backup_verify.log 2>&1
 ```
 
 ---
@@ -81,3 +91,19 @@ python manage.py ez360_record_restore_test --outcome pass --notes "Restored 2026
 ```
 
 If you record `--outcome fail`, EZ360PM creates an **Ops Alert** so it’s visible in Ops → Alerts.
+
+---
+
+## Restore drill command (operator checklist)
+
+Print a step-by-step checklist (references the latest successful BackupRun):
+
+```
+python manage.py ez360_restore_drill
+```
+
+Optionally record outcome after you complete the drill:
+
+```
+python manage.py ez360_restore_drill --record-outcome pass --notes "Restored into staging; login + reports OK." --tested-by-email you@company.com
+```

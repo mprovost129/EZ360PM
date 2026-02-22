@@ -7,6 +7,7 @@ from typing import Any
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
+from django.utils import timezone
 from django.utils.html import strip_tags
 
 
@@ -82,6 +83,16 @@ def send_templated_email(spec: EmailSpec, *, fail_silently: bool = False) -> int
     )
     msg.attach_alternative(html_body, "text/html")
 
+    # Best-effort: infer company for observability logging.
+    company = None
+    try:
+        ctx = spec.context or {}
+        candidate = ctx.get("company") or ctx.get("active_company")
+        if candidate is not None and getattr(candidate, "pk", None):
+            company = candidate
+    except Exception:
+        company = None
+
     # Attachments (optional)
     if spec.attachments:
         for filename, content, mimetype in spec.attachments:
@@ -93,9 +104,45 @@ def send_templated_email(spec: EmailSpec, *, fail_silently: bool = False) -> int
     try:
         sent = msg.send(fail_silently=fail_silently)
         logger.info("email_sent subject=%s to=%s sent=%s", subject, spec.to, sent)
+
+        # Observability log (best-effort, never blocks delivery)
+        try:
+            from ops.models import OutboundEmailLog, OutboundEmailStatus
+
+            OutboundEmailLog.objects.create(
+                template_type=(spec.template_html or "")[:120],
+                to_email=",".join(spec.to)[:254],
+                company=company,
+                provider_response_id="",
+                status=OutboundEmailStatus.SENT,
+                error_message="",
+                subject=subject[:200],
+                created_at=timezone.now(),
+            )
+        except Exception:
+            pass
+
         return sent
     except Exception as e:
         logger.exception("email_send_failed subject=%s to=%s err=%s", subject, spec.to, str(e)[:500])
+
+        # Observability log (best-effort)
+        try:
+            from ops.models import OutboundEmailLog, OutboundEmailStatus
+
+            OutboundEmailLog.objects.create(
+                template_type=(spec.template_html or "")[:120],
+                to_email=",".join(spec.to)[:254],
+                company=company,
+                provider_response_id="",
+                status=OutboundEmailStatus.ERROR,
+                error_message=str(e)[:1000],
+                subject=subject[:200],
+                created_at=timezone.now(),
+            )
+        except Exception:
+            pass
+
         try:
             from ops.services_alerts import create_ops_alert
             from ops.models import OpsAlertLevel, OpsAlertSource
@@ -105,7 +152,7 @@ def send_templated_email(spec: EmailSpec, *, fail_silently: bool = False) -> int
                 message="An email failed to send.",
                 level=OpsAlertLevel.ERROR,
                 source=OpsAlertSource.EMAIL,
-                company=None,
+                company=company,
                 details={
                     "subject": subject[:200],
                     "to": ",".join(spec.to)[:500],
@@ -118,6 +165,7 @@ def send_templated_email(spec: EmailSpec, *, fail_silently: bool = False) -> int
         try:
             if getattr(settings, "EZ360_ALERT_ON_EMAIL_FAILURE", False):
                 from core.ops_alerts import alert_admins
+
                 alert_admins(
                     "EZ360PM: email delivery failed",
                     "An email failed to send.",

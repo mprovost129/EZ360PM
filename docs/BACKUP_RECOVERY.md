@@ -1,10 +1,13 @@
-# EZ360PM — Backup & Recovery (Phase 3G)
+# EZ360PM — Backup & Recovery
 
-This pack adds a first-class backup command:
+> Note: This document is retained for historical context.
+> The current, production wiring is documented in **docs/BACKUPS.md** (commands: ez360_backup_db / ez360_prune_backups / ez360_verify_backups).
 
-- `python manage.py ez360_backup` (PostgreSQL dump via `pg_dump`)
-- optional: `python manage.py ez360_backup --media` (tar.gz of `MEDIA_ROOT`)
-- retention pruning (keep-last + max-age)
+EZ360PM includes a first-class DB backup command (pg_dump) and an executive gate for verification:
+
+- `python manage.py ez360_backup_db --gzip`
+- `python manage.py ez360_prune_backups`
+- `python manage.py ez360_verify_backups`
 
 > Goal: you can **restore** your production database and validate the restore procedure on a schedule.
 

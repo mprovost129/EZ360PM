@@ -58,6 +58,35 @@ urlpatterns = [
     path("backups/record-restore-test/", views.ops_backup_record_restore_test, name="backup_record_restore_test"),
     path("releases/", views.ops_releases, name="releases"),
 
+    # Companies (SaaS operations)
+    path("companies/", views.ops_companies, name="companies"),
+    path("companies/presets/", views.ops_company_presets, name="company_presets"),
+
+    # Billing control (queued Stripe actions)
+    path("billing/actions/", views.ops_billing_actions, name="billing_actions"),
+    path("billing/actions/<int:pk>/", views.ops_billing_action_detail, name="billing_action_detail"),
+    path("billing/actions/<int:pk>/approve/", views.ops_billing_action_approve, name="billing_action_approve"),
+    path("billing/actions/<int:pk>/run/", views.ops_billing_action_run, name="billing_action_run"),
+    path("billing/actions/<int:pk>/cancel/", views.ops_billing_action_cancel, name="billing_action_cancel"),
+
+    # Operational reports
+    path("reports/", views.ops_reports, name="reports"),
+
+    # Webhook health (Stripe/Plaid reliability)
+    path("webhooks/", views.ops_webhook_health, name="webhook_health"),
+
+    # Email health (deliverability observability)
+    path("email/", views.ops_email_health, name="email_health"),
+
+
+    # Ops access control
+    path("access/", views.ops_access, name="access"),
+    path("access/<int:pk>/revoke/", views.ops_access_revoke, name="access_revoke"),
+
+    # Ops activity (executive audit feed)
+    path("activity/", views.ops_activity, name="activity"),
+    path("activity/export.csv", views.ops_activity_export_csv, name="activity_export_csv"),
+
     # QA punchlist (Phase 8S2)
     path("qa/", views.ops_qa_issues, name="qa_issues"),
     path("qa/new/", views.ops_qa_issue_new, name="qa_issue_new"),
@@ -65,7 +94,11 @@ urlpatterns = [
     path("qa/<int:pk>/edit/", views.ops_qa_issue_edit, name="qa_issue_edit"),
     path("qa/<int:pk>/close/", views.ops_qa_issue_close, name="qa_issue_close"),
     # Company primary keys are UUIDs.
+    path("companies/<uuid:company_id>/jump/<str:dest>/", views.ops_company_jump, name="company_jump"),
     path("companies/<uuid:company_id>/", views.ops_company_detail, name="company_detail"),
     path("companies/<uuid:company_id>/timeline/", views.ops_company_timeline, name="company_timeline"),
     path("companies/<uuid:company_id>/resync-subscription/", views.ops_resync_subscription, name="resync_subscription"),
+    path("companies/run-snapshot-now/", views.ops_run_snapshot_now, name="run_snapshot_now"),
+    path("companies/run-desync-scan/", views.ops_run_desync_scan, name="run_desync_scan"),
+    path("support-mode/clear/", views.ops_support_mode_clear, name="support_mode_clear"),
 ]

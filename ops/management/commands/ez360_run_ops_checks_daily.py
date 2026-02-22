@@ -98,6 +98,7 @@ class Command(BaseCommand):
 
         # Global checks
         _run(OpsCheckKind.READINESS, "ez360_readiness_check")
+        _run(OpsCheckKind.BACKUP_VERIFY, "ez360_verify_backups")
 
         kwargs_common = {}
         if quiet:

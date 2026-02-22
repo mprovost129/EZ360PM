@@ -1,0 +1,135 @@
+{% extends "ops/_base.html" %}
+
+{% block title %}Company Presets · Ops · EZ360PM{% endblock %}
+
+{% block ops_title %}Company Presets{% endblock %}
+{% block ops_subtitle %}
+  <div class="ez-ops-muted small">Manage saved filters for the Company directory.</div>
+{% endblock %}
+
+{% block ops_actions %}
+  <a class="btn btn-outline-dark ez-ops-btn" href="{% url 'ops:companies' %}"><i class="bi bi-arrow-left me-1"></i>Back to companies</a>
+{% endblock %}
+
+{% block ops_content %}
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card ez-ops-card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="fw-semibold">Your presets</div>
+        <span class="text-secondary small">{{ my_presets|length }} total</span>
+      </div>
+      <div class="card-body p-0">
+        {% if my_presets %}
+          <div class="table-responsive">
+            <table class="table table-sm mb-0 align-middle">
+              <thead>
+                <tr class="small text-secondary">
+                  <th class="ps-3">Name</th>
+                  <th>Params</th>
+                  <th>Status</th>
+                  <th class="pe-3 text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in my_presets %}
+                  <tr>
+                    <td class="ps-3">
+                      <div class="fw-semibold">{{ p.name }}</div>
+                      {% if p.is_default %}<div class="small text-secondary">Default</div>{% endif %}
+                    </td>
+                    <td class="small text-secondary">
+                      {% if p.query_params %}
+                        {{ p.query_params|safe }}
+                      {% else %}—{% endif %}
+                    </td>
+                    <td>
+                      {% if p.is_active %}<span class="ez-ops-badge">Active</span>{% else %}<span class="ez-ops-badge bg-light">Inactive</span>{% endif %}
+                    </td>
+                    <td class="pe-3 text-end">
+                      <form class="d-inline" method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="preset_id" value="{{ p.id }}">
+                        <input type="hidden" name="action" value="set_default">
+                        <button class="btn btn-sm btn-outline-dark" type="submit" {% if p.is_default %}disabled{% endif %}>Default</button>
+                      </form>
+                      <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="collapse" data-bs-target="#rename{{ p.id }}">Rename</button>
+                      <form class="d-inline" method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="preset_id" value="{{ p.id }}">
+                        <input type="hidden" name="action" value="toggle_active">
+                        <button class="btn btn-sm btn-outline-dark" type="submit">{% if p.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+                      </form>
+                      <form class="d-inline" method="post" onsubmit="return confirm('Delete preset?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="preset_id" value="{{ p.id }}">
+                        <input type="hidden" name="action" value="delete">
+                        <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                      </form>
+                    </td>
+                  </tr>
+                  <tr class="collapse" id="rename{{ p.id }}">
+                    <td colspan="4" class="p-3 bg-body-tertiary">
+                      <form class="d-flex gap-2" method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="preset_id" value="{{ p.id }}">
+                        <input type="hidden" name="action" value="rename">
+                        <input class="form-control" name="name" value="{{ p.name }}" required>
+                        <button class="btn btn-dark" type="submit">Save</button>
+                      </form>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="p-3 text-secondary">No presets saved yet. Save one from the Companies page.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card ez-ops-card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="fw-semibold">Global presets</div>
+        <span class="text-secondary small">Visible to all ops users</span>
+      </div>
+      <div class="card-body">
+        {% if global_presets %}
+          <ul class="list-unstyled mb-0">
+            {% for p in global_presets %}
+              <li class="d-flex align-items-start justify-content-between gap-2 py-2 border-bottom">
+                <div>
+                  <div class="fw-semibold">{{ p.name }}</div>
+                  <div class="small text-secondary">{{ p.query_params|default:"—" }}</div>
+                </div>
+                <span class="ez-ops-badge {% if p.is_active %}bg-light{% else %}bg-body-tertiary{% endif %}">{% if p.is_active %}Active{% else %}Inactive{% endif %}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="text-secondary">No global presets defined.</div>
+        {% endif %}
+
+        {% if can_manage_global %}
+          <hr>
+          <div class="small text-secondary mb-2">As SUPEROPS you can create/manage global presets by setting owner = NULL in DB (or we can add UI later).</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card ez-ops-card mt-3">
+      <div class="card-body">
+        <div class="fw-semibold">How presets work</div>
+        <div class="text-secondary small mt-1">
+          Presets store the filter state for the Companies directory (segment/status/comped/search). Defaults apply automatically when you open Companies.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

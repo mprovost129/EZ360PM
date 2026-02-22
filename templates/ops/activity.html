@@ -1,0 +1,249 @@
+{% extends "ops/_base.html" %}
+
+{% block ops_title %}Activity{% endblock %}
+
+{% block ops_subtitle %}
+  <p class="text-muted mb-0">Executive audit feed for ops actions, Stripe change queue, and launch evidence checks.</p>
+{% endblock %}
+
+{% block ops_content %}
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-12 col-lg-2">
+          <label class="form-label small text-muted">View</label>
+          <select class="form-select" name="tab" onchange="this.form.submit()">
+            <option value="actions" {% if tab == 'actions' or not tab %}selected{% endif %}>Ops actions</option>
+            <option value="stripe" {% if tab == 'stripe' %}selected{% endif %}>Stripe actions</option>
+            <option value="checks" {% if tab == 'checks' %}selected{% endif %}>Checks evidence</option>
+          </select>
+        </div>
+
+        <div class="col-12 col-lg-2">
+          <label class="form-label small text-muted">Days</label>
+          <input type="number" class="form-control" name="days" value="{{ days }}" min="1" max="365">
+        </div>
+
+        <div class="col-12 col-lg-3">
+          <label class="form-label small text-muted">Search</label>
+          <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="company, actor, action…">
+        </div>
+
+        <div class="col-12 col-lg-2">
+          <label class="form-label small text-muted">Company ID</label>
+          <input type="text" class="form-control" name="company_id" value="{{ company_id }}" placeholder="uuid">
+        </div>
+
+        {% if tab == 'checks' %}
+          <div class="col-12 col-lg-2">
+            <label class="form-label small text-muted">Kind</label>
+            <input type="text" class="form-control" name="kind" value="{{ kind }}" placeholder="smoke, readiness…">
+          </div>
+          <div class="col-12 col-lg-1">
+            <label class="form-label small text-muted">OK</label>
+            <select class="form-select" name="ok">
+              <option value="" {% if not ok %}selected{% endif %}>Any</option>
+              <option value="true" {% if ok == 'true' %}selected{% endif %}>OK</option>
+              <option value="false" {% if ok == 'false' %}selected{% endif %}>Fail</option>
+            </select>
+          </div>
+        {% elif tab == 'stripe' %}
+          <div class="col-12 col-lg-2">
+            <label class="form-label small text-muted">Status</label>
+            <input type="text" class="form-control" name="status" value="{{ status }}" placeholder="pending, approved…">
+          </div>
+          <div class="col-12 col-lg-2">
+            <label class="form-label small text-muted">Type contains</label>
+            <input type="text" class="form-control" name="action_type" value="{{ action_type }}" placeholder="change_plan, seats…">
+          </div>
+        {% else %}
+          <div class="col-12 col-lg-2">
+            <label class="form-label small text-muted">Actor</label>
+            <input type="text" class="form-control" name="actor" value="{{ actor }}" placeholder="email">
+          </div>
+          <div class="col-12 col-lg-2">
+            <label class="form-label small text-muted">Action contains</label>
+            <input type="text" class="form-control" name="action" value="{{ action }}" placeholder="billing., company., ops.">
+          </div>
+        {% endif %}
+
+        <div class="col-12 col-lg-2">
+          <button class="btn btn-primary w-100" type="submit">
+            <i class="bi bi-search"></i> Filter
+          </button>
+        </div>
+
+        {% if tab != 'checks' %}
+          <div class="col-12 col-lg-2">
+            <a class="btn btn-outline-secondary w-100" href="{% url 'ops:activity_export_csv' %}?{{ request.GET.urlencode }}">
+              <i class="bi bi-download"></i> Export CSV
+            </a>
+          </div>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mt-3">
+    <div class="card-body">
+      {% if tab == 'checks' %}
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fw-semibold">Checks evidence</div>
+          <div class="text-muted small">{{ checks_total }} total</div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Kind</th>
+                <th>Company</th>
+                <th>OK</th>
+                <th>Duration</th>
+                <th>By</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in checks %}
+                <tr>
+                  <td class="text-muted small">{{ r.created_at|date:"Y-m-d H:i" }}</td>
+                  <td>{{ r.get_kind_display }}</td>
+                  <td class="small">{% if r.company %}<a href="{% url 'ops:company_detail' r.company.id %}">{{ r.company.name }}</a>{% else %}<span class="text-muted">Platform</span>{% endif %}</td>
+                  <td>
+                    {% if r.is_ok %}
+                      <span class="badge text-bg-success">OK</span>
+                    {% else %}
+                      <span class="badge text-bg-danger">Fail</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-muted small">{{ r.duration_ms }}ms</td>
+                  <td class="text-muted small">{{ r.created_by_email }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="6" class="text-muted">No check runs found.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {% if checks.has_other_pages %}
+          <nav class="mt-2">
+            <ul class="pagination pagination-sm mb-0">
+              {% if checks.has_previous %}
+                <li class="page-item"><a class="page-link" href="?{{ request.GET.urlencode }}&page={{ checks.previous_page_number }}">Prev</a></li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link">Prev</span></li>
+              {% endif %}
+              <li class="page-item disabled"><span class="page-link">Page {{ checks.number }} / {{ checks.paginator.num_pages }}</span></li>
+              {% if checks.has_next %}
+                <li class="page-item"><a class="page-link" href="?{{ request.GET.urlencode }}&page={{ checks.next_page_number }}">Next</a></li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link">Next</span></li>
+              {% endif %}
+            </ul>
+          </nav>
+        {% endif %}
+
+      {% elif tab == 'stripe' %}
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fw-semibold">Stripe actions</div>
+          <div class="text-muted small">{{ stripe_total }} total</div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Company</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Requested by</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in stripe_actions %}
+                <tr>
+                  <td class="text-muted small">{{ s.created_at|date:"Y-m-d H:i" }}</td>
+                  <td class="small"><a href="{% url 'ops:company_detail' s.company.id %}">{{ s.company.name }}</a></td>
+                  <td class="small"><code>{{ s.action_type }}</code></td>
+                  <td class="small"><span class="badge text-bg-secondary">{{ s.status }}</span></td>
+                  <td class="text-muted small">{{ s.requested_by_email }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="text-muted">No Stripe actions found.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {% if stripe_actions.has_other_pages %}
+          <nav class="mt-2">
+            <ul class="pagination pagination-sm mb-0">
+              {% if stripe_actions.has_previous %}
+                <li class="page-item"><a class="page-link" href="?{{ request.GET.urlencode }}&page={{ stripe_actions.previous_page_number }}">Prev</a></li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link">Prev</span></li>
+              {% endif %}
+              <li class="page-item disabled"><span class="page-link">Page {{ stripe_actions.number }} / {{ stripe_actions.paginator.num_pages }}</span></li>
+              {% if stripe_actions.has_next %}
+                <li class="page-item"><a class="page-link" href="?{{ request.GET.urlencode }}&page={{ stripe_actions.next_page_number }}">Next</a></li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link">Next</span></li>
+              {% endif %}
+            </ul>
+          </nav>
+        {% endif %}
+
+      {% else %}
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fw-semibold">Ops actions</div>
+          <div class="text-muted small">{{ actions_total }} total</div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Company</th>
+                <th>Action</th>
+                <th>Summary</th>
+                <th>Actor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in actions %}
+                <tr>
+                  <td class="text-muted small">{{ a.created_at|date:"Y-m-d H:i" }}</td>
+                  <td class="small">{% if a.company %}<a href="{% url 'ops:company_detail' a.company.id %}">{{ a.company.name }}</a>{% else %}<span class="text-muted">Platform</span>{% endif %}</td>
+                  <td class="small"><code>{{ a.action }}</code></td>
+                  <td class="small">{{ a.summary }}</td>
+                  <td class="text-muted small">{{ a.actor_email }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="text-muted">No ops actions found.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {% if actions.has_other_pages %}
+          <nav class="mt-2">
+            <ul class="pagination pagination-sm mb-0">
+              {% if actions.has_previous %}
+                <li class="page-item"><a class="page-link" href="?{{ request.GET.urlencode }}&page={{ actions.previous_page_number }}">Prev</a></li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link">Prev</span></li>
+              {% endif %}
+              <li class="page-item disabled"><span class="page-link">Page {{ actions.number }} / {{ actions.paginator.num_pages }}</span></li>
+              {% if actions.has_next %}
+                <li class="page-item"><a class="page-link" href="?{{ request.GET.urlencode }}&page={{ actions.next_page_number }}">Next</a></li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link">Next</span></li>
+              {% endif %}
+            </ul>
+          </nav>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

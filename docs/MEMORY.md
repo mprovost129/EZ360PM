@@ -1,3 +1,69 @@
+## 2026-02-22 — Ops Center Pack 19: Executive Activity Feed (DONE)
+
+- Added **Ops → Activity** (`/ops/activity/`) as an executive audit feed for:
+  - **Ops actions** (`OpsActionLog`) with filters + CSV export
+  - **Checks evidence** (`OpsCheckRun`) with filters
+- Added Activity to the Ops sidebar under **Security Ops** and to the **Ops Tools** quick links.
+- Fixed a latent bug in Ops Tools: dropdown link now correctly points to `ops:webhook_health`.
+
+## 2026-02-21 — Ops Center Pack 14: Lifecycle Funnel + Webhook Health + Tenant Risk (DONE)
+
+- Upgraded Ops Reports lifecycle section to a true **funnel** (30d):
+  - Trials started → conversions (with conversion rate)
+  - Churn (with churn rate)
+  - New subs started + reactivations
+  - Net growth
+  - Recent lifecycle events feed (CompanyLifecycleEvent)
+- Added a dedicated **Webhook Health** page (`/ops/webhooks/`):
+  - 24h/7d deliveries + handler failures
+  - Last received event
+  - Top event types (7d)
+  - Recent failures with deep links to the webhook event detail
+  - Stripe mirror drift panel (stale subscriptions sample)
+- Added **tenant risk scoring** on Ops Companies grid (0–100) with human-readable flags:
+  - suspended, past_due, mirror_stale, payment_failed_14d, canceling, trial_ends_7d
+
+## 2026-02-21 — Ops Center Pack 12: Stripe Mirror Health + Critical 2FA (DONE)
+
+- Extended Ops Site Config with:
+  - `stripe_mirror_stale_after_hours` + `stripe_mirror_stale_alert_level` (drift detection controls)
+  - `ops_require_2fa_for_critical_actions` (ops governance / safety)
+- Updated Stripe drift alerting to use Site Config (both the nightly revenue snapshot command and the desync scan command).
+- Added **Stripe Health** panel to Ops Reports (last webhook received + mirror drift counts + oldest examples).
+- Enforced optional **2FA requirement** (when enabled) on critical ops actions:
+  - Suspend/reactivate company
+  - Force logout
+  - Stripe action approve/run/cancel
+- Fixed a bug in company reactivation flow that referenced an undefined `reason`.
+
+## 2026-02-21 — Ops Center Pack 8: Operational Reports (DONE)
+
+- Added Ops Center **Reports** page (`/ops/reports/`) with executive-level operational metrics:
+  - Revenue snapshot (MRR/ARR)
+  - Trials started, conversions, churn (best-effort)
+  - Stripe webhook health (24h/7d)
+  - Payment failure counts (7d/30d)
+  - Unresolved alerts by source (7d)
+- Wired Reports into Ops Center navigation.
+
+
+## 2026-02-21 — Ops Center Pack 5: Support Mode banner + cap alignment (DONE)
+
+- Added a **global Support Mode banner** to authenticated app pages (`templates/base_app.html`) so staff always sees when they are operating under Support Mode, including company id, expiry, and reason, with a one-click **Exit Support Mode** action.
+- Exposed `support_mode` in the global app context processor for staff (`core/context_processors.py`).
+- Aligned Support Mode max duration cap to **240 minutes** (`core/support_mode.py`) to match Ops Center UI clamping.
+
+## 2026-02-21 — Admin portals groundwork: EZ360PM Settings + Customers (IN PROGRESS)
+
+- Added `ezadmin` app with **two branded AdminSite portals**:
+  - **EZ360PM Settings** at `/ops-admin/`
+  - **EZ360PM Customers** at `/customers-admin/`
+- Both portals are branded (EZ360PM header/title) and use a curated **sectioned index** (`admin/ez360_index.html`).
+- Customers admin includes a **Company switcher** in the header and enforces a safe default:
+  - Company-scoped models are filtered by the selected company.
+  - If no company is selected, company-scoped querysets return empty (prevents accidental cross-tenant browsing).
+- Kept legacy `/admin/` enabled temporarily for safety during the transition.
+
 ## 2026-02-19 — Stripe trial days + ops signup/conversion notifications (DONE)
 
 - Moved **trial length** to DB-backed Ops SiteConfig: `billing_trial_days` (default 14) used by Stripe Checkout subscription creation.
@@ -1785,3 +1851,193 @@ Next:
 ## Pack: Home Marketing Alternating Features
 
 - Home public marketing page: replaced feature cards with alternating left/right feature sections with illustrative images (documents, time, reports, integrations) and kept pricing teaser.
+
+
+## 2026-02-21 — Ops Center Light (Pack 3) — Company Controls + Ops Audit
+
+- Added **company suspension** support:
+  - `companies.Company`: `is_suspended`, `suspended_at`, `suspended_reason`
+  - `core.middleware.CompanySuspensionMiddleware` blocks tenant routes when suspended (staff support mode still allowed).
+  - New tenant landing page: `/companies/suspended/`
+
+- Added **force logout** support:
+  - `accounts.User.force_logout_at` timestamp
+  - `core.middleware.ForceLogoutMiddleware` logs users out if their session predates `force_logout_at`
+  - Login/2FA now stores `session['auth_time_iso']`
+
+- Ops Center: **Company detail** now has executive-grade tabs:
+  - Overview / Billing / Users / Activity / Ops audit
+  - Tenant controls: suspend/reactivate, force logout, per-user enable/disable
+  - Billing panel: comped + discount overrides (app-side flags) + recent webhook sample
+
+- Added **OpsActionLog** (platform audit trail) to record all Ops Center actions with actor, company, IP/UA, metadata.
+
+## 2026-02-21 — Ops Center Light (Pack 4) — Billing Control Queue + Support Mode Guardrails
+
+- Added **queued Stripe action system** for Ops Center billing operations:
+  - `ops.OpsStripeAction` (type, status, payload, approval + execution metadata, idempotency key, error)
+  - New Ops routes:
+    - `/ops/billing/actions/` (queue list)
+    - `/ops/billing/actions/<id>/` (detail)
+    - approve / run / cancel actions
+  - Company Billing tab now includes a **Stripe control panel** to queue:
+    - Cancel at period end
+    - Resume (un-cancel)
+    - Change plan (monthly/yearly)
+  - Execution uses Stripe idempotency keys and best-effort resync back into `CompanySubscription`.
+
+- Strengthened **Support Mode** in Ops Center:
+  - Support mode entry now requires a reason.
+  - Added preset reasons + optional custom reason field.
+  - Duration is clamped (5–240 minutes) to prevent accidental “always-on” support mode.
+
+- Added `ops.OpsCompanyViewPreset` model (foundation for saved directory filters; UI wiring can follow in next pack).
+
+## Pack 6 — Ops Center safety confirmations + global banner polish (2026-02-21)
+
+- Added **typed confirmations** for high-impact Ops actions:
+  - Company suspend/reactivate now requires typing the **company name**.
+  - Force logout now requires typing **LOGOUT**.
+  - Stripe queue approve/run now requires typing the **company name**.
+- Enhanced the **global Support Mode banner** (app-wide):
+  - Displays the company name when available.
+  - Adds a quick link to **Company 360** in Ops Center.
+
+## Pack 7 — Ops Companies segments + CSV export + bugfix (2026-02-21)
+
+- Fixed a critical view bug in `ops_companies` where stray code referenced undefined variables (`tab`, `company`).
+- Upgraded the Companies directory with **segments** (exec-friendly triage): Active, Trialing, Past due, Discounted, Comped, Suspended, All.
+- Added **CSV export** for the company directory (`export=csv`) to support ops workflows (triage, outreach, reconciliation).
+
+## 2026-02-21 — Ops Center Pack 10 — Stripe-authoritative Revenue Snapshots (Daily)
+
+- Added **first-class lifecycle + revenue intelligence foundations**:
+  - `ops.CompanyLifecycleEvent` (trial/convert/subscription start/cancel/reactivate + tenant suspend/reactivate)
+  - `ops.PlatformRevenueSnapshot` (daily platform snapshot; money stored as cents)
+  - Migration: `ops/migrations/0008_revenue_snapshots_and_lifecycle.py`
+
+- Added **daily snapshot management command**:
+  - `python manage.py ez360_snapshot_platform_revenue` (idempotent, `--force` supported)
+  - Computes MRR/ARR from the **mirrored subscription table** (`billing.CompanySubscription`) using the DB-backed pricing catalog (`billing.PlanCatalog`, `billing.SeatAddonConfig`).
+  - Computes a first-pass **Revenue at risk** based on: past-due subs, cancel_at_period_end, and trials ending within 7 days.
+
+- Updated **Ops Reports** to read from **daily snapshots** (instead of live computation), and began transitioning growth metrics to lifecycle events.
+
+- Ops company suspend/reactivate now records lifecycle events (best-effort).
+
+## 2026-02-21 — Ops Center Pack 11 — Webhook-derived Lifecycle + Mirror Drift Alerts
+
+- Stripe webhooks now record **subscription lifecycle events** (best-effort) by comparing the previous mirrored subscription state vs the newly-synced state:
+  - Trial started / Trial converted
+  - Subscription started / Canceled / Reactivated
+  - Source: `billing/webhooks.py` → `ops/services_lifecycle.py`
+
+- Added a **Stripe mirror freshness marker** on `billing.CompanySubscription`:
+  - `last_stripe_event_at` is populated from Stripe event `created` timestamps (webhooks) or Stripe subscription `created` (API fetch).
+  - Migration: `billing/migrations/0006_subscription_last_stripe_event_at.py`
+
+- Added **mirror drift alerting**:
+  - New command: `python manage.py ez360_stripe_desync_scan` (default 48h)
+  - The daily revenue snapshot command also emits WARN alerts if the mirror is stale (48h) for any ACTIVE/TRIALING/PAST_DUE subscription.
+
+
+## 2026-02-21 — Ops Center Pack 13 (RBAC + governance)
+
+- Added Ops RBAC with explicit roles (viewer/support/finance/superops).
+- New model: `ops.OpsRoleAssignment` + Ops Access page to grant/revoke roles (superops only).
+- Applied role gates to critical Ops actions (support mode, force logout, suspend/reactivate, Stripe billing actions).
+- Fixed security hole: `ops_company_detail` now requires staff auth (was missing decorators).
+- Fixed `ops_billing_actions` logic that referenced undefined variables.
+
+## 2026-02-21 — Ops Center Pack 15 (Tunable risk scoring)
+
+- Made tenant **risk scoring operator-tunable** via `ops.SiteConfig` (weights, windows, thresholds).
+- Updated Ops Settings → Site settings UI with a new **Tenant risk scoring** section.
+- Companies directory risk score now reads SiteConfig values (no hardcoded weights).
+- Added migration: `ops/migrations/0011_siteconfig_risk_scoring.py`.
+
+
+## 2026-02-21 — Ops Center Pack 16
+- Added Company 360 tenant risk drill-down card (score + thresholds + contributing signals).
+- Added per-operator saved Company directory presets (OpsCompanyViewPreset.owner). Companies page supports selecting a preset and saving current filters as a preset.
+
+## 2026-02-22 — Ops Center Pack 17
+- Added **Company Presets** management screen (`/ops/companies/presets/`) to rename, activate/deactivate, set default, and delete saved presets.
+- Implemented **CompanyRiskSnapshot** daily snapshots and a 30-day **risk trend** table on Company 360.
+- Added Site setting: **Two-person approval for Stripe ops actions** (requester cannot approve/run).
+- Extended `ez360_snapshot_platform_revenue` to also snapshot daily tenant risk (best-effort, bulk).
+
+## 2026-02-22 — Ops Center Pack 18C (Branding + section layout)
+- Updated Ops Center branding to **Executive Ops Center** (light theme).
+- Replaced top “pill” navigation with a **sectioned left ops sidebar**:
+  - Dashboard (Overview, Reports)
+  - Tenants (Companies)
+  - Billing Ops (Billing queue, Webhook health)
+  - Security Ops (Alerts, Security, Access)
+  - System Settings (System status, Settings, Launch, Backups)
+- Mobile: sidebar collapses into a compact pill-style nav automatically.
+- Added an Ops **status strip** to the shell (environment, Stripe mode, open alerts, support mode).
+- Refined sidebar active-state styling for stronger “console” feel.
+
+
+## 2026-02-22 — Ops Center Pack 18C3 (QuickBooks-style Ops Tools)
+- Added top-right **Ops Tools** dropdown in Ops header (run revenue snapshot, run Stripe desync scan, quick links).
+- Added staff-only POST endpoints: `ops_run_snapshot_now`, `ops_run_desync_scan`.
+- Added light styling for the dropdown.
+
+## 2026-02-22 — Ops Center Pack 18C4 (Ops Tools expansion + recent actions)
+- Expanded the Ops Tools dropdown with quick links/actions for **readiness checks**, **smoke checks**, and **run DB backup now**.
+- Added a lightweight **Recent ops actions** mini-feed in the dropdown (last 8 OpsActionLog entries) for "what just happened" visibility.
+- Fixed a runtime bug in `ops_launch_checks` where stray code referenced undefined variables.
+
+## 2026-02-22 — Ops Center Pack 20 (Tenant workspace jump + Stripe activity feed)
+
+- Added **Company workspace** navigation card on Company 360 (Dashboard, Clients, Projects, Invoices, Payments, Time).
+  - Links are **Support Mode scoped**: they only activate when Support Mode is enabled for that company.
+  - Jump sets the tenant **active company** in-session and then deep-links into the main app.
+- Added `/ops/companies/<uuid>/jump/<dest>/` endpoint to perform the scoped jump and record an `OpsActionLog` entry (`ops.company_jump`).
+- Upgraded Ops → **Activity** to support three views:
+  - Ops actions
+  - Stripe actions (OpsStripeAction queue visibility)
+  - Checks evidence
+- Expanded Activity CSV export to support **Stripe actions** export when tab=stripe.
+
+## 2026-02-22 — Pack 21 (Executive Hardening: Monitoring & Observability)
+
+Monitoring & Observability layer implemented:
+
+- **/health/** production-grade JSON endpoint with best-effort checks:
+  - database (SELECT 1)
+  - cache (set/get)
+  - storage_s3 (HeadBucket when S3 configured)
+  - stripe (Balance.retrieve auth ping)
+  - status aggregation: ok / degraded / error
+  - returns **200** for ok, **503** for degraded/error
+- **/health/details/** token-protected variant (requires `HEALTHCHECK_TOKEN`) with per-component error summaries.
+- **OutboundEmailLog** model + migration; integrated into `core.email_utils.send_templated_email()` for sent/error logging (best-effort).
+- Ops Center:
+  - New **Email health** page: `/ops/email/` (24h/7d counts, failure rate, recent failures).
+  - Ops top strip upgraded to include **Webhooks health**, **Email health**, **Last snapshot**, and **Mirror drift** chips.
+  - Ops Reports includes a **Sentry** panel (enabled state + optional `SENTRY_DASHBOARD_URL`).
+- **PerformanceLoggingMiddleware** enabled in settings; slow-request guardrail now active with prod-safe defaults.
+- **SentryContextMiddleware** added to attach user + company context to Sentry events when Sentry is configured.
+
+## 2026-02-22 — Pack 22 (Executive Hardening: Backup & Recovery Gate)
+
+Recoverability is now an explicit, testable operator gate:
+
+- Added `python manage.py ez360_verify_backups`:
+  - requires a recent SUCCESS BackupRun within `BACKUP_VERIFY_MAX_AGE_HOURS` (default 26h)
+  - enforces minimum size `BACKUP_VERIFY_MIN_SIZE_BYTES` (default 1024 bytes)
+  - best-effort integrity check:
+    - local backups: file exists + readable (gzip sniff)
+    - S3 backups: `head_object` for bucket/key + size consistency
+  - on failure: creates an **Ops Alert** (no silent backup drift)
+- Wired `ez360_verify_backups` into `ez360_run_ops_checks_daily` so it runs with other daily checks.
+- Added `python manage.py ez360_restore_drill`:
+  - prints a restore drill checklist referencing the latest successful backup
+  - can optionally record PASS/FAIL evidence
+- Ops UI:
+  - Ops status strip includes **Backup health** chip
+  - Ops → Backups page includes an **Automated backup verification** panel with last run status + output.
+

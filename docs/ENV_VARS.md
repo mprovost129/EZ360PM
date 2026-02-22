@@ -186,3 +186,14 @@ See `docs/MEDIA_STORAGE.md` for required bucket CORS configuration.
 
 - `OPS_ALERT_WEBHOOK_URL` — if set, ops alerts will POST a small JSON payload to this URL (best-effort).
 - `OPS_ALERT_WEBHOOK_TIMEOUT_SECONDS` (default `2.5`) — HTTP timeout for webhook delivery.
+
+## Monitoring & Observability (Pack 21)
+
+- `HEALTHCHECK_TOKEN` — enables `/health/details/` token-protected endpoint.
+  - Provide token via `X-Health-Token` header or `?token=` query.
+- `SLOW_REQUEST_THRESHOLD_MS` (default `1500`) — slow request alert threshold in milliseconds.
+- `EZ360_PERF_ENABLED` (default: `1` in prod, `0` in debug) — enables `PerformanceLoggingMiddleware` sampling.
+- `EZ360_PERF_SAMPLE_RATE` (default: `0.25` in prod, `1.0` in debug) — sample rate for perf logs.
+- `EZ360_PERF_STORE_DB` (default: `1` in prod, `0` in debug) — when enabled, slow requests generate OpsAlert events.
+- `SENTRY_DASHBOARD_URL` — optional URL displayed in Ops Reports to jump straight into your Sentry project.
+

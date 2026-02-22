@@ -33,6 +33,28 @@ def _lazy_import_stripe():
     return stripe
 
 
+def stripe_client():
+    """Return an initialized Stripe client (stripe module) with api_key set."""
+    return _lazy_import_stripe()
+
+
+def get_base_plan_price_id(plan: str, interval: str) -> str:
+    """Resolve the Stripe price_id for the base plan (Starter/Pro/Premium) and interval."""
+    plan_row = PlanCatalog.objects.filter(code=plan, is_active=True).first()
+    price_id = ""
+    if plan_row:
+        if interval == BillingInterval.MONTH:
+            price_id = str(plan_row.stripe_monthly_price_id or "").strip()
+        elif interval == BillingInterval.YEAR:
+            price_id = str(plan_row.stripe_annual_price_id or "").strip()
+
+    if not price_id:
+        lookup_key = _lookup_key_for_base(plan, interval)
+        price_id = get_price_id_by_lookup_key(lookup_key)
+
+    return str(price_id or "").strip()
+
+
 def _lookup_key_for_base(plan: str, interval: str) -> str:
     if plan not in {PlanCode.STARTER, PlanCode.PROFESSIONAL, PlanCode.PREMIUM}:
         raise ValueError("Invalid plan.")
@@ -357,6 +379,7 @@ def fetch_and_sync_subscription_from_stripe(*, company: Company) -> None:
         cancel_at_period_end=cancel_at_period_end,
         cancel_at=int(cancel_at) if cancel_at else None,
         canceled_at=int(canceled_at) if canceled_at else None,
+        stripe_event_created=int(stripe_sub.get("created") or 0) or None,
     )
 
 
@@ -376,6 +399,7 @@ def sync_subscription_from_stripe(
     cancel_at_period_end: bool | None = None,
     cancel_at: int | None = None,
     canceled_at: int | None = None,
+    stripe_event_created: int | None = None,
 ) -> None:
     """
     Update CompanySubscription from Stripe webhook data.
@@ -458,6 +482,15 @@ def sync_subscription_from_stripe(
         dt = timezone.datetime.fromtimestamp(int(canceled_at), tz=timezone.utc)
         sub.stripe_canceled_at = dt
         changed.append("stripe_canceled_at")
+
+    # Webhook freshness marker.
+    if stripe_event_created is not None:
+        try:
+            dt = timezone.datetime.fromtimestamp(int(stripe_event_created), tz=timezone.utc)
+            sub.last_stripe_event_at = dt
+            changed.append("last_stripe_event_at")
+        except Exception:
+            pass
 
     if changed:
         sub.save(update_fields=changed + ["updated_at"])

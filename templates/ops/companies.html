@@ -1,0 +1,181 @@
+{% extends "ops/_base.html" %}
+
+{% block title %}Companies · Ops · EZ360PM{% endblock %}
+
+{% block ops_title %}Companies{% endblock %}
+{% block ops_subtitle %}
+  <div class="ez-ops-muted small">Tenant directory for support, billing triage, and account operations.</div>
+{% endblock %}
+
+{% block ops_actions %}
+  <form class="d-flex flex-wrap gap-2" method="get" action="{% url 'ops:companies' %}">
+    <input type="hidden" name="segment" value="{{ segment }}">
+    <div class="d-flex align-items-center gap-2">
+      <select class="form-select ez-ops-select" name="preset" style="min-width: 220px;">
+        <option value="">Presets…</option>
+        {% for p in presets %}
+          <option value="{{ p.id }}" {% if preset_id and p.id|stringformat:"s" == preset_id %}selected{% endif %}>{{ p.name }}{% if p.is_default %} (default){% endif %}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-outline-dark ez-ops-btn" type="submit">Apply</button>
+      <a class="btn btn-outline-dark ez-ops-btn" href="{% url 'ops:company_presets' %}"><i class="bi bi-sliders me-1"></i>Manage presets</a>
+    </div>
+
+    <input class="form-control ez-ops-search" name="q" value="{{ q }}" placeholder="Search company name or email…">
+
+    <select class="form-select" name="status" style="max-width: 190px;">
+      <option value="active" {% if status == 'active' %}selected{% endif %}>Active / Past due</option>
+      <option value="trialing" {% if status == 'trialing' %}selected{% endif %}>Trialing</option>
+      <option value="past_due" {% if status == 'past_due' %}selected{% endif %}>Past due</option>
+      <option value="canceled" {% if status == 'canceled' %}selected{% endif %}>Canceled</option>
+      <option value="ended" {% if status == 'ended' %}selected{% endif %}>Ended</option>
+      <option value="all" {% if status == 'all' %}selected{% endif %}>All</option>
+    </select>
+
+    <div class="form-check align-self-center">
+      <input class="form-check-input" type="checkbox" value="1" id="compedOnly" name="comped" {% if comped == '1' %}checked{% endif %}>
+      <label class="form-check-label" for="compedOnly">Comped</label>
+    </div>
+
+    <button class="btn btn-dark ez-ops-btn" type="submit"><i class="bi bi-filter me-1"></i>Apply</button>
+    <a class="btn btn-outline-dark ez-ops-btn" href="{% url 'ops:companies' %}?segment={{ segment|urlencode }}">Reset</a>
+
+    <a class="btn btn-outline-dark ez-ops-btn" href="{% url 'ops:companies' %}?segment={{ segment|urlencode }}&q={{ q|urlencode }}&status={{ status|urlencode }}&comped={{ comped|urlencode }}&export=csv">
+      <i class="bi bi-download me-1"></i>CSV
+    </a>
+  </form>
+  <form class="d-flex flex-wrap gap-2 mt-2" method="post" action="{% url 'ops:companies' %}">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="save_preset">
+    <input type="hidden" name="segment" value="{{ segment }}">
+    <input type="hidden" name="status" value="{{ status }}">
+    <input type="hidden" name="comped" value="{{ comped }}">
+    <input type="hidden" name="q" value="{{ q }}">
+    <input class="form-control" style="max-width: 220px;" name="preset_name" placeholder="Save preset as…" required>
+    <label class="d-flex align-items-center gap-2 small ez-ops-muted">
+      <input class="form-check-input" type="checkbox" name="make_default" value="1">
+      Default
+    </label>
+    <button class="btn btn-dark ez-ops-btn" type="submit">Save preset</button>
+  </form>
+
+{% endblock %}
+
+{% block ops_content %}
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a class="btn btn-sm {% if segment == 'active' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="{% url 'ops:companies' %}?segment=active">Active</a>
+  <a class="btn btn-sm {% if segment == 'trialing' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="{% url 'ops:companies' %}?segment=trialing">Trialing</a>
+  <a class="btn btn-sm {% if segment == 'past_due' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="{% url 'ops:companies' %}?segment=past_due">Past due</a>
+  <a class="btn btn-sm {% if segment == 'discounted' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="{% url 'ops:companies' %}?segment=discounted">Discounted</a>
+  <a class="btn btn-sm {% if segment == 'comped' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="{% url 'ops:companies' %}?segment=comped">Comped</a>
+  <a class="btn btn-sm {% if segment == 'suspended' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="{% url 'ops:companies' %}?segment=suspended">Suspended</a>
+  <a class="btn btn-sm {% if segment == 'all' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="{% url 'ops:companies' %}?segment=all">All</a>
+</div>
+
+{% if support_mode.is_active %}
+  <div class="alert alert-warning d-flex align-items-center justify-content-between">
+    <div>
+      <div class="fw-semibold"><i class="bi bi-life-preserver me-1"></i>Support mode is active</div>
+      <div class="small">Company: {{ support_mode.company_id }} · Expires: {{ support_mode.expires_at }}</div>
+    </div>
+    <form method="post" action="{% url 'ops:support_mode_clear' %}">
+      {% csrf_token %}
+      <button class="btn btn-sm btn-outline-dark" type="submit">Clear</button>
+    </form>
+  </div>
+{% endif %}
+
+<div class="card ez-ops-card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <div class="fw-semibold">Company directory</div>
+    <div class="small ez-ops-muted">Showing {{ page_obj.paginator.count }} result{{ page_obj.paginator.count|pluralize }}</div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle ez-ops-table mb-0">
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Owner</th>
+            <th>Status</th>
+            <th class="text-end">Risk</th>
+            <th class="text-end">Seats</th>
+            <th class="text-end">MRR</th>
+            <th class="text-end">ARR</th>
+            <th class="text-end">Users</th>
+            <th>Last login</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in page_obj.object_list %}
+            <tr>
+              <td class="fw-semibold">
+                <a class="text-decoration-none" href="{% url 'ops:company_detail' row.company.id %}">{{ row.company.name }}</a>
+                <div class="small text-secondary">{{ row.company.id }}</div>
+              </td>
+              <td class="text-secondary">{{ row.company.owner.email }}</td>
+              <td>
+                {% if row.subscription %}
+                  <span class="ez-ops-badge">{{ row.subscription.get_status_display }}</span>
+                  {% if row.subscription.is_comped_active %}
+                    <span class="ms-1 ez-ops-badge">Comped</span>
+                  {% endif %}
+                {% else %}
+                  <span class="text-secondary">—</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                {% if row.risk_level == 'high' %}
+                  <span class="badge text-bg-danger">{{ row.risk_score }}</span>
+                {% elif row.risk_level == 'medium' %}
+                  <span class="badge text-bg-warning">{{ row.risk_score }}</span>
+                {% elif row.risk_level == 'low' %}
+                  <span class="badge text-bg-info">{{ row.risk_score }}</span>
+                {% else %}
+                  <span class="badge text-bg-light">0</span>
+                {% endif %}
+                {% if row.risk_flags %}
+                  <div class="text-muted small">{{ row.risk_flags|join:", " }}</div>
+                {% endif %}
+              </td>
+              <td class="text-end text-secondary">
+                {{ row.seats_limit }}
+              </td>
+              <td class="text-end">${{ row.mrr }}</td>
+              <td class="text-end">${{ row.arr }}</td>
+              <td class="text-end text-secondary">{{ row.employee_count }}</td>
+              <td class="text-secondary">
+                {% if row.last_login %}{{ row.last_login|date:"Y-m-d H:i" }}{% else %}—{% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="9" class="text-center text-secondary p-4">No companies found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+  <nav class="mt-3" aria-label="Companies pagination">
+    <ul class="pagination pagination-sm mb-0">
+      {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&status={{ status }}&comped={{ comped }}&page={{ page_obj.previous_page_number }}">Prev</a></li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">Prev</span></li>
+      {% endif %}
+
+      <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+
+      {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&status={{ status }}&comped={{ comped }}&page={{ page_obj.next_page_number }}">Next</a></li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">Next</span></li>
+      {% endif %}
+    </ul>
+  </nav>
+{% endif %}
+
+{% endblock %}

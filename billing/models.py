@@ -113,6 +113,10 @@ class CompanySubscription(SyncModel):
     stripe_customer_id = models.CharField(max_length=80, blank=True, default="")
     stripe_subscription_id = models.CharField(max_length=80, blank=True, default="")
 
+    # Stripe webhook freshness marker (authoritative mirror).
+    # Updated whenever we successfully process a Stripe event that touches the subscription.
+    last_stripe_event_at = models.DateTimeField(null=True, blank=True)
+
     # Stripe cancellation tracking
     stripe_cancel_at_period_end = models.BooleanField(default=False)
     stripe_cancel_at = models.DateTimeField(null=True, blank=True)
@@ -142,6 +146,8 @@ class CompanySubscription(SyncModel):
         indexes = [
             models.Index(fields=["plan", "billing_interval", "status"]),
             models.Index(fields=["trial_ends_at"]),
+            # Keep index names <= 30 chars for cross-DB compatibility.
+            models.Index(fields=["last_stripe_event_at"], name="bill_sub_last_evt_idx"),
         ]
 
     def is_in_trial(self) -> bool:

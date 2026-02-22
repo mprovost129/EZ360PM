@@ -17,4 +17,5 @@ urlpatterns = [
     path("team/invite/<uuid:invite_id>/resend/", views.invite_resend, name="invite_resend"),
     path("team/invite/<uuid:invite_id>/revoke/", views.invite_revoke, name="invite_revoke"),
     path("team/employee/<int:employee_id>/unlock/", views.employee_unlock, name="employee_unlock"),
+    path("suspended/", views.account_suspended, name="account_suspended"),
 ]

@@ -143,6 +143,12 @@ def login_view(request):
 
             login(request, user)
 
+            # Store session auth time for Ops "force logout" control.
+            try:
+                request.session["auth_time_iso"] = timezone.now().isoformat()
+            except Exception:
+                pass
+
             # Session rotation on successful auth (security hardening)
             try:
                 request.session.cycle_key()
@@ -220,6 +226,12 @@ def register_view(request):
                 messages.warning(request, "Account created, but we couldn't send a verification email yet.")
 
             login(request, user)
+
+            # Store session auth time for Ops "force logout" control.
+            try:
+                request.session["auth_time_iso"] = timezone.now().isoformat()
+            except Exception:
+                pass
 
             pending = pop_pending_invite(request)
             if pending:
@@ -378,6 +390,12 @@ def two_factor_verify(request):
             code = form.cleaned_data["code"]
             if verify_totp(tf.secret, code):
                 login(request, user)
+
+            # Store session auth time for Ops "force logout" control.
+            try:
+                request.session["auth_time_iso"] = timezone.now().isoformat()
+            except Exception:
+                pass
                 mark_session_2fa_verified(request)
                 log_login_success(request, user, method=LoginEvent.METHOD_2FA)
                 tf.last_used_at = timezone.now()

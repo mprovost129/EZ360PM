@@ -1,0 +1,40 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{#
+  Minimal override to:
+  - brand the admin (EZ360PM)
+  - add a company switcher for the customer-scoped admin
+#}
+
+{% block title %}{{ site_title|default:_('EZ360PM Admin') }}{% endblock %}
+
+{% block branding %}
+  <h1 id="site-name">
+    {% if ezadmin_index_url %}
+      <a href="{{ ezadmin_index_url }}">{{ site_header|default:_('EZ360PM') }}</a>
+    {% else %}
+      <a href="{% url 'admin:index' %}">{{ site_header|default:_('EZ360PM') }}</a>
+    {% endif %}
+  </h1>
+{% endblock %}
+
+{% block nav-global %}
+  {{ block.super }}
+
+  {% if ezadmin_mode == 'customers' %}
+    <div class="ezadmin-company-switcher" style="display:inline-flex; align-items:center; gap:.5rem; margin-left:1rem;">
+      <form method="post" action="{{ ezadmin_switch_company_url }}" style="display:inline-flex; align-items:center; gap:.5rem;">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path|default:'' }}">
+        <label for="ezadmin_company_id" style="color: var(--header-color, #fff); font-weight:600;">Company</label>
+        <select id="ezadmin_company_id" name="company_id" onchange="this.form.submit()" style="max-width: 320px;">
+          <option value="">— Select —</option>
+          {% for c in ezadmin_companies %}
+            <option value="{{ c.id }}" {% if ezadmin_selected_company_id == c.id|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </form>
+    </div>
+  {% endif %}
+{% endblock %}

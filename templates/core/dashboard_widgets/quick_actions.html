@@ -27,17 +27,17 @@
         {% if is_manager %}
           <li><hr class="dropdown-divider"></li>
           <li>
-            <a class="dropdown-item" href="{% url 'documents:invoice_wizard' %}">
+            <a class="dropdown-item" href="{% url 'documents:invoice_list' %}">
               <i class="bi bi-receipt me-2"></i>New invoice
             </a>
           </li>
           <li>
-            <a class="dropdown-item" href="{% url 'documents:estimate_wizard' %}">
+            <a class="dropdown-item" href="{% url 'documents:estimate_list' %}">
               <i class="bi bi-file-earmark-spreadsheet me-2"></i>New estimate
             </a>
           </li>
           <li>
-            <a class="dropdown-item" href="{% url 'documents:proposal_wizard' %}">
+            <a class="dropdown-item" href="{% url 'documents:proposal_list' %}">
               <i class="bi bi-file-earmark-richtext me-2"></i>New proposal
             </a>
           </li>

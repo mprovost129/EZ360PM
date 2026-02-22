@@ -277,6 +277,8 @@
 - Keep Django superuser for break-glass only (rare use).
 - Day-to-day operations should use staff users (is_staff) + Ops Console + Support Mode.
 - Support Mode is the sanctioned way to access/inspect tenant data; all support actions should be audit-logged.
+- Support Mode entry requires a human reason and must expire automatically (time-limited).
+- Stripe mutations from Ops Console must be queued + auditable + idempotent (explicit intent record, approval, then execution).
 
 
 ## Stripe Subscription Resync (Staff-only)
@@ -1208,3 +1210,53 @@ Legal and help pages must be treated as production routes. Missing-template regr
 ## Phase 9 — Manual QA is the Launch Gate
 - Launch readiness is proven by executing the Manual QA Checklist on staging and production.
 - Optional seed data exists for local verification only; staging/prod should be tested with realistic data.
+
+## Ops Center safety controls
+
+- High-impact ops actions (tenant suspend/reactivate, force logout, Stripe subscription mutations) must require a **typed confirmation** to reduce operator error.
+- Optional governance: the platform can enforce **2FA for critical ops actions** via `SiteConfig.ops_require_2fa_for_critical_actions`.
+- Optional governance: enable **two-person approval** for Stripe ops actions via `SiteConfig.ops_two_person_approval_enabled` (requester cannot approve/run).
+- Support mode must be visibly indicated across the app while active, including clear company context and a one-click exit.
+
+## 2026-02-21 — Stripe authority + daily revenue snapshots
+
+- **Stripe is the billing authority** for subscription state and pricing truth.
+- EZ360PM maintains a **mirrored subscription projection** (`billing.CompanySubscription`) updated via webhooks / ops actions.
+- Platform revenue analytics is sourced from **daily snapshots** (`ops.PlatformRevenueSnapshot`) computed from the mirrored table.
+- Snapshot values are stored as **integer cents** (no floats) and are treated as the historical record for ops reporting.
+- Stripe API should be used for **reconciliation / mutation**, not for routine daily full-table reporting.
+
+## 2026-02-21 — Webhook-derived lifecycle + mirror freshness
+
+- Subscription lifecycle analytics (trial started/converted, subscription started/canceled/reactivated) are derived from **Stripe webhooks** by comparing the previous mirrored state to the newly-synced state.
+- We persist a `CompanySubscription.last_stripe_event_at` timestamp from Stripe event `created` times to measure **mirror freshness**.
+- Ops must be alerted when the mirror appears stale (default 48h) for ACTIVE/TRIALING/PAST_DUE tenants; this is an early signal of webhook delivery/config issues.
+- Staleness window and alert level are controlled by SiteConfig (`stripe_mirror_stale_after_hours`, `stripe_mirror_stale_alert_level`) so operators can tune sensitivity without redeploying.
+
+
+## Ops RBAC (Separation of Duties)
+
+- Stripe remains billing authority; Ops Center is the control surface.
+- Ops Center access is role-based via `ops.OpsRoleAssignment` (viewer/support/finance/superops).
+- Superusers bypass RBAC checks; otherwise roles must be explicitly granted.
+- Critical actions are gated by role + typed confirmation + optional 2FA enforcement (SiteConfig).
+
+## Ops Center — Tenant risk scoring configuration
+
+- **Risk scoring is triage-only** (ops UX), not billing authority.
+- Risk scores are stored daily as `ops.CompanyRiskSnapshot` for trend visibility and incident review.
+- Risk weights/thresholds/windows are **DB-backed (SiteConfig)** and editable in Ops UI.
+- All risk scores are clamped to 0–100; high/medium thresholds must remain ordered (high > medium).
+
+
+## 2026-02-21 — Ops Center Pack 16
+- Ops directory presets are per-operator (scoped to staff user) with optional global presets reserved for future SuperOps tooling.
+- Tenant risk scoring must be explainable: Company 360 shows a breakdown of signals + points.
+
+## 2026-02-22 — Ops Center as control plane; tenant navigation via Support Mode
+
+- Ops Center is the **control plane**; tenant data operations are performed in the main app UI.
+- Any ops deep-link into the tenant workspace must be **Support Mode scoped** to a specific company:
+  - Support Mode must be active for that company.
+  - The jump sets the active company in-session, then redirects to the destination.
+  - The jump is logged as an Ops action for auditability.

@@ -1,25 +1,12 @@
-{% extends "base_app.html" %}
-{% block title %}Site settings · EZ360PM{% endblock %}
+{% extends "ops/_base.html" %}
+{% block title %}Site settings · Ops · EZ360PM{% endblock %}
 
-{% block content %}
-<div class="container-fluid" style="max-width: 980px;">
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-    <div>
-      <h1 class="h4 mb-1">Site settings</h1>
-      <div class="text-secondary small">Platform-level configuration managed inside EZ360PM (no Django admin).</div>
-    </div>
-    <div class="d-flex gap-2">
-      <a class="btn btn-outline-dark" href="{% url 'ops:settings_home' %}">Back to settings</a>
-      <a class="btn btn-outline-dark" href="{% url 'ops:dashboard' %}">Back to Ops</a>
-    </div>
-  </div>
+{% block ops_title %}Site settings{% endblock %}
+{% block ops_subtitle %}<div class="ez-ops-muted small">Branding, email, storage, and platform defaults.</div>{% endblock %}
+{% block ops_actions %}<a class="btn btn-outline-dark ez-ops-btn" href="{% url 'ops:settings_home' %}"><i class="bi bi-arrow-left me-1"></i>Settings</a>{% endblock %}
 
-  <form method="post" class="card shadow-sm">
-    {% csrf_token %}
-    <div class="card-body">
-
-      <h2 class="h6">Maintenance mode</h2>
-      <div class="row g-2 align-items-end">
+{% block ops_content %}
+<div class="row g-2 align-items-end">
         <div class="col-12">
           <div class="form-check">
             {{ form.maintenance_mode_enabled }}
@@ -50,6 +37,94 @@
       </div>
 
       <hr class="my-4">
+
+      <h2 class="h6">Stripe mirror health</h2>
+      <div class="text-secondary small mb-2">Controls drift detection for Stripe webhooks/subscription projection.</div>
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-4">
+          <label class="form-label">Stale after (hours)</label>
+          {{ form.stripe_mirror_stale_after_hours }}
+          <div class="text-secondary small mt-1">If no Stripe event updates a subscription within this window, we raise an ops alert.</div>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">Alert level</label>
+          {{ form.stripe_mirror_stale_alert_level }}
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <h2 class="h6">Tenant risk scoring</h2>
+      <div class="text-secondary small mb-2">Controls the risk score shown in the Companies directory (0–100). Use this to tune triage sensitivity.</div>
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-4">
+          <label class="form-label">Payment failure window (days)</label>
+          {{ form.risk_payment_failed_window_days }}
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">Trial ending soon window (days)</label>
+          {{ form.risk_trial_ends_within_days }}
+        </div>
+      </div>
+
+      <div class="row g-2 align-items-end mt-1">
+        <div class="col-12 col-md-3">
+          <label class="form-label">Past due weight</label>
+          {{ form.risk_weight_past_due }}
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label">Mirror stale weight</label>
+          {{ form.risk_weight_mirror_stale }}
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label">Payment failed weight</label>
+          {{ form.risk_weight_payment_failed }}
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label">Payment failed (sub-only) weight</label>
+          {{ form.risk_weight_payment_failed_sub_only }}
+        </div>
+      </div>
+
+      <div class="row g-2 align-items-end mt-1">
+        <div class="col-12 col-md-3">
+          <label class="form-label">Canceling weight</label>
+          {{ form.risk_weight_canceling }}
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label">Trial ending soon weight</label>
+          {{ form.risk_weight_trial_ends_soon }}
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label">Medium threshold</label>
+          {{ form.risk_level_medium_threshold }}
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label">High threshold</label>
+          {{ form.risk_level_high_threshold }}
+        </div>
+      </div>
+
+<hr class="my-4">
+
+      <h2 class="h6">Ops governance</h2>
+      <div class="text-secondary small mb-2">Operator safety controls for high-impact actions.</div>
+      <div class="row g-2 align-items-end">
+        <div class="col-12">
+          <div class="form-check">
+            {{ form.ops_require_2fa_for_critical_actions }}
+            <label class="form-check-label" for="{{ form.ops_require_2fa_for_critical_actions.id_for_label }}">Require 2FA for critical ops actions</label>
+          </div>
+          <div class="text-secondary small mt-1">When enabled, suspend/reactivate/force logout and Stripe billing actions require a valid 2FA session.</div>
+        </div>
+        <div class="col-12 mt-2">
+          <div class="form-check">
+            {{ form.ops_two_person_approval_enabled }}
+            <label class="form-check-label" for="{{ form.ops_two_person_approval_enabled.id_for_label }}">Enable two-person approval for Stripe ops actions</label>
+          </div>
+          <div class="text-secondary small mt-1">When enabled, the requester cannot approve or run their own Stripe action. Use this to enforce separation of duties.</div>
+        </div>
+      </div>
 
       <h2 class="h6">Owner notifications</h2>
       <div class="text-secondary small mb-2">High-signal lifecycle emails for the platform operator (separate from Ops Alerts).</div>

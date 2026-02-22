@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.urls import include, path
+from ezadmin.sites import ops_admin_site, customers_admin_site
 from django.conf import settings
 from django.conf.urls.static import static
 
@@ -38,7 +39,11 @@ urlpatterns = [
     path("", include("accounting.urls")),
 
     path("ops/", include("ops.urls")),
-    # Django admin
+    # Admin portals
+    path("ops-admin/", ops_admin_site.urls),
+    path("customers-admin/", customers_admin_site.urls),
+
+    # Legacy Django admin (keep for now; we can remove once Ops/Customers admin is complete)
     path("admin/", admin.site.urls),
 
     # API auth (JWT)

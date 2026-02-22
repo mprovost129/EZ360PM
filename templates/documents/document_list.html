@@ -11,11 +11,110 @@
   </div>
 
   {% if is_manager %}
-    <a class="btn btn-ez" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_wizard' %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_wizard' %}{% else %}{% url 'documents:proposal_wizard' %}{% endif %}">
-      <i class="bi bi-plus-lg me-1"></i>New {{ doc_label }}
-    </a>
+    {% if doc_type == 'invoice' %}{% url 'documents:invoice_wizard' as wizard_url %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_wizard' as wizard_url %}{% else %}{% url 'documents:proposal_wizard' as wizard_url %}{% endif %}
+
+    <div class="dropdown">
+      <button class="btn btn-ez dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="bi bi-plus-lg me-1"></i>New {{ doc_label }}
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li>
+          <button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#ezNewFromTemplateModal">
+            <i class="bi bi-file-earmark-text me-2"></i>New {{ doc_label }} from template…
+          </button>
+        </li>
+        <li>
+          <form method="post" action="{{ wizard_url }}" class="m-0">
+            {% csrf_token %}
+            <input type="hidden" name="mode" value="new">
+            <button class="dropdown-item" type="submit">
+              <i class="bi bi-file-earmark-plus me-2"></i>New {{ doc_label }} blank
+            </button>
+          </form>
+        </li>
+        <li>
+          <button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#ezCopyFromRecentModal">
+            <i class="bi bi-copy me-2"></i>Copy from recent…
+          </button>
+        </li>
+      </ul>
+    </div>
   {% endif %}
 </div>
+
+{% if is_manager %}
+  {# New from template modal #}
+  <div class="modal fade" id="ezNewFromTemplateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">New {{ doc_label }} from template</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form method="post" action="{{ wizard_url }}">
+          <div class="modal-body">
+            {% csrf_token %}
+            <input type="hidden" name="mode" value="new">
+            <label class="form-label">Template</label>
+            <select class="form-select" name="template" {% if not templates %}disabled{% endif %}>
+              {% if templates %}
+                {% for t in templates %}
+                  <option value="{{ t.pk }}">{{ t.name }}</option>
+                {% endfor %}
+              {% else %}
+                <option value="">No templates yet</option>
+              {% endif %}
+            </select>
+            {% if not templates %}
+              <div class="text-secondary small mt-2">Create templates in Document settings first.</div>
+            {% endif %}
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-ez" {% if not templates %}disabled{% endif %}>Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {# Copy from recent modal #}
+  <div class="modal fade" id="ezCopyFromRecentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Copy recent {{ doc_label|lower }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form method="post" action="{{ wizard_url }}">
+          <div class="modal-body">
+            {% csrf_token %}
+            <input type="hidden" name="mode" value="copy">
+            <label class="form-label">Recent</label>
+            <select class="form-select" name="copy_from" {% if not recent_docs %}disabled{% endif %}>
+              {% if recent_docs %}
+                {% for d in recent_docs %}
+                  <option value="{{ d.pk }}">
+                    {% if d.number %}{{ d.number }}{% else %}(draft){% endif %}
+                    · {{ d.title|default:doc_label }}
+                    {% if d.client %}· {{ d.client.display_name }}{% endif %}
+                  </option>
+                {% endfor %}
+              {% else %}
+                <option value="">No recent {{ doc_label|lower }}s yet</option>
+              {% endif %}
+            </select>
+            <div class="text-secondary small mt-2">Copies line items but clears client, project, and number.</div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-ez" {% if not recent_docs %}disabled{% endif %}>Create copy</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endif %}
 
 <form class="card card-body mb-3" method="get">
   <div class="row g-2 align-items-end">
@@ -113,9 +212,24 @@
             <td colspan="6">
               {% include "includes/empty_state.html" with title="No documents yet" subtitle="Create your first document to start billing and tracking A/R." %}
               <div class="text-center pb-4">
-                <a class="btn btn-sm btn-ez" href="{% if doc_type == 'invoice' %}{% url 'documents:invoice_wizard' %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_wizard' %}{% else %}{% url 'documents:proposal_wizard' %}{% endif %}">
-                  <i class="bi bi-plus-lg me-1"></i>New {{ doc_label|lower }}
-                </a>
+                {% if is_manager %}
+                  {% if doc_type == 'invoice' %}{% url 'documents:invoice_wizard' as wizard_url %}{% elif doc_type == 'estimate' %}{% url 'documents:estimate_wizard' as wizard_url %}{% else %}{% url 'documents:proposal_wizard' as wizard_url %}{% endif %}
+                  <div class="d-inline-flex flex-wrap gap-2 justify-content-center">
+                    <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="modal" data-bs-target="#ezNewFromTemplateModal">
+                      <i class="bi bi-file-earmark-text me-1"></i>From template
+                    </button>
+                    <form method="post" action="{{ wizard_url }}" class="m-0">
+                      {% csrf_token %}
+                      <input type="hidden" name="mode" value="new">
+                      <button class="btn btn-sm btn-ez" type="submit">
+                        <i class="bi bi-plus-lg me-1"></i>New blank
+                      </button>
+                    </form>
+                    <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="modal" data-bs-target="#ezCopyFromRecentModal">
+                      <i class="bi bi-copy me-1"></i>Copy recent
+                    </button>
+                  </div>
+                {% endif %}
               </div>
             </td>
           </tr>

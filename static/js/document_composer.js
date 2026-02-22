@@ -62,6 +62,70 @@ Server remains the source of truth on save.
 
     var catalogJsonBase = root.getAttribute('data-catalog-json-base') || '';
 
+    // ------------------------------------------------------------
+    // Lightweight select search (no dependencies)
+    // - Keeps native <select> for IDs
+    // - Filters options as the user types
+    // ------------------------------------------------------------
+    function wireSelectFilter(inputEl) {
+      if (!inputEl) return;
+      var selectId = inputEl.getAttribute('data-ez-select-filter') || '';
+      if (!selectId) return;
+      var selectEl = document.getElementById(selectId);
+      if (!selectEl || selectEl.tagName !== 'SELECT') return;
+
+      // Snapshot original options once.
+      var original = [];
+      for (var i = 0; i < selectEl.options.length; i++) {
+        var opt = selectEl.options[i];
+        original.push({
+          value: opt.value,
+          text: opt.text,
+          disabled: opt.disabled,
+          selected: opt.selected
+        });
+      }
+
+      function render(filterText) {
+        var ft = String(filterText || '').trim().toLowerCase();
+        var current = selectEl.value;
+
+        // Clear
+        while (selectEl.options.length) {
+          selectEl.remove(0);
+        }
+
+        // Rebuild
+        original.forEach(function (o) {
+          if (o.value === '' || !ft || o.text.toLowerCase().indexOf(ft) !== -1) {
+            var opt = document.createElement('option');
+            opt.value = o.value;
+            opt.text = o.text;
+            opt.disabled = !!o.disabled;
+            selectEl.add(opt);
+          }
+        });
+
+        // Restore selection if still present
+        try {
+          selectEl.value = current;
+        } catch (e) {}
+      }
+
+      inputEl.addEventListener('input', function () {
+        render(inputEl.value);
+      });
+
+      // If the user focuses and types quickly, start from full list.
+      inputEl.addEventListener('focus', function () {
+        if (!String(inputEl.value || '').trim()) {
+          render('');
+        }
+      });
+    }
+
+    qsa('input[data-ez-select-filter]', root).forEach(wireSelectFilter);
+
     function refreshSortOrders() {
       var i = 1;
       qsa('tr[data-ez-line="1"]', tbody).forEach(function (row) {

@@ -60,6 +60,59 @@
           </div>
         </div>
 
+        <hr class="my-4">
+
+        <div class="mb-2">
+          <div class="fw-semibold">Document numbering</div>
+          <div class="text-secondary small">
+            Company-wide numbering patterns and counters. Patterns support: <code>{YY}</code>, <code>{YYYY}</code>, <code>{MM}</code>, <code>{DD}</code>, <code>{SEQ:3}</code>.
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12"><div class="fw-semibold">Invoices</div></div>
+          <div class="col-md-7">
+            <label class="form-label">Invoice pattern</label>
+            {{ scheme_form.invoice_pattern }}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Reset</label>
+            {{ scheme_form.invoice_reset }}
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Next #</label>
+            {{ scheme_form.invoice_seq }}
+          </div>
+
+          <div class="col-12"><div class="fw-semibold mt-2">Estimates</div></div>
+          <div class="col-md-7">
+            <label class="form-label">Estimate pattern</label>
+            {{ scheme_form.estimate_pattern }}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Reset</label>
+            {{ scheme_form.estimate_reset }}
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Next #</label>
+            {{ scheme_form.estimate_seq }}
+          </div>
+
+          <div class="col-12"><div class="fw-semibold mt-2">Proposals</div></div>
+          <div class="col-md-7">
+            <label class="form-label">Proposal pattern</label>
+            {{ scheme_form.proposal_pattern }}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Reset</label>
+            {{ scheme_form.proposal_reset }}
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Next #</label>
+            {{ scheme_form.proposal_seq }}
+          </div>
+        </div>
+
         <div class="d-flex justify-content-end gap-2 mt-4">
           <a class="btn btn-outline-secondary" href="{% url 'core:app_dashboard' %}">Back</a>
           {% if can_edit %}

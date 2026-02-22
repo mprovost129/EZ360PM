@@ -1,0 +1,77 @@
+{% extends "admin/index.html" %}
+
+{#
+  Custom admin index that groups registered apps into curated sections.
+  Each app dict is tagged with `section` by our AdminSite.get_app_list().
+#}
+
+{% block content %}
+  <div id="content-main">
+
+    {% if ezadmin_mode == 'customers' and ezadmin_selected_company %}
+      <div class="module" style="margin-bottom: 1.25rem;">
+        <h2 style="margin-bottom:.25rem;">Selected Company</h2>
+        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:.75rem; padding:.5rem .75rem;">
+          <div style="font-weight:700;">{{ ezadmin_selected_company.name }}</div>
+          <div style="opacity:.75;">Tenant-scoped admin</div>
+        </div>
+
+        {% if ezadmin_quick_links %}
+          <div style="padding: .25rem .75rem .75rem .75rem; display:flex; flex-wrap:wrap; gap:.5rem;">
+            {% for l in ezadmin_quick_links %}
+              <a class="button" href="{{ l.url }}" style="padding:.25rem .6rem;">{{ l.label }}</a>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if ezadmin_mode == 'customers' and not ezadmin_selected_company_id %}
+      <div class="messagelist">
+        <div class="warning">Select a company to view tenant-scoped data.</div>
+      </div>
+    {% endif %}
+
+    {% for section in ezadmin_sections %}
+      {% with section_key=section.key %}
+        <div class="module" style="margin-bottom: 1.25rem;">
+          <h2 style="margin-bottom:.25rem;">{{ section.title }}</h2>
+
+          {% with apps_in_section=app_list|dictsort:"name" %}
+            {% for app in app_list %}
+              {% if app.section == section_key %}
+                <table>
+                  <caption>
+                    <a href="{{ app.app_url }}" class="section" title="Models in the {{ app.name }} application">{{ app.name }}</a>
+                  </caption>
+                  {% for model in app.models %}
+                    <tr class="model-{{ model.object_name|lower }}">
+                      <th scope="row">
+                        {% if model.admin_url %}
+                          <a href="{{ model.admin_url }}">{{ model.name }}</a>
+                        {% else %}
+                          {{ model.name }}
+                        {% endif %}
+                      </th>
+                      <td>
+                        {% if model.add_url %}
+                          <a href="{{ model.add_url }}" class="addlink">Add</a>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if model.admin_url and model.view_only %}
+                          <a href="{{ model.admin_url }}" class="viewlink">View</a>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </table>
+              {% endif %}
+            {% endfor %}
+          {% endwith %}
+        </div>
+      {% endwith %}
+    {% endfor %}
+
+  </div>
+{% endblock %}

@@ -1,5 +1,37 @@
 ## 2026-02-18 — Phase 9 (P9-DASH-FOCUS-LISTS) — Dashboard Focus Lists + KPI Period Filter (DONE)
 
+## 2026-02-21 — Admin experience overhaul (IN PROGRESS)
+
+Goal: Replace reliance on raw Django Admin with an **EZ360PM-branded control panel** that cleanly separates:
+- **Platform / Ops / Site config** (EZ360PM Settings)
+- **Tenant-scoped customer data** with a **Company selector** (EZ360PM Customers)
+
+Planned rollout:
+1) Stand up two AdminSite portals + branding + sectioned index (DONE)
+2) Add Company switcher + queryset scoping for company-owned models (DONE baseline)
+3) Tighten registrations: only platform models in Ops admin; only tenant-scoped models in Customers admin (NEXT)
+4) Add per-company “jump navigation” (quick links) and stronger guardrails (permissions + FK limiting edge cases) (NEXT)
+5) Remove legacy `/admin/` once parity is reached (LATER)
+
+## 2026-02-21 — Ops Center (Executive SaaS Ops) — Packs 1–5 (DONE FOUNDATION)
+
+Goal: Build a **professional, executive-grade SaaS operations center** under `/ops/` for platform control.
+
+Done (foundation):
+- Pack 1: Light executive shell + KPI overview layout.
+- Pack 2: Companies directory + Company 360 panel + support mode entry/exit.
+- Pack 3: Suspension controls + force logout + ops action audit trail.
+- Pack 4: Stripe action queue (approve/run/cancel) + Support Mode reason guardrails.
+- Pack 5: Global Support Mode banner across app pages + support cap alignment.
+
+Done (hardening + polish):
+- Pack 6: Typed confirmations for high-impact ops actions + enhanced global Support Mode banner.
+- Pack 7: Ops Companies segments + CSV export + critical bugfix.
+
+Next (candidate Pack 8):
+- Operational reports: churn, trial conversion, payment failures, webhook error rate.
+- Saved filter presets stored per-operator (wire `OpsCompanyViewPreset` into UI).
+
 ## 2026-02-19 — DONE: UI Layer Consistency (CSS)
 
 Applied an app-wide CSS layer consistency pass (navbar/sidebar/cards/inputs) without altering the active sidebar menu item color.
@@ -1350,3 +1382,140 @@ We are entering **Phase 9** with a strict **feature-by-feature QA + fix loop**.
   - Added Notes module (`notes` app) and `/notes/` page for call/intake capture.
   - Moved active company display under the sidebar company dropdown.
   - Dashboard header now shows user name + role.
+
+
+### DONE — 2026-02-21
+- **P9-OPS-CENTER-PACK3:** Ops Center company controls + audit trail.
+  - Added tenant suspension fields + middleware + suspended landing page.
+  - Added force-logout control (User.force_logout_at + middleware + auth_time session marker).
+  - Ops company detail: tabbed executive console (Overview/Billing/Users/Activity/Ops audit).
+  - Added OpsActionLog for platform-level staff action logging.Added OpsActionLog for platform-level staff action logging.
+
+- **P9-OPS-CENTER-PACK4:** Billing Control queue (Stripe action approvals + run) + Support Mode guardrails.
+  - Queued Stripe action model + UI (approve/run/cancel) and company billing control panel.
+  - Support mode now requires reason + presets + duration clamp.
+
+- **P9-OPS-CENTER-PACK6:** Safety confirmations + support banner polish.
+  - Typed confirmations for high-impact ops actions (suspend/reactivate/force logout + Stripe approve/run).
+  - Support-mode banner shows company name and links to Company 360.
+
+
+## 2026-02-21 — Ops Center Pack 8 (DONE)
+
+- Added `/ops/reports/` operational reports page (MRR/ARR, churn, trials, webhook health, payment failures, alerts).
+
+## 2026-02-21 — Ops Center Pack 10 (DONE)
+
+- Added **Stripe-authoritative daily revenue snapshots**:
+  - `ops.PlatformRevenueSnapshot` + daily command `ez360_snapshot_platform_revenue`.
+  - `ops.CompanyLifecycleEvent` foundation for accurate churn/conversion analytics.
+- Updated `/ops/reports/` to consume snapshots + begin lifecycle-based growth metrics.
+## 2026-02-21 — Ops Center Pack 11 (DONE)
+
+- Wired **subscription lifecycle events** from Stripe webhooks (best-effort):
+  - Trial started / converted
+  - Subscription started / canceled / reactivated
+- Added `billing.CompanySubscription.last_stripe_event_at` as a webhook freshness marker.
+- Added mirror drift alerting:
+  - `ez360_stripe_desync_scan` command (default 48h)
+  - Daily revenue snapshot command now emits WARN alerts if mirror is stale.
+
+## 2026-02-21 — Ops Center Pack 12 (DONE)
+
+- SiteConfig now controls Stripe mirror drift:
+  - `stripe_mirror_stale_after_hours`
+  - `stripe_mirror_stale_alert_level`
+- SiteConfig can enforce 2FA for critical ops actions (`ops_require_2fa_for_critical_actions`).
+- Ops Reports includes a new Stripe health panel (last webhook + drift examples).
+- Critical ops actions (suspend/reactivate, force logout, Stripe action approve/run/cancel) are blocked if 2FA enforcement is enabled and the session is not 2FA-verified.
+
+### Next
+
+- Ops Reports: add lifecycle charts (trials → conversions, churn, reactivations) using `CompanyLifecycleEvent`.
+- Ops Reports: add lightweight visualizations (sparklines) for MRR and lifecycle funnels.
+- Ops Billing: add “reconcile now” action to force a subscription sync from Stripe for a single company.
+- Ops Governance: consider 4-eyes approval for company suspension (optional) once early customers arrive.
+
+
+### Pack 13 — Ops RBAC + governance (DONE)
+- Ops role assignments + Access UI
+- Role gates for critical actions
+- Fix missing auth decorator on company detail
+
+### Pack 14 — Lifecycle funnel + Webhook Health + Tenant Risk (DONE)
+- Ops Reports: upgraded lifecycle funnel (30d) with conversion/churn rates, reactivations, net growth, and a “recent lifecycle events” feed (CompanyLifecycleEvent-backed).
+- Ops Webhook Health page: new `/ops/webhooks/` dashboard with delivery totals, last event, top event types, and recent handler failures, plus Stripe mirror drift panel.
+- Companies grid: added per-tenant risk score (0–100) with flags (past_due, mirror_stale, payment_failed_14d, canceling, trial_ends_7d, suspended) for fast triage.
+
+### Next (Pack 15)
+- Add configurable risk scoring weights + thresholds to SiteConfig (operator-tunable).
+- Add “webhook stale” alert thresholds and a daily webhook health snapshot.
+- Add basic lifecycle charts (weekly buckets) and MRR sparkline rendering (server-side).
+
+## 2026-02-21 — Ops Center Pack 15 (DONE)
+
+- Tunable tenant risk scoring via SiteConfig + Ops UI.
+
+
+## 2026-02-21 — Ops Center Pack 16
+- DONE: Pack 16 — Risk drill-down on Company 360 + per-operator saved Company presets.
+
+## 2026-02-22 — Ops Center Pack 17
+- DONE: Preset management UI (rename, activate/deactivate, set default, delete).
+- DONE: Daily Company Risk Snapshots + 30-day risk trend table on Company 360.
+- DONE: Two-person approval toggle for Stripe ops actions (requester cannot approve/run).
+
+## 2026-02-22 — Ops Center Pack 18C (DONE)
+
+- DONE: Executive-grade Ops Center branding (light) and **sectioned navigation layout**.
+- DONE: Left sidebar navigation grouped into operational domains (Dashboard / Tenants / Billing Ops / Security Ops / System Settings), with responsive mobile fallback.
+- DONE: Ops shell status strip (environment, Stripe mode, open alerts, support mode) for “console” visibility.
+
+- [x] Pack 18C3: Ops header Tools dropdown + on-demand snapshot/desync scan actions (operator console polish)
+- [x] Pack 18C4: Expand Ops Tools (readiness/smoke/backup quick actions) + recent ops actions mini-feed; fix ops_launch_checks bug
+
+## 2026-02-22 — Ops Center Pack 19 (DONE)
+
+- [x] Add **Ops → Activity** (`/ops/activity/`) as a unified executive audit feed:
+  - Ops actions (filterable + CSV export)
+  - Checks evidence (filterable)
+- [x] Add Activity to sidebar and Ops Tools quick links.
+- [x] Fix dropdown URL to use `ops:webhook_health`.
+
+## 2026-02-22 — Ops Center Pack 20 (DONE)
+
+- [x] Add **Company workspace** card on Company 360 with deep links into tenant UI (Dashboard/Clients/Projects/Invoices/Payments/Time).
+- [x] Enforce **Support Mode scoping** for tenant workspace navigation (must be active for the target company).
+- [x] Add `/ops/companies/<uuid>/jump/<dest>/` to set active company + redirect + log `ops.company_jump`.
+- [x] Extend Ops Activity feed to include **Stripe actions** (OpsStripeAction) + filter/search.
+- [x] Extend Activity CSV export to support **Stripe actions** when tab=stripe.
+
+### Next (Ops polish)
+- [ ] Add a persistent **Support Mode banner** in tenant UI (outside Ops) showing "Viewing as Support" + company name + expiry + exit button.
+- [ ] Add dedicated **Stripe action detail** view from Activity list (drill-down to payload + resolution).
+
+## 2026-02-22 — Pack 21 (DONE) — Executive Hardening: Monitoring & Observability
+
+- [x] Production-grade **/health/** endpoint with DB/cache/S3/Stripe checks (structured JSON + ok/degraded/error + 200/503).
+- [x] Token-protected **/health/details/** endpoint (requires `HEALTHCHECK_TOKEN`) with per-component error summaries.
+- [x] Email delivery observability:
+  - [x] `OutboundEmailLog` model + migration
+  - [x] logging wired into `core.email_utils.send_templated_email()`
+  - [x] Ops → Email health dashboard (`/ops/email/`)
+- [x] Ops top strip upgraded with executive telemetry (Webhooks / Email / Snapshot / Mirror drift).
+- [x] Sentry hardening:
+  - [x] Sentry context middleware (user + company)
+  - [x] Ops Reports Sentry panel + optional dashboard link env var.
+- [x] Slow-request guardrail enabled (PerformanceLoggingMiddleware active with prod defaults).
+
+## Pack 22 (DONE) — Backup & Recovery Gate
+
+- [x] Automated daily DB backup verification (`ez360_verify_backups`) wired into `ez360_run_ops_checks_daily`.
+- [x] Backup integrity test (best-effort):
+  - local: verifies recorded path exists and is readable (gzip sniff)
+  - s3: `head_object` check for bucket/key + size consistency
+- [x] Restore drill command (`ez360_restore_drill`) prints operator checklist and can record PASS/FAIL evidence.
+- [x] Ops status strip now includes **Backup health** chip with last successful backup timestamp.
+- [x] Ops → Backups page includes automated verification panel + output.
+- [x] Backup verification failure creates an Ops Alert (no silent recoverability drift).
+

@@ -145,6 +145,25 @@ def app_context(request):
         **_timer_context(request, active_company, active_employee),
     }
 
+    # Staff-only: support mode banner + context (set via Ops Center).
+    try:
+        if request.user.is_staff:
+            ctx["support_mode"] = get_support_mode(request)
+
+            # Convenience: load company object for support-mode banner (safe, staff-only).
+            try:
+                if ctx["support_mode"] and ctx["support_mode"].is_active and ctx["support_mode"].company_id:
+                    from companies.models import Company
+                    ctx["support_mode_company"] = Company.objects.filter(pk=ctx["support_mode"].company_id).only("id", "name").first()
+                else:
+                    ctx["support_mode_company"] = None
+            except Exception:
+                ctx["support_mode_company"] = None
+        else:
+            ctx["support_mode"] = None
+    except Exception:
+        ctx["support_mode"] = None
+
     # Staff-only: quick “Report QA issue” link that pre-fills the QA form with the current URL.
     # This supports the Phase 8Y QA burn-down workflow without impacting non-staff UX.
     try:
